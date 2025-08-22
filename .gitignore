@@ -1,56 +1,9 @@
-# Build directories
-build_*/
-build/
-bin/
-*.app/
+# Only ignore system files that don't belong in version control
+.DS_Store
+Thumbs.db
 
-# CMake files
-CMakeCache.txt
-CMakeFiles/
-cmake_install.cmake
-Makefile
-
-# Qt generated files
-*_autogen/
-moc_*.cpp
-moc_*.h
-mocs_compilation.cpp
-ui_*.h
-qrc_*.cpp
-
-# Object files
-*.o
-*.obj
-*.exe
-*.dll
-*.dylib
-*.so
-
-# IDE files
+# IDE specific files
 .vscode/
 .vs/
 *.user
 *.pro.user
-
-# System files
-.DS_Store
-Thumbs.db
-
-# Deployment directories
-manual_deployment/
-
-# Log files
-*.log
-
-# Temporary files
-*.tmp
-*.temp
-
-# Qt source (too large for git)
-qt-everywhere-src-*
-
-# Backup files
-*.backup
-
-# Lock files
-.lock.*

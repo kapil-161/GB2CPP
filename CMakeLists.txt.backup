@@ -1,0 +1,74 @@
+cmake_minimum_required(VERSION 3.16)
+project(GB2_CPP VERSION 1.0.0 LANGUAGES CXX)
+
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+# Find required Qt6 components
+find_package(Qt6 REQUIRED COMPONENTS Core Widgets Charts)
+
+# Enable automatic processing of Qt MOC files
+set(CMAKE_AUTOMOC ON)
+set(CMAKE_AUTOUIC ON)
+set(CMAKE_AUTORCC ON)
+
+# Include directories
+include_directories(${CMAKE_SOURCE_DIR}/src)
+include_directories(${CMAKE_SOURCE_DIR}/include)
+
+# Source files
+set(SOURCES
+    src/main.cpp
+    src/MainWindow.cpp
+    src/StatusWidget.cpp
+    src/DataProcessor.cpp
+    src/PlotWidget.cpp
+    src/TableWidget.cpp
+    src/MetricsCalculator.cpp
+    src/MetricsTableWidget.cpp
+    src/MetricsDialog.cpp
+    src/PandasTableModel.cpp
+    src/DataTableWidget.cpp
+    src/CommandLineHandler.cpp
+    src/SingleInstanceApp.cpp
+    src/PlotSettingsDialog.cpp
+)
+
+# Header files
+set(HEADERS
+    include/MainWindow.h
+    include/StatusWidget.h
+    include/DataProcessor.h
+    include/PlotWidget.h
+    include/TableWidget.h
+    include/Config.h
+    include/MetricsCalculator.h
+    include/MetricsTableWidget.h
+    include/MetricsDialog.h
+    include/PandasTableModel.h
+    include/DataTableWidget.h
+    include/CommandLineHandler.h
+    include/SingleInstanceApp.h
+    include/PlotSettingsDialog.h
+)
+
+# Create executable
+add_executable(GB2 ${SOURCES} ${HEADERS})
+
+# Link Qt6 libraries
+target_link_libraries(GB2 Qt6::Core Qt6::Widgets Qt6::Charts)
+
+# Set output directory
+set_target_properties(GB2 PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
+)
+
+# Copy resources
+file(COPY ${CMAKE_SOURCE_DIR}/resources DESTINATION ${CMAKE_BINARY_DIR}/bin)
+
+# Platform-specific settings
+if(WIN32)
+    set_target_properties(GB2 PROPERTIES WIN32_EXECUTABLE TRUE)
+elseif(APPLE)
+    set_target_properties(GB2 PROPERTIES MACOSX_BUNDLE TRUE)
+endif()

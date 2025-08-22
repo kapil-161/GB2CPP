@@ -1,0 +1,740 @@
+INFO: [2025-08-22 14:03:41] Starting "GB2" version "2.0.0"
+INFO: [2025-08-22 14:03:41] Qt version: 6.9.1
+INFO: [2025-08-22 14:03:41] Platform: "cocoa"
+DEBUG: [2025-08-22 14:03:41] Loaded application icon: "/Applications/DSSAT48/Tools/GBTOOLS/GB2CPP/build_macos/bin/resources/final.ico"
+DEBUG: [2025-08-22 14:03:41] Widget creation status:
+DEBUG: [2025-08-22 14:03:41] m_fileComboBox: OK
+DEBUG: [2025-08-22 14:03:41] m_xVariableComboBox: OK
+DEBUG: [2025-08-22 14:03:41] m_yVariableComboBox: OK
+DEBUG: [2025-08-22 14:03:41] m_updatePlotButton: OK
+WARNING: [2025-08-22 14:03:41] Populating font family aliases took 131 ms. Replace uses of missing font family "Segoe UI" with one that exists to avoid this cost. 
+DEBUG: [2025-08-22 14:03:41] MainWindow: About to create PlotWidget
+DEBUG: [2025-08-22 14:03:41] PlotWidget::PlotWidget() - CONSTRUCTOR CALLED
+DEBUG: [2025-08-22 14:03:41] PlotWidget::PlotWidget() - setupChart() completed
+DEBUG: [2025-08-22 14:03:41] MainWindow: PlotWidget created successfully
+DEBUG: [2025-08-22 14:03:41] MainWindow: PlotWidget added to layout
+DEBUG: [2025-08-22 14:03:41] populateFiles: Looking for files in folder: "Alfalfa"
+DEBUG: [2025-08-22 14:03:41] prepareOutFiles: Checking if directory exists: "/Applications/DSSAT48/Alfalfa"
+DEBUG: [2025-08-22 14:03:41] prepareOutFiles: Directory exists, looking for files...
+DEBUG: [2025-08-22 14:03:41] prepareOutFiles: Found 32 total files: QList("Dormancy.OUT", "ET.OUT", "ETPhot.OUT", "Evaluate.OUT", "FORAGE.OUT", "GHG.OUT", "INFO.OUT", "Mulch.OUT", "N2O.OUT", "PlantC.OUT", "PlantGro.OUT", "PlantMob.OUT", "PlantN.OUT", "PlantNBal.OUT", "RunList.OUT", "SOMLITC.OUT", "SOMLITN.OUT", "SoilCBal.OUT", "SoilCBalSum.OUT", "SoilNBalSum.OUT", "SoilNi.OUT", "SoilNiBal.OUT", "SoilNoBal.OUT", "SoilOrg.OUT", "SoilTemp.OUT", "SoilWat.OUT", "SoilWatBal.OUT", "SoilWater.OUT", "Storage.OUT", "Summary.OUT", "WARNING.OUT", "Weather.OUT")
+DEBUG: [2025-08-22 14:03:41] isFilePlottable: "/Applications/DSSAT48/Alfalfa/Dormancy.OUT" -> hasDataTable: true hasTimeColumns: true dataRowCount: 5 isPlottable: true
+DEBUG: [2025-08-22 14:03:41] isFilePlottable: "/Applications/DSSAT48/Alfalfa/ET.OUT" -> hasDataTable: true hasTimeColumns: true dataRowCount: 5 isPlottable: true
+DEBUG: [2025-08-22 14:03:41] isFilePlottable: "/Applications/DSSAT48/Alfalfa/ETPhot.OUT" -> hasDataTable: true hasTimeColumns: true dataRowCount: 5 isPlottable: true
+DEBUG: [2025-08-22 14:03:41] prepareOutFiles: Filtering out non-plottable file: "Evaluate.OUT" ( "matches non-plottable pattern: evaluate" )
+DEBUG: [2025-08-22 14:03:41] isFilePlottable: "/Applications/DSSAT48/Alfalfa/FORAGE.OUT" -> hasDataTable: true hasTimeColumns: true dataRowCount: 5 isPlottable: true
+DEBUG: [2025-08-22 14:03:41] isFilePlottable: "/Applications/DSSAT48/Alfalfa/GHG.OUT" -> hasDataTable: true hasTimeColumns: true dataRowCount: 5 isPlottable: true
+DEBUG: [2025-08-22 14:03:41] isFilePlottable: "/Applications/DSSAT48/Alfalfa/INFO.OUT" -> hasDataTable: false hasTimeColumns: false dataRowCount: 0 isPlottable: false
+DEBUG: [2025-08-22 14:03:41] prepareOutFiles: Filtering out non-plottable file: "INFO.OUT" ( "lacks time-series structure" )
+DEBUG: [2025-08-22 14:03:41] isFilePlottable: "/Applications/DSSAT48/Alfalfa/Mulch.OUT" -> hasDataTable: true hasTimeColumns: true dataRowCount: 5 isPlottable: true
+DEBUG: [2025-08-22 14:03:41] isFilePlottable: "/Applications/DSSAT48/Alfalfa/N2O.OUT" -> hasDataTable: true hasTimeColumns: true dataRowCount: 5 isPlottable: true
+DEBUG: [2025-08-22 14:03:41] isFilePlottable: "/Applications/DSSAT48/Alfalfa/PlantC.OUT" -> hasDataTable: true hasTimeColumns: true dataRowCount: 5 isPlottable: true
+DEBUG: [2025-08-22 14:03:41] isFilePlottable: "/Applications/DSSAT48/Alfalfa/PlantGro.OUT" -> hasDataTable: true hasTimeColumns: true dataRowCount: 5 isPlottable: true
+DEBUG: [2025-08-22 14:03:41] isFilePlottable: "/Applications/DSSAT48/Alfalfa/PlantMob.OUT" -> hasDataTable: true hasTimeColumns: true dataRowCount: 5 isPlottable: true
+DEBUG: [2025-08-22 14:03:41] isFilePlottable: "/Applications/DSSAT48/Alfalfa/PlantN.OUT" -> hasDataTable: true hasTimeColumns: true dataRowCount: 5 isPlottable: true
+DEBUG: [2025-08-22 14:03:41] isFilePlottable: "/Applications/DSSAT48/Alfalfa/PlantNBal.OUT" -> hasDataTable: false hasTimeColumns: false dataRowCount: 0 isPlottable: false
+DEBUG: [2025-08-22 14:03:41] prepareOutFiles: Filtering out non-plottable file: "PlantNBal.OUT" ( "lacks time-series structure" )
+DEBUG: [2025-08-22 14:03:41] isFilePlottable: "/Applications/DSSAT48/Alfalfa/RunList.OUT" -> hasDataTable: false hasTimeColumns: false dataRowCount: 0 isPlottable: false
+DEBUG: [2025-08-22 14:03:41] prepareOutFiles: Filtering out non-plottable file: "RunList.OUT" ( "lacks time-series structure" )
+DEBUG: [2025-08-22 14:03:41] isFilePlottable: "/Applications/DSSAT48/Alfalfa/SOMLITC.OUT" -> hasDataTable: true hasTimeColumns: true dataRowCount: 5 isPlottable: true
+DEBUG: [2025-08-22 14:03:41] isFilePlottable: "/Applications/DSSAT48/Alfalfa/SOMLITN.OUT" -> hasDataTable: true hasTimeColumns: true dataRowCount: 5 isPlottable: true
+DEBUG: [2025-08-22 14:03:41] isFilePlottable: "/Applications/DSSAT48/Alfalfa/SoilCBal.OUT" -> hasDataTable: false hasTimeColumns: false dataRowCount: 0 isPlottable: false
+DEBUG: [2025-08-22 14:03:41] prepareOutFiles: Filtering out non-plottable file: "SoilCBal.OUT" ( "lacks time-series structure" )
+DEBUG: [2025-08-22 14:03:41] isFilePlottable: "/Applications/DSSAT48/Alfalfa/SoilCBalSum.OUT" -> hasDataTable: true hasTimeColumns: false dataRowCount: 6 isPlottable: false
+DEBUG: [2025-08-22 14:03:41] prepareOutFiles: Filtering out non-plottable file: "SoilCBalSum.OUT" ( "lacks time-series structure" )
+DEBUG: [2025-08-22 14:03:41] isFilePlottable: "/Applications/DSSAT48/Alfalfa/SoilNBalSum.OUT" -> hasDataTable: true hasTimeColumns: false dataRowCount: 6 isPlottable: false
+DEBUG: [2025-08-22 14:03:41] prepareOutFiles: Filtering out non-plottable file: "SoilNBalSum.OUT" ( "lacks time-series structure" )
+DEBUG: [2025-08-22 14:03:41] isFilePlottable: "/Applications/DSSAT48/Alfalfa/SoilNi.OUT" -> hasDataTable: true hasTimeColumns: true dataRowCount: 5 isPlottable: true
+DEBUG: [2025-08-22 14:03:41] isFilePlottable: "/Applications/DSSAT48/Alfalfa/SoilNiBal.OUT" -> hasDataTable: false hasTimeColumns: false dataRowCount: 0 isPlottable: false
+DEBUG: [2025-08-22 14:03:41] prepareOutFiles: Filtering out non-plottable file: "SoilNiBal.OUT" ( "lacks time-series structure" )
+DEBUG: [2025-08-22 14:03:41] isFilePlottable: "/Applications/DSSAT48/Alfalfa/SoilNoBal.OUT" -> hasDataTable: false hasTimeColumns: false dataRowCount: 0 isPlottable: false
+DEBUG: [2025-08-22 14:03:41] prepareOutFiles: Filtering out non-plottable file: "SoilNoBal.OUT" ( "lacks time-series structure" )
+DEBUG: [2025-08-22 14:03:41] isFilePlottable: "/Applications/DSSAT48/Alfalfa/SoilOrg.OUT" -> hasDataTable: true hasTimeColumns: true dataRowCount: 5 isPlottable: true
+DEBUG: [2025-08-22 14:03:41] isFilePlottable: "/Applications/DSSAT48/Alfalfa/SoilTemp.OUT" -> hasDataTable: true hasTimeColumns: true dataRowCount: 5 isPlottable: true
+DEBUG: [2025-08-22 14:03:41] isFilePlottable: "/Applications/DSSAT48/Alfalfa/SoilWat.OUT" -> hasDataTable: true hasTimeColumns: true dataRowCount: 5 isPlottable: true
+DEBUG: [2025-08-22 14:03:41] isFilePlottable: "/Applications/DSSAT48/Alfalfa/SoilWatBal.OUT" -> hasDataTable: false hasTimeColumns: false dataRowCount: 0 isPlottable: false
+DEBUG: [2025-08-22 14:03:41] prepareOutFiles: Filtering out non-plottable file: "SoilWatBal.OUT" ( "lacks time-series structure" )
+DEBUG: [2025-08-22 14:03:41] isFilePlottable: "/Applications/DSSAT48/Alfalfa/SoilWater.OUT" -> hasDataTable: true hasTimeColumns: true dataRowCount: 5 isPlottable: true
+DEBUG: [2025-08-22 14:03:41] isFilePlottable: "/Applications/DSSAT48/Alfalfa/Storage.OUT" -> hasDataTable: true hasTimeColumns: true dataRowCount: 5 isPlottable: true
+DEBUG: [2025-08-22 14:03:41] prepareOutFiles: Filtering out non-plottable file: "Summary.OUT" ( "matches non-plottable pattern: summary" )
+DEBUG: [2025-08-22 14:03:41] isFilePlottable: "/Applications/DSSAT48/Alfalfa/WARNING.OUT" -> hasDataTable: false hasTimeColumns: false dataRowCount: 0 isPlottable: false
+DEBUG: [2025-08-22 14:03:41] prepareOutFiles: Filtering out non-plottable file: "WARNING.OUT" ( "lacks time-series structure" )
+DEBUG: [2025-08-22 14:03:41] isFilePlottable: "/Applications/DSSAT48/Alfalfa/Weather.OUT" -> hasDataTable: true hasTimeColumns: true dataRowCount: 5 isPlottable: true
+DEBUG: [2025-08-22 14:03:41] prepareOutFiles: After filtering, found 20 plottable files: QList("Dormancy.OUT", "ET.OUT", "ETPhot.OUT", "FORAGE.OUT", "GHG.OUT", "Mulch.OUT", "N2O.OUT", "PlantC.OUT", "PlantGro.OUT", "PlantMob.OUT", "PlantN.OUT", "SOMLITC.OUT", "SOMLITN.OUT", "SoilNi.OUT", "SoilOrg.OUT", "SoilTemp.OUT", "SoilWat.OUT", "SoilWater.OUT", "Storage.OUT", "Weather.OUT")
+DEBUG: [2025-08-22 14:03:41] populateFiles: Found 20 files: QList("Dormancy.OUT", "ET.OUT", "ETPhot.OUT", "FORAGE.OUT", "GHG.OUT", "Mulch.OUT", "N2O.OUT", "PlantC.OUT", "PlantGro.OUT", "PlantMob.OUT", "PlantN.OUT", "SOMLITC.OUT", "SOMLITN.OUT", "SoilNi.OUT", "SoilOrg.OUT", "SoilTemp.OUT", "SoilWat.OUT", "SoilWater.OUT", "Storage.OUT", "Weather.OUT")
+DEBUG: [2025-08-22 14:03:41] DataProcessor::findOutfileCde() - DSSAT Base: "/Applications/DSSAT48"
+DEBUG: [2025-08-22 14:03:41] DataProcessor::findOutfileCde() - Looking for: "/Applications/DSSAT48/OUTPUT.CDE"
+DEBUG: [2025-08-22 14:03:41] DataProcessor::findOutfileCde() - Found OUTPUT.CDE at: "/Applications/DSSAT48/OUTPUT.CDE"
+DEBUG: [2025-08-22 14:03:41] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "Daily chemical applications output file"
+DEBUG: [2025-08-22 14:03:41] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "Daily soil-plant-atmosphere output file"
+DEBUG: [2025-08-22 14:03:41] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "Daily evapotranspiration output file"
+DEBUG: [2025-08-22 14:03:41] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "Daily flood water nitrogen output file"
+DEBUG: [2025-08-22 14:03:41] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "Daily flood management output file"
+DEBUG: [2025-08-22 14:03:41] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "Daily management operations output file"
+DEBUG: [2025-08-22 14:03:41] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "Daily pest and disease damage output file"
+DEBUG: [2025-08-22 14:03:41] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "Daily plant carbon output file"
+DEBUG: [2025-08-22 14:03:41] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "Daily plant growth output file"
+DEBUG: [2025-08-22 14:03:41] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "Daily plant nitrogen output file"
+DEBUG: [2025-08-22 14:03:41] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "Daily plant phosphorus output"
+DEBUG: [2025-08-22 14:03:41] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "soil dynamics output file (temp)"
+DEBUG: [2025-08-22 14:03:41] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "Daily inorganic soil"
+DEBUG: [2025-08-22 14:03:41] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "Daily soil carbon output file"
+DEBUG: [2025-08-22 14:03:41] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "Daily inorganic soil phosphorus output file"
+DEBUG: [2025-08-22 14:03:41] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "Daily inorganic soil potassium output file"
+DEBUG: [2025-08-22 14:03:41] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "Daily soil temperature output file"
+DEBUG: [2025-08-22 14:03:41] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "Daily soil water output file"
+DEBUG: [2025-08-22 14:03:41] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "Daily soil organic matter carbon output file OUTSOMC"
+DEBUG: [2025-08-22 14:03:41] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "Daily soil organic matter nitrogen output file OUTSOMN"
+DEBUG: [2025-08-22 14:03:41] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "Daily soil organic matter phosphorus output file OUTSOMP"
+DEBUG: [2025-08-22 14:03:41] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "Daily weather output file"
+DEBUG: [2025-08-22 14:03:41] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "output from EAAMOD high water table model"
+DEBUG: [2025-08-22 14:03:41] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "fresh fruit weight"
+DEBUG: [2025-08-22 14:03:41] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "surface mulch output file"
+DEBUG: [2025-08-22 14:03:41] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "sugarcane output PSTALK"
+DEBUG: [2025-08-22 14:03:41] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "sugarcane output CSP_SENES"
+DEBUG: [2025-08-22 14:03:41] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "sugarcane output CSP_PHOTO"
+DEBUG: [2025-08-22 14:03:41] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "sugarcane output CSP_GRO"
+DEBUG: [2025-08-22 14:03:41] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "sugarcane output OUTPHNL"
+DEBUG: [2025-08-22 14:03:41] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "sugarcane output OUTKG"
+DEBUG: [2025-08-22 14:03:41] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "(temporary) output file"
+DEBUG: [2025-08-22 14:03:41] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "gas emissions report"
+DEBUG: [2025-08-22 14:03:41] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "Soil N2O and"
+DEBUG: [2025-08-22 14:03:41] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "Methane emissions daily output file"
+DEBUG: [2025-08-22 14:03:41] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "potential - daily"
+DEBUG: [2025-08-22 14:03:41] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "Wheat and barley specific output file"
+DEBUG: [2025-08-22 14:03:41] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "Wheat and barley specific output file"
+DEBUG: [2025-08-22 14:03:41] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "potential - daily"
+DEBUG: [2025-08-22 14:03:41] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "daylength signal for stolon daily output"
+DEBUG: [2025-08-22 14:03:41] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "plant mobilization and refill of storage"
+DEBUG: [2025-08-22 14:03:41] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "storage organ characteristics daily output"
+DEBUG: [2025-08-22 14:03:41] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "soil water output file by layer"
+DEBUG: [2025-08-22 14:03:41] DataProcessor::getOutfileDescriptions() - Loaded: "CSV" = "plant growth output file in"
+DEBUG: [2025-08-22 14:03:41] DataProcessor::getOutfileDescriptions() - Loaded: "CSV" = "plant nitrogen output file in"
+DEBUG: [2025-08-22 14:03:41] DataProcessor::getOutfileDescriptions() - Loaded: "CSV" = "output file (simulated vs. measured)"
+DEBUG: [2025-08-22 14:03:41] DataProcessor::getOutfileDescriptions() - Loaded: "CSV" = "plant carbon output file in"
+DEBUG: [2025-08-22 14:03:41] DataProcessor::getOutfileDescriptions() - Loaded: "CSV" = "plant growth output file in"
+DEBUG: [2025-08-22 14:03:41] DataProcessor::getOutfileDescriptions() - Loaded: "CSV" = "plant growth output file in"
+DEBUG: [2025-08-22 14:03:41] DataProcessor::getOutfileDescriptions() - Loaded: "CSV" = "soil water output file in"
+DEBUG: [2025-08-22 14:03:41] DataProcessor::getOutfileDescriptions() - Loaded: "CSV" = "soil temperature output file in"
+DEBUG: [2025-08-22 14:03:41] DataProcessor::getOutfileDescriptions() - Loaded: "CSV" = "soil-plant-atmosphere output file in"
+DEBUG: [2025-08-22 14:03:41] DataProcessor::getOutfileDescriptions() - Loaded: "CSV" = "inorganic soil N output file in"
+DEBUG: [2025-08-22 14:03:41] DataProcessor::getOutfileDescriptions() - Loaded: "CSV" = "weather output file in"
+DEBUG: [2025-08-22 14:03:41] DataProcessor::getOutfileDescriptions() - Loaded: "CSV" = "soil carbon output file in"
+DEBUG: [2025-08-22 14:03:41] DataProcessor::getOutfileDescriptions() - Loaded: "CSV" = "evapotranspiration output file in"
+DEBUG: [2025-08-22 14:03:41] DataProcessor::getOutfileDescriptions() - Loaded: "CSV" = "surface mulch output file in"
+DEBUG: [2025-08-22 14:03:41] DataProcessor::getOutfileDescriptions() - Loaded: "CSV" = "plant phosphorus output in"
+DEBUG: [2025-08-22 14:03:41] DataProcessor::getOutfileDescriptions() - Loaded: "CSV" = "inorganic soil phosphorus output file,"
+DEBUG: [2025-08-22 14:03:41] DataProcessor::getOutfileDescriptions() - Loaded: "CSV" = "N2O output file,"
+DEBUG: [2025-08-22 14:03:41] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "Environmental modifications output file"
+DEBUG: [2025-08-22 14:03:41] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "Evaluation output file (simulated vs. measured)"
+DEBUG: [2025-08-22 14:03:41] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "Management event output file"
+DEBUG: [2025-08-22 14:03:41] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "Operations summary output file"
+DEBUG: [2025-08-22 14:03:41] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "water balance file"
+DEBUG: [2025-08-22 14:03:41] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "Seasonal overview output file"
+DEBUG: [2025-08-22 14:03:41] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "currently operational PCBAL"
+DEBUG: [2025-08-22 14:03:41] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "nitrogen balance PNBAL"
+DEBUG: [2025-08-22 14:03:41] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "phosphorus balance"
+DEBUG: [2025-08-22 14:03:41] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "currently operational SOUTG"
+DEBUG: [2025-08-22 14:03:41] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "soil carbon balance"
+DEBUG: [2025-08-22 14:03:41] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "C balance summary"
+DEBUG: [2025-08-22 14:03:41] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "soil potassium balance"
+DEBUG: [2025-08-22 14:03:41] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "N balance summary"
+DEBUG: [2025-08-22 14:03:41] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "soil N balance (v4.02 and earlier)"
+DEBUG: [2025-08-22 14:03:41] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "inorganic soil N balance"
+DEBUG: [2025-08-22 14:03:41] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "organic soil N balance"
+DEBUG: [2025-08-22 14:03:41] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "P balance summary"
+DEBUG: [2025-08-22 14:03:41] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "inorganic soil P balance"
+DEBUG: [2025-08-22 14:03:41] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "organic soil P balance"
+DEBUG: [2025-08-22 14:03:41] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "soil water balance"
+DEBUG: [2025-08-22 14:03:41] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "Seasonal summary output file"
+DEBUG: [2025-08-22 14:03:41] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "currently operational SOUTWTH"
+DEBUG: [2025-08-22 14:03:41] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "Forage harvest output file FORHARV"
+DEBUG: [2025-08-22 14:03:41] DataProcessor::getOutfileDescriptions() - Loaded: "CSV" = "output file in"
+DEBUG: [2025-08-22 14:03:41] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "number for simulation"
+DEBUG: [2025-08-22 14:03:41] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "messages ERRORO"
+DEBUG: [2025-08-22 14:03:41] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "output file OUTINFO"
+DEBUG: [2025-08-22 14:03:41] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "log file"
+DEBUG: [2025-08-22 14:03:41] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "Century SOM output"
+DEBUG: [2025-08-22 14:03:41] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "messages OUTWARN"
+DEBUG: [2025-08-22 14:03:41] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "CSP information output file"
+DEBUG: [2025-08-22 14:03:41] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "Climate change summary output file"
+DEBUG: [2025-08-22 14:03:41] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "extended summary output file"
+DEBUG: [2025-08-22 14:03:41] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "phytomeric outputs SAMPHY"
+DEBUG: [2025-08-22 14:03:41] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "canopy photosynthesis outputs"
+DEBUG: [2025-08-22 14:03:41] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "abiotic stress factors"
+DEBUG: [2025-08-22 14:03:41] DataProcessor::getOutfileDescriptions() - Loaded 2 descriptions from "/Applications/DSSAT48/OUTPUT.CDE"
+DEBUG: [2025-08-22 14:03:41] populateFiles: Loaded 2 outfile descriptions
+DEBUG: [2025-08-22 14:03:41] populateFiles: File "Dormancy.OUT" Extension: "OUT" Description: "abiotic stress factors"
+DEBUG: [2025-08-22 14:03:41] populateFiles: Set tooltip to: "OUT: abiotic stress factors"
+DEBUG: [2025-08-22 14:03:41] populateFiles: File "ET.OUT" Extension: "OUT" Description: "abiotic stress factors"
+DEBUG: [2025-08-22 14:03:41] populateFiles: Set tooltip to: "OUT: abiotic stress factors"
+DEBUG: [2025-08-22 14:03:41] populateFiles: File "ETPhot.OUT" Extension: "OUT" Description: "abiotic stress factors"
+DEBUG: [2025-08-22 14:03:41] populateFiles: Set tooltip to: "OUT: abiotic stress factors"
+DEBUG: [2025-08-22 14:03:41] populateFiles: File "FORAGE.OUT" Extension: "OUT" Description: "abiotic stress factors"
+DEBUG: [2025-08-22 14:03:41] populateFiles: Set tooltip to: "OUT: abiotic stress factors"
+DEBUG: [2025-08-22 14:03:41] populateFiles: File "GHG.OUT" Extension: "OUT" Description: "abiotic stress factors"
+DEBUG: [2025-08-22 14:03:41] populateFiles: Set tooltip to: "OUT: abiotic stress factors"
+DEBUG: [2025-08-22 14:03:41] populateFiles: File "Mulch.OUT" Extension: "OUT" Description: "abiotic stress factors"
+DEBUG: [2025-08-22 14:03:41] populateFiles: Set tooltip to: "OUT: abiotic stress factors"
+DEBUG: [2025-08-22 14:03:41] populateFiles: File "N2O.OUT" Extension: "OUT" Description: "abiotic stress factors"
+DEBUG: [2025-08-22 14:03:41] populateFiles: Set tooltip to: "OUT: abiotic stress factors"
+DEBUG: [2025-08-22 14:03:41] populateFiles: File "PlantC.OUT" Extension: "OUT" Description: "abiotic stress factors"
+DEBUG: [2025-08-22 14:03:41] populateFiles: Set tooltip to: "OUT: abiotic stress factors"
+DEBUG: [2025-08-22 14:03:41] populateFiles: File "PlantGro.OUT" Extension: "OUT" Description: "abiotic stress factors"
+DEBUG: [2025-08-22 14:03:41] populateFiles: Set tooltip to: "OUT: abiotic stress factors"
+DEBUG: [2025-08-22 14:03:41] populateFiles: File "PlantMob.OUT" Extension: "OUT" Description: "abiotic stress factors"
+DEBUG: [2025-08-22 14:03:41] populateFiles: Set tooltip to: "OUT: abiotic stress factors"
+DEBUG: [2025-08-22 14:03:41] populateFiles: File "PlantN.OUT" Extension: "OUT" Description: "abiotic stress factors"
+DEBUG: [2025-08-22 14:03:41] populateFiles: Set tooltip to: "OUT: abiotic stress factors"
+DEBUG: [2025-08-22 14:03:41] populateFiles: File "SOMLITC.OUT" Extension: "OUT" Description: "abiotic stress factors"
+DEBUG: [2025-08-22 14:03:41] populateFiles: Set tooltip to: "OUT: abiotic stress factors"
+DEBUG: [2025-08-22 14:03:41] populateFiles: File "SOMLITN.OUT" Extension: "OUT" Description: "abiotic stress factors"
+DEBUG: [2025-08-22 14:03:41] populateFiles: Set tooltip to: "OUT: abiotic stress factors"
+DEBUG: [2025-08-22 14:03:41] populateFiles: File "SoilNi.OUT" Extension: "OUT" Description: "abiotic stress factors"
+DEBUG: [2025-08-22 14:03:41] populateFiles: Set tooltip to: "OUT: abiotic stress factors"
+DEBUG: [2025-08-22 14:03:41] populateFiles: File "SoilOrg.OUT" Extension: "OUT" Description: "abiotic stress factors"
+DEBUG: [2025-08-22 14:03:41] populateFiles: Set tooltip to: "OUT: abiotic stress factors"
+DEBUG: [2025-08-22 14:03:41] populateFiles: File "SoilTemp.OUT" Extension: "OUT" Description: "abiotic stress factors"
+DEBUG: [2025-08-22 14:03:41] populateFiles: Set tooltip to: "OUT: abiotic stress factors"
+DEBUG: [2025-08-22 14:03:41] populateFiles: File "SoilWat.OUT" Extension: "OUT" Description: "abiotic stress factors"
+DEBUG: [2025-08-22 14:03:41] populateFiles: Set tooltip to: "OUT: abiotic stress factors"
+DEBUG: [2025-08-22 14:03:41] populateFiles: File "SoilWater.OUT" Extension: "OUT" Description: "abiotic stress factors"
+DEBUG: [2025-08-22 14:03:41] populateFiles: Set tooltip to: "OUT: abiotic stress factors"
+DEBUG: [2025-08-22 14:03:41] populateFiles: File "Storage.OUT" Extension: "OUT" Description: "abiotic stress factors"
+DEBUG: [2025-08-22 14:03:41] populateFiles: Set tooltip to: "OUT: abiotic stress factors"
+DEBUG: [2025-08-22 14:03:41] populateFiles: File "Weather.OUT" Extension: "OUT" Description: "abiotic stress factors"
+DEBUG: [2025-08-22 14:03:41] populateFiles: Set tooltip to: "OUT: abiotic stress factors"
+DEBUG: [2025-08-22 14:03:41] populateFiles: Looking for files in folder: "Alfalfa"
+DEBUG: [2025-08-22 14:03:41] prepareOutFiles: Checking if directory exists: "/Applications/DSSAT48/Alfalfa"
+DEBUG: [2025-08-22 14:03:41] prepareOutFiles: Directory exists, looking for files...
+DEBUG: [2025-08-22 14:03:41] prepareOutFiles: Found 32 total files: QList("Dormancy.OUT", "ET.OUT", "ETPhot.OUT", "Evaluate.OUT", "FORAGE.OUT", "GHG.OUT", "INFO.OUT", "Mulch.OUT", "N2O.OUT", "PlantC.OUT", "PlantGro.OUT", "PlantMob.OUT", "PlantN.OUT", "PlantNBal.OUT", "RunList.OUT", "SOMLITC.OUT", "SOMLITN.OUT", "SoilCBal.OUT", "SoilCBalSum.OUT", "SoilNBalSum.OUT", "SoilNi.OUT", "SoilNiBal.OUT", "SoilNoBal.OUT", "SoilOrg.OUT", "SoilTemp.OUT", "SoilWat.OUT", "SoilWatBal.OUT", "SoilWater.OUT", "Storage.OUT", "Summary.OUT", "WARNING.OUT", "Weather.OUT")
+DEBUG: [2025-08-22 14:03:41] isFilePlottable: "/Applications/DSSAT48/Alfalfa/Dormancy.OUT" -> hasDataTable: true hasTimeColumns: true dataRowCount: 5 isPlottable: true
+DEBUG: [2025-08-22 14:03:41] isFilePlottable: "/Applications/DSSAT48/Alfalfa/ET.OUT" -> hasDataTable: true hasTimeColumns: true dataRowCount: 5 isPlottable: true
+DEBUG: [2025-08-22 14:03:41] isFilePlottable: "/Applications/DSSAT48/Alfalfa/ETPhot.OUT" -> hasDataTable: true hasTimeColumns: true dataRowCount: 5 isPlottable: true
+DEBUG: [2025-08-22 14:03:41] prepareOutFiles: Filtering out non-plottable file: "Evaluate.OUT" ( "matches non-plottable pattern: evaluate" )
+DEBUG: [2025-08-22 14:03:41] isFilePlottable: "/Applications/DSSAT48/Alfalfa/FORAGE.OUT" -> hasDataTable: true hasTimeColumns: true dataRowCount: 5 isPlottable: true
+DEBUG: [2025-08-22 14:03:41] isFilePlottable: "/Applications/DSSAT48/Alfalfa/GHG.OUT" -> hasDataTable: true hasTimeColumns: true dataRowCount: 5 isPlottable: true
+DEBUG: [2025-08-22 14:03:41] isFilePlottable: "/Applications/DSSAT48/Alfalfa/INFO.OUT" -> hasDataTable: false hasTimeColumns: false dataRowCount: 0 isPlottable: false
+DEBUG: [2025-08-22 14:03:41] prepareOutFiles: Filtering out non-plottable file: "INFO.OUT" ( "lacks time-series structure" )
+DEBUG: [2025-08-22 14:03:41] isFilePlottable: "/Applications/DSSAT48/Alfalfa/Mulch.OUT" -> hasDataTable: true hasTimeColumns: true dataRowCount: 5 isPlottable: true
+DEBUG: [2025-08-22 14:03:41] isFilePlottable: "/Applications/DSSAT48/Alfalfa/N2O.OUT" -> hasDataTable: true hasTimeColumns: true dataRowCount: 5 isPlottable: true
+DEBUG: [2025-08-22 14:03:41] isFilePlottable: "/Applications/DSSAT48/Alfalfa/PlantC.OUT" -> hasDataTable: true hasTimeColumns: true dataRowCount: 5 isPlottable: true
+DEBUG: [2025-08-22 14:03:41] isFilePlottable: "/Applications/DSSAT48/Alfalfa/PlantGro.OUT" -> hasDataTable: true hasTimeColumns: true dataRowCount: 5 isPlottable: true
+DEBUG: [2025-08-22 14:03:41] isFilePlottable: "/Applications/DSSAT48/Alfalfa/PlantMob.OUT" -> hasDataTable: true hasTimeColumns: true dataRowCount: 5 isPlottable: true
+DEBUG: [2025-08-22 14:03:41] isFilePlottable: "/Applications/DSSAT48/Alfalfa/PlantN.OUT" -> hasDataTable: true hasTimeColumns: true dataRowCount: 5 isPlottable: true
+DEBUG: [2025-08-22 14:03:41] isFilePlottable: "/Applications/DSSAT48/Alfalfa/PlantNBal.OUT" -> hasDataTable: false hasTimeColumns: false dataRowCount: 0 isPlottable: false
+DEBUG: [2025-08-22 14:03:41] prepareOutFiles: Filtering out non-plottable file: "PlantNBal.OUT" ( "lacks time-series structure" )
+DEBUG: [2025-08-22 14:03:41] isFilePlottable: "/Applications/DSSAT48/Alfalfa/RunList.OUT" -> hasDataTable: false hasTimeColumns: false dataRowCount: 0 isPlottable: false
+DEBUG: [2025-08-22 14:03:41] prepareOutFiles: Filtering out non-plottable file: "RunList.OUT" ( "lacks time-series structure" )
+DEBUG: [2025-08-22 14:03:41] isFilePlottable: "/Applications/DSSAT48/Alfalfa/SOMLITC.OUT" -> hasDataTable: true hasTimeColumns: true dataRowCount: 5 isPlottable: true
+DEBUG: [2025-08-22 14:03:41] isFilePlottable: "/Applications/DSSAT48/Alfalfa/SOMLITN.OUT" -> hasDataTable: true hasTimeColumns: true dataRowCount: 5 isPlottable: true
+DEBUG: [2025-08-22 14:03:41] isFilePlottable: "/Applications/DSSAT48/Alfalfa/SoilCBal.OUT" -> hasDataTable: false hasTimeColumns: false dataRowCount: 0 isPlottable: false
+DEBUG: [2025-08-22 14:03:41] prepareOutFiles: Filtering out non-plottable file: "SoilCBal.OUT" ( "lacks time-series structure" )
+DEBUG: [2025-08-22 14:03:41] isFilePlottable: "/Applications/DSSAT48/Alfalfa/SoilCBalSum.OUT" -> hasDataTable: true hasTimeColumns: false dataRowCount: 6 isPlottable: false
+DEBUG: [2025-08-22 14:03:41] prepareOutFiles: Filtering out non-plottable file: "SoilCBalSum.OUT" ( "lacks time-series structure" )
+DEBUG: [2025-08-22 14:03:41] isFilePlottable: "/Applications/DSSAT48/Alfalfa/SoilNBalSum.OUT" -> hasDataTable: true hasTimeColumns: false dataRowCount: 6 isPlottable: false
+DEBUG: [2025-08-22 14:03:41] prepareOutFiles: Filtering out non-plottable file: "SoilNBalSum.OUT" ( "lacks time-series structure" )
+DEBUG: [2025-08-22 14:03:41] isFilePlottable: "/Applications/DSSAT48/Alfalfa/SoilNi.OUT" -> hasDataTable: true hasTimeColumns: true dataRowCount: 5 isPlottable: true
+DEBUG: [2025-08-22 14:03:41] isFilePlottable: "/Applications/DSSAT48/Alfalfa/SoilNiBal.OUT" -> hasDataTable: false hasTimeColumns: false dataRowCount: 0 isPlottable: false
+DEBUG: [2025-08-22 14:03:41] prepareOutFiles: Filtering out non-plottable file: "SoilNiBal.OUT" ( "lacks time-series structure" )
+DEBUG: [2025-08-22 14:03:41] isFilePlottable: "/Applications/DSSAT48/Alfalfa/SoilNoBal.OUT" -> hasDataTable: false hasTimeColumns: false dataRowCount: 0 isPlottable: false
+DEBUG: [2025-08-22 14:03:41] prepareOutFiles: Filtering out non-plottable file: "SoilNoBal.OUT" ( "lacks time-series structure" )
+DEBUG: [2025-08-22 14:03:41] isFilePlottable: "/Applications/DSSAT48/Alfalfa/SoilOrg.OUT" -> hasDataTable: true hasTimeColumns: true dataRowCount: 5 isPlottable: true
+DEBUG: [2025-08-22 14:03:41] isFilePlottable: "/Applications/DSSAT48/Alfalfa/SoilTemp.OUT" -> hasDataTable: true hasTimeColumns: true dataRowCount: 5 isPlottable: true
+DEBUG: [2025-08-22 14:03:41] isFilePlottable: "/Applications/DSSAT48/Alfalfa/SoilWat.OUT" -> hasDataTable: true hasTimeColumns: true dataRowCount: 5 isPlottable: true
+DEBUG: [2025-08-22 14:03:41] isFilePlottable: "/Applications/DSSAT48/Alfalfa/SoilWatBal.OUT" -> hasDataTable: false hasTimeColumns: false dataRowCount: 0 isPlottable: false
+DEBUG: [2025-08-22 14:03:41] prepareOutFiles: Filtering out non-plottable file: "SoilWatBal.OUT" ( "lacks time-series structure" )
+DEBUG: [2025-08-22 14:03:41] isFilePlottable: "/Applications/DSSAT48/Alfalfa/SoilWater.OUT" -> hasDataTable: true hasTimeColumns: true dataRowCount: 5 isPlottable: true
+DEBUG: [2025-08-22 14:03:41] isFilePlottable: "/Applications/DSSAT48/Alfalfa/Storage.OUT" -> hasDataTable: true hasTimeColumns: true dataRowCount: 5 isPlottable: true
+DEBUG: [2025-08-22 14:03:41] prepareOutFiles: Filtering out non-plottable file: "Summary.OUT" ( "matches non-plottable pattern: summary" )
+DEBUG: [2025-08-22 14:03:41] isFilePlottable: "/Applications/DSSAT48/Alfalfa/WARNING.OUT" -> hasDataTable: false hasTimeColumns: false dataRowCount: 0 isPlottable: false
+DEBUG: [2025-08-22 14:03:41] prepareOutFiles: Filtering out non-plottable file: "WARNING.OUT" ( "lacks time-series structure" )
+DEBUG: [2025-08-22 14:03:41] isFilePlottable: "/Applications/DSSAT48/Alfalfa/Weather.OUT" -> hasDataTable: true hasTimeColumns: true dataRowCount: 5 isPlottable: true
+DEBUG: [2025-08-22 14:03:41] prepareOutFiles: After filtering, found 20 plottable files: QList("Dormancy.OUT", "ET.OUT", "ETPhot.OUT", "FORAGE.OUT", "GHG.OUT", "Mulch.OUT", "N2O.OUT", "PlantC.OUT", "PlantGro.OUT", "PlantMob.OUT", "PlantN.OUT", "SOMLITC.OUT", "SOMLITN.OUT", "SoilNi.OUT", "SoilOrg.OUT", "SoilTemp.OUT", "SoilWat.OUT", "SoilWater.OUT", "Storage.OUT", "Weather.OUT")
+DEBUG: [2025-08-22 14:03:41] populateFiles: Found 20 files: QList("Dormancy.OUT", "ET.OUT", "ETPhot.OUT", "FORAGE.OUT", "GHG.OUT", "Mulch.OUT", "N2O.OUT", "PlantC.OUT", "PlantGro.OUT", "PlantMob.OUT", "PlantN.OUT", "SOMLITC.OUT", "SOMLITN.OUT", "SoilNi.OUT", "SoilOrg.OUT", "SoilTemp.OUT", "SoilWat.OUT", "SoilWater.OUT", "Storage.OUT", "Weather.OUT")
+DEBUG: [2025-08-22 14:03:41] populateFiles: Loaded 2 outfile descriptions
+DEBUG: [2025-08-22 14:03:41] populateFiles: File "Dormancy.OUT" Extension: "OUT" Description: "abiotic stress factors"
+DEBUG: [2025-08-22 14:03:41] populateFiles: Set tooltip to: "OUT: abiotic stress factors"
+DEBUG: [2025-08-22 14:03:41] populateFiles: File "ET.OUT" Extension: "OUT" Description: "abiotic stress factors"
+DEBUG: [2025-08-22 14:03:41] populateFiles: Set tooltip to: "OUT: abiotic stress factors"
+DEBUG: [2025-08-22 14:03:41] populateFiles: File "ETPhot.OUT" Extension: "OUT" Description: "abiotic stress factors"
+DEBUG: [2025-08-22 14:03:41] populateFiles: Set tooltip to: "OUT: abiotic stress factors"
+DEBUG: [2025-08-22 14:03:41] populateFiles: File "FORAGE.OUT" Extension: "OUT" Description: "abiotic stress factors"
+DEBUG: [2025-08-22 14:03:41] populateFiles: Set tooltip to: "OUT: abiotic stress factors"
+DEBUG: [2025-08-22 14:03:41] populateFiles: File "GHG.OUT" Extension: "OUT" Description: "abiotic stress factors"
+DEBUG: [2025-08-22 14:03:41] populateFiles: Set tooltip to: "OUT: abiotic stress factors"
+DEBUG: [2025-08-22 14:03:41] populateFiles: File "Mulch.OUT" Extension: "OUT" Description: "abiotic stress factors"
+DEBUG: [2025-08-22 14:03:41] populateFiles: Set tooltip to: "OUT: abiotic stress factors"
+DEBUG: [2025-08-22 14:03:41] populateFiles: File "N2O.OUT" Extension: "OUT" Description: "abiotic stress factors"
+DEBUG: [2025-08-22 14:03:41] populateFiles: Set tooltip to: "OUT: abiotic stress factors"
+DEBUG: [2025-08-22 14:03:41] populateFiles: File "PlantC.OUT" Extension: "OUT" Description: "abiotic stress factors"
+DEBUG: [2025-08-22 14:03:41] populateFiles: Set tooltip to: "OUT: abiotic stress factors"
+DEBUG: [2025-08-22 14:03:41] populateFiles: File "PlantGro.OUT" Extension: "OUT" Description: "abiotic stress factors"
+DEBUG: [2025-08-22 14:03:41] populateFiles: Set tooltip to: "OUT: abiotic stress factors"
+DEBUG: [2025-08-22 14:03:41] populateFiles: File "PlantMob.OUT" Extension: "OUT" Description: "abiotic stress factors"
+DEBUG: [2025-08-22 14:03:41] populateFiles: Set tooltip to: "OUT: abiotic stress factors"
+DEBUG: [2025-08-22 14:03:41] populateFiles: File "PlantN.OUT" Extension: "OUT" Description: "abiotic stress factors"
+DEBUG: [2025-08-22 14:03:41] populateFiles: Set tooltip to: "OUT: abiotic stress factors"
+DEBUG: [2025-08-22 14:03:41] populateFiles: File "SOMLITC.OUT" Extension: "OUT" Description: "abiotic stress factors"
+DEBUG: [2025-08-22 14:03:41] populateFiles: Set tooltip to: "OUT: abiotic stress factors"
+DEBUG: [2025-08-22 14:03:41] populateFiles: File "SOMLITN.OUT" Extension: "OUT" Description: "abiotic stress factors"
+DEBUG: [2025-08-22 14:03:41] populateFiles: Set tooltip to: "OUT: abiotic stress factors"
+DEBUG: [2025-08-22 14:03:41] populateFiles: File "SoilNi.OUT" Extension: "OUT" Description: "abiotic stress factors"
+DEBUG: [2025-08-22 14:03:41] populateFiles: Set tooltip to: "OUT: abiotic stress factors"
+DEBUG: [2025-08-22 14:03:41] populateFiles: File "SoilOrg.OUT" Extension: "OUT" Description: "abiotic stress factors"
+DEBUG: [2025-08-22 14:03:41] populateFiles: Set tooltip to: "OUT: abiotic stress factors"
+DEBUG: [2025-08-22 14:03:41] populateFiles: File "SoilTemp.OUT" Extension: "OUT" Description: "abiotic stress factors"
+DEBUG: [2025-08-22 14:03:41] populateFiles: Set tooltip to: "OUT: abiotic stress factors"
+DEBUG: [2025-08-22 14:03:41] populateFiles: File "SoilWat.OUT" Extension: "OUT" Description: "abiotic stress factors"
+DEBUG: [2025-08-22 14:03:41] populateFiles: Set tooltip to: "OUT: abiotic stress factors"
+DEBUG: [2025-08-22 14:03:41] populateFiles: File "SoilWater.OUT" Extension: "OUT" Description: "abiotic stress factors"
+DEBUG: [2025-08-22 14:03:41] populateFiles: Set tooltip to: "OUT: abiotic stress factors"
+DEBUG: [2025-08-22 14:03:41] populateFiles: File "Storage.OUT" Extension: "OUT" Description: "abiotic stress factors"
+DEBUG: [2025-08-22 14:03:41] populateFiles: Set tooltip to: "OUT: abiotic stress factors"
+DEBUG: [2025-08-22 14:03:41] populateFiles: File "Weather.OUT" Extension: "OUT" Description: "abiotic stress factors"
+DEBUG: [2025-08-22 14:03:41] populateFiles: Set tooltip to: "OUT: abiotic stress factors"
+WARNING: [2025-08-22 14:03:41] Unknown property box-shadow
+WARNING: [2025-08-22 14:03:41] Insufficient parameters: QList("--version")
+DEBUG: [2025-08-22 14:03:41] No valid command line arguments provided, starting normally
+INFO: [2025-08-22 14:03:41] Application started successfully
+DEBUG: [2025-08-22 14:03:45] MainWindow::onFileSelectionChanged() - File selection changed!
+DEBUG: [2025-08-22 14:03:45] MainWindow::onFileSelectionChanged() - Selected items count: 1
+DEBUG: [2025-08-22 14:03:45] MainWindow::onFileSelectionChanged() - Enabling update button
+DEBUG: [2025-08-22 14:03:45] MainWindow::onFileSelectionChanged() - Processing selected file...
+DEBUG: [2025-08-22 14:03:45] MainWindow::onFileSelectionChanged() - Selected file name: "FORAGE.OUT"
+DEBUG: [2025-08-22 14:03:45] MainWindow::onFileSelectionChanged() - Getting DSSAT base path...
+DEBUG: [2025-08-22 14:03:45] MainWindow::onFileSelectionChanged() - DSSAT base: "/Applications/DSSAT48"
+DEBUG: [2025-08-22 14:03:45] MainWindow::onFileSelectionChanged() - Selected folder: "Alfalfa"
+DEBUG: [2025-08-22 14:03:45] MainWindow: Selected simulated file path: "/Applications/DSSAT48/Alfalfa/FORAGE.OUT"
+DEBUG: [2025-08-22 14:03:45] MainWindow::onFileSelectionChanged() - About to call loadFile...
+DEBUG: [2025-08-22 14:03:45] MainWindow::loadFile() called with: "/Applications/DSSAT48/Alfalfa/FORAGE.OUT"
+DEBUG: [2025-08-22 14:03:45] MainWindow: File size: 14891 bytes
+DEBUG: [2025-08-22 14:03:45] MainWindow: Calling readFile on DataProcessor...
+DEBUG: [2025-08-22 14:03:45] DataProcessor::readOutFile() called with: "/Applications/DSSAT48/Alfalfa/FORAGE.OUT"
+DEBUG: [2025-08-22 14:03:45] DataProcessor: File opened successfully, size: 14891
+DEBUG: [2025-08-22 14:03:45] DataProcessor: Read 125 total lines
+DEBUG: [2025-08-22 14:03:45] DataProcessor: Starting file parsing...
+DEBUG: [2025-08-22 14:03:45] DataProcessor: readOutFile completed successfully
+DEBUG: [2025-08-22 14:03:45] MainWindow: readFile result: true
+DEBUG: [2025-08-22 14:03:45] MainWindow: File loaded successfully, rows: 122
+DEBUG: [2025-08-22 14:03:45] MainWindow::onFileSelectionChanged() - loadFile completed
+DEBUG: [2025-08-22 14:03:45] MainWindow: Extracted unique Experiment Codes from simulated data: QList()
+DEBUG: [2025-08-22 14:03:45] MainWindow: Extracted Treatment Names: QMap(("DEFAULT", QMap(("1", "Treatment 1")("10", "Treatment 1")("11", "Treatment 1")("12", "Treatment 1")("13", "Treatment 1")("14", "Treatment 1")("15", "Treatment 1")("16", "Treatment 1")("17", "Treatment 1")("18", "Treatment 1")("19", "Treatment 1")("2", "Treatment 1")("20", "Treatment 1")("21", "Treatment 1")("22", "Treatment 1")("23", "Treatment 1")("24", "Treatment 1")("25", "Treatment 1")("26", "Treatment 1")("27", "Treatment 1")("28", "Treatment 1")("29", "Treatment 1")("3", "Treatment 1")("30", "Treatment 1")("31", "Treatment 1")("32", "Treatment 1")("33", "Treatment 1")("34", "Treatment 1")("35", "Treatment 1")("36", "Treatment 1")("37", "Treatment 1")("38", "Treatment 1")("39", "Treatment 1")("4", "Treatment 1")("40", "Treatment 1")("41", "Treatment 1")("42", "Treatment 1")("43", "Treatment 1")("5", "Treatment 1")("6", "Treatment 1")("7", "Treatment 1")("8", "Treatment 1")("9", "Treatment 1"))))
+DEBUG: [2025-08-22 14:03:45] MainWindow: No experiment codes found, m_selectedExperiment set to empty.
+DEBUG: [2025-08-22 14:03:45] MainWindow: Determined Crop Code: "XX"
+DEBUG: [2025-08-22 14:03:45] MainWindow: Added CROP column with code: "XX" to simulated data
+DEBUG: [2025-08-22 14:03:45] MainWindow::onFileSelectionChanged() - Data loaded, marked for table refresh.
+DEBUG: [2025-08-22 14:03:45] MainWindow::onFileSelectionChanged() - Function completed successfully; table data not yet set.
+DEBUG: [2025-08-22 14:03:45] MainWindow::onFileSelectionChanged() - Function finished
+DEBUG: [2025-08-22 14:03:47] MainWindow::onUpdatePlot() - Refresh button clicked!
+DEBUG: [2025-08-22 14:03:47] MainWindow::onUpdatePlot() - Refreshing plot for Time Series tab
+DEBUG: [2025-08-22 14:03:47] MainWindow::updatePlot() - ENTRY POINT
+DEBUG: [2025-08-22 14:03:47] MainWindow::updatePlot() - Plot widget exists: true
+DEBUG: [2025-08-22 14:03:47] MainWindow::updatePlot() - X variable: "DATE"
+DEBUG: [2025-08-22 14:03:47] MainWindow::updatePlot() - Y variables: QList("FHC%H") Count: 1
+DEBUG: [2025-08-22 14:03:47] PlotWidget::updatePlotWithScaling() - ENTRY POINT
+DEBUG: [2025-08-22 14:03:47] PlotWidget: Sim data rows: 122
+DEBUG: [2025-08-22 14:03:47] PlotWidget: Current Y vars count: 1
+DEBUG: [2025-08-22 14:03:47] PlotWidget: Current Y vars list: QList("FHC%H")
+DEBUG: [2025-08-22 14:03:47] PlotWidget: Current X var: "DATE"
+DEBUG: [2025-08-22 14:03:47] PlotWidget::updatePlotWithScaling() - About to calculate scaling factors
+DEBUG: [2025-08-22 14:03:47] PlotWidget: calculateScalingFactors called with 1 variables: QList("FHC%H")
+DEBUG: [2025-08-22 14:03:47] PlotWidget: Single variable detected, no scaling applied
+DEBUG: [2025-08-22 14:03:47] PlotWidget::updatePlotWithScaling() - Scaling factors calculated
+DEBUG: [2025-08-22 14:03:47] PlotWidget::updatePlotWithScaling() - BEFORE scaling, sample values:
+DEBUG: [2025-08-22 14:03:47]    "FHC%H"  first value BEFORE scaling: QVariant(QString, "6.52")
+DEBUG: [2025-08-22 14:03:47] PlotWidget: applyScaling called for variables: QList("FHC%H")
+DEBUG: [2025-08-22 14:03:47] PlotWidget: Available scale factors keys: QList("default")
+DEBUG: [2025-08-22 14:03:47] PlotWidget: Default scale factors for variables: QList("FHC%H")
+DEBUG: [2025-08-22 14:03:47] PlotWidget: Applying scaling to "FHC%H" - factor: 1 offset: 0
+DEBUG: [2025-08-22 14:03:47] PlotWidget: Stored scaling factor for label: "FHC%H" = 1
+DEBUG: [2025-08-22 14:03:47] PlotWidget: No significant scaling needed for "FHC%H" - factor: 1
+DEBUG: [2025-08-22 14:03:47] PlotWidget::updatePlotWithScaling() - AFTER scaling, sample values:
+DEBUG: [2025-08-22 14:03:47]    "FHC%H"  first non-zero AFTER scaling: "6.52"
+DEBUG: [2025-08-22 14:03:47] PlotWidget::updatePlotWithScaling() - About to plot datasets
+DEBUG: [2025-08-22 14:03:47] PlotWidget::updatePlotWithScaling() - Plotting with SCALED data
+DEBUG: [2025-08-22 14:03:47] PlotWidget::setupAxes() - CALLED with X variable: "DATE"
+DEBUG: [2025-08-22 14:03:47] PlotWidget::setupAxes() - Removing 2 existing axes
+DEBUG: [2025-08-22 14:03:47] PlotWidget::calculateOptimalDateTickCount() - Plot width: 349.867
+DEBUG: [2025-08-22 14:03:47] PlotWidget::calculateOptimalDateTickCount() - Width: 349.867 Base ticks: 5 Optimal ticks: 4
+DEBUG: [2025-08-22 14:03:47] PlotWidget::setupAxes() - Created QDateTimeAxis for DATE variable with format: MMM dd, yyyy and dynamic tickCount: 4
+DEBUG: [2025-08-22 14:03:47] PlotWidget::setupAxes() - Added axes for X variable: "DATE"
+DEBUG: [2025-08-22 14:03:47] PlotWidget::plotDatasets() - ENTRY with Y vars: QList("FHC%H")
+DEBUG: [2025-08-22 14:03:47] PlotWidget::plotDatasets() - First value of "FHC%H" = QVariant(QString, "6.52")
+DEBUG: [2025-08-22 14:03:47] PlotWidget: plotDatasets - Plotting simulated data...
+DEBUG: [2025-08-22 14:03:47] PlotWidget: EXPERIMENT column exists: true
+DEBUG: [2025-08-22 14:03:47] PlotWidget: Selected treatments filter: QList("All")
+DEBUG: [2025-08-22 14:03:47] PlotWidget: plotDatasets - Plotting observed data (if available). Row count: 0 , Columns: QList()
+DEBUG: [2025-08-22 14:03:47] PlotWidget: Available simulated treatment keys: QSet()
+DEBUG: [2025-08-22 14:03:47] plotDatasets: Generated 0 plot data items before adding to chart
+DEBUG: [2025-08-22 14:03:47] addSeriesToPlot: Called with 0 plot data items
+DEBUG: [2025-08-22 14:03:47] addSeriesToPlot: Chart has 0 series and 2 axes
+DEBUG: [2025-08-22 14:03:47] PlotWidget::autoFitAxes() - CALLED
+DEBUG: [2025-08-22 14:03:47] PlotWidget::autoFitAxes() - No series to fit
+DEBUG: [2025-08-22 14:03:47] addSeriesToPlot: Chart has 2 axes
+DEBUG: [2025-08-22 14:03:47] addSeriesToPlot: DateTimeAxis range: QDateTime(1969-12-31 19:00:00.000 EST Qt::LocalTime) to QDateTime(1969-12-31 19:00:00.000 EST Qt::LocalTime)
+DEBUG: [2025-08-22 14:03:47] addSeriesToPlot: ValueAxis range: 0 to 0
+DEBUG: [2025-08-22 14:03:47] updateLegend: m_plotDataList has 0 items
+DEBUG: [2025-08-22 14:03:47] updateLegend: Legend entries organized:
+DEBUG: [2025-08-22 14:03:47] updateLegendAdvanced: Found 0 variables: QList()
+DEBUG: [2025-08-22 14:03:47] PlotWidget::updatePlotWithScaling() - Datasets plotted
+DEBUG: [2025-08-22 14:03:47] PlotWidget::updatePlotWithScaling() - About to update scaling label
+DEBUG: [2025-08-22 14:03:47] PlotWidget: updateScalingLabel called with variables: QList("FHC%H")
+DEBUG: [2025-08-22 14:03:47] PlotWidget: m_appliedScalingFactors keys: QList("FHC%H")
+DEBUG: [2025-08-22 14:03:47] PlotWidget: Checking variable: "FHC%H" in applied scaling factors
+DEBUG: [2025-08-22 14:03:47] PlotWidget: Variable "FHC%H" has applied scale factor: 1
+DEBUG: [2025-08-22 14:03:47] PlotWidget: Variable "FHC%H" has scale factor 1.0 (no scaling)
+DEBUG: [2025-08-22 14:03:47] PlotWidget: No scaling applied, hiding scaling label
+DEBUG: [2025-08-22 14:03:47] PlotWidget: Scaling label visibility set to: false with text: ""
+DEBUG: [2025-08-22 14:03:47] PlotWidget::updatePlotWithScaling() - COMPLETED
+DEBUG: [2025-08-22 14:03:47] PlotWidget: No observed data for metrics calculation
+DEBUG: [2025-08-22 14:03:47] MainWindow::updatePlot() - plotTimeSeries call completed
+DEBUG: [2025-08-22 14:03:47] PlotWidget::autoFitAxes() - CALLED
+DEBUG: [2025-08-22 14:03:47] PlotWidget::autoFitAxes() - No series to fit
+DEBUG: [2025-08-22 14:03:47] addSeriesToPlot: Delayed auto-fit completed
+DEBUG: [2025-08-22 14:03:47] PlotWidget::autoFitAxes() - CALLED
+DEBUG: [2025-08-22 14:03:47] PlotWidget::autoFitAxes() - No series to fit
+DEBUG: [2025-08-22 14:03:47] updatePlotWithScaling: Final delayed auto-fit completed
+DEBUG: [2025-08-22 14:03:50] PlotWidget::calculateOptimalDateTickCount() - Plot width: 815.391
+DEBUG: [2025-08-22 14:03:50] PlotWidget::calculateOptimalDateTickCount() - Width: 815.391 Base ticks: 12 Optimal ticks: 12
+DEBUG: [2025-08-22 14:03:50] PlotWidget::resizeEvent() - Updated date axis tick count to: 12
+INFO: [2025-08-22 14:03:56] Starting "GB2" version "2.0.0"
+INFO: [2025-08-22 14:03:56] Qt version: 6.9.1
+INFO: [2025-08-22 14:03:56] Platform: "cocoa"
+DEBUG: [2025-08-22 14:03:56] Loaded application icon: "/Applications/DSSAT48/Tools/GBTOOLS/GB2CPP/build_macos/bin/resources/final.ico"
+DEBUG: [2025-08-22 14:03:56] Widget creation status:
+DEBUG: [2025-08-22 14:03:56] m_fileComboBox: OK
+DEBUG: [2025-08-22 14:03:56] m_xVariableComboBox: OK
+DEBUG: [2025-08-22 14:03:56] m_yVariableComboBox: OK
+DEBUG: [2025-08-22 14:03:56] m_updatePlotButton: OK
+WARNING: [2025-08-22 14:03:57] Populating font family aliases took 108 ms. Replace uses of missing font family "Segoe UI" with one that exists to avoid this cost. 
+DEBUG: [2025-08-22 14:03:57] MainWindow: About to create PlotWidget
+DEBUG: [2025-08-22 14:03:57] PlotWidget::PlotWidget() - CONSTRUCTOR CALLED
+DEBUG: [2025-08-22 14:03:57] PlotWidget::PlotWidget() - setupChart() completed
+DEBUG: [2025-08-22 14:03:57] MainWindow: PlotWidget created successfully
+DEBUG: [2025-08-22 14:03:57] MainWindow: PlotWidget added to layout
+DEBUG: [2025-08-22 14:03:57] populateFiles: Looking for files in folder: "Alfalfa"
+DEBUG: [2025-08-22 14:03:57] prepareOutFiles: Checking if directory exists: "/Applications/DSSAT48/Alfalfa"
+DEBUG: [2025-08-22 14:03:57] prepareOutFiles: Directory exists, looking for files...
+DEBUG: [2025-08-22 14:03:57] prepareOutFiles: Found 32 total files: QList("Dormancy.OUT", "ET.OUT", "ETPhot.OUT", "Evaluate.OUT", "FORAGE.OUT", "GHG.OUT", "INFO.OUT", "Mulch.OUT", "N2O.OUT", "PlantC.OUT", "PlantGro.OUT", "PlantMob.OUT", "PlantN.OUT", "PlantNBal.OUT", "RunList.OUT", "SOMLITC.OUT", "SOMLITN.OUT", "SoilCBal.OUT", "SoilCBalSum.OUT", "SoilNBalSum.OUT", "SoilNi.OUT", "SoilNiBal.OUT", "SoilNoBal.OUT", "SoilOrg.OUT", "SoilTemp.OUT", "SoilWat.OUT", "SoilWatBal.OUT", "SoilWater.OUT", "Storage.OUT", "Summary.OUT", "WARNING.OUT", "Weather.OUT")
+DEBUG: [2025-08-22 14:03:57] isFilePlottable: "/Applications/DSSAT48/Alfalfa/Dormancy.OUT" -> hasDataTable: true hasTimeColumns: true dataRowCount: 5 isPlottable: true
+DEBUG: [2025-08-22 14:03:57] isFilePlottable: "/Applications/DSSAT48/Alfalfa/ET.OUT" -> hasDataTable: true hasTimeColumns: true dataRowCount: 5 isPlottable: true
+DEBUG: [2025-08-22 14:03:57] isFilePlottable: "/Applications/DSSAT48/Alfalfa/ETPhot.OUT" -> hasDataTable: true hasTimeColumns: true dataRowCount: 5 isPlottable: true
+DEBUG: [2025-08-22 14:03:57] prepareOutFiles: Filtering out non-plottable file: "Evaluate.OUT" ( "matches non-plottable pattern: evaluate" )
+DEBUG: [2025-08-22 14:03:57] isFilePlottable: "/Applications/DSSAT48/Alfalfa/FORAGE.OUT" -> hasDataTable: true hasTimeColumns: true dataRowCount: 5 isPlottable: true
+DEBUG: [2025-08-22 14:03:57] isFilePlottable: "/Applications/DSSAT48/Alfalfa/GHG.OUT" -> hasDataTable: true hasTimeColumns: true dataRowCount: 5 isPlottable: true
+DEBUG: [2025-08-22 14:03:57] isFilePlottable: "/Applications/DSSAT48/Alfalfa/INFO.OUT" -> hasDataTable: false hasTimeColumns: false dataRowCount: 0 isPlottable: false
+DEBUG: [2025-08-22 14:03:57] prepareOutFiles: Filtering out non-plottable file: "INFO.OUT" ( "lacks time-series structure" )
+DEBUG: [2025-08-22 14:03:57] isFilePlottable: "/Applications/DSSAT48/Alfalfa/Mulch.OUT" -> hasDataTable: true hasTimeColumns: true dataRowCount: 5 isPlottable: true
+DEBUG: [2025-08-22 14:03:57] isFilePlottable: "/Applications/DSSAT48/Alfalfa/N2O.OUT" -> hasDataTable: true hasTimeColumns: true dataRowCount: 5 isPlottable: true
+DEBUG: [2025-08-22 14:03:57] isFilePlottable: "/Applications/DSSAT48/Alfalfa/PlantC.OUT" -> hasDataTable: true hasTimeColumns: true dataRowCount: 5 isPlottable: true
+DEBUG: [2025-08-22 14:03:57] isFilePlottable: "/Applications/DSSAT48/Alfalfa/PlantGro.OUT" -> hasDataTable: true hasTimeColumns: true dataRowCount: 5 isPlottable: true
+DEBUG: [2025-08-22 14:03:57] isFilePlottable: "/Applications/DSSAT48/Alfalfa/PlantMob.OUT" -> hasDataTable: true hasTimeColumns: true dataRowCount: 5 isPlottable: true
+DEBUG: [2025-08-22 14:03:57] isFilePlottable: "/Applications/DSSAT48/Alfalfa/PlantN.OUT" -> hasDataTable: true hasTimeColumns: true dataRowCount: 5 isPlottable: true
+DEBUG: [2025-08-22 14:03:57] isFilePlottable: "/Applications/DSSAT48/Alfalfa/PlantNBal.OUT" -> hasDataTable: false hasTimeColumns: false dataRowCount: 0 isPlottable: false
+DEBUG: [2025-08-22 14:03:57] prepareOutFiles: Filtering out non-plottable file: "PlantNBal.OUT" ( "lacks time-series structure" )
+DEBUG: [2025-08-22 14:03:57] isFilePlottable: "/Applications/DSSAT48/Alfalfa/RunList.OUT" -> hasDataTable: false hasTimeColumns: false dataRowCount: 0 isPlottable: false
+DEBUG: [2025-08-22 14:03:57] prepareOutFiles: Filtering out non-plottable file: "RunList.OUT" ( "lacks time-series structure" )
+DEBUG: [2025-08-22 14:03:57] isFilePlottable: "/Applications/DSSAT48/Alfalfa/SOMLITC.OUT" -> hasDataTable: true hasTimeColumns: true dataRowCount: 5 isPlottable: true
+DEBUG: [2025-08-22 14:03:57] isFilePlottable: "/Applications/DSSAT48/Alfalfa/SOMLITN.OUT" -> hasDataTable: true hasTimeColumns: true dataRowCount: 5 isPlottable: true
+DEBUG: [2025-08-22 14:03:57] isFilePlottable: "/Applications/DSSAT48/Alfalfa/SoilCBal.OUT" -> hasDataTable: false hasTimeColumns: false dataRowCount: 0 isPlottable: false
+DEBUG: [2025-08-22 14:03:57] prepareOutFiles: Filtering out non-plottable file: "SoilCBal.OUT" ( "lacks time-series structure" )
+DEBUG: [2025-08-22 14:03:57] isFilePlottable: "/Applications/DSSAT48/Alfalfa/SoilCBalSum.OUT" -> hasDataTable: true hasTimeColumns: false dataRowCount: 6 isPlottable: false
+DEBUG: [2025-08-22 14:03:57] prepareOutFiles: Filtering out non-plottable file: "SoilCBalSum.OUT" ( "lacks time-series structure" )
+DEBUG: [2025-08-22 14:03:57] isFilePlottable: "/Applications/DSSAT48/Alfalfa/SoilNBalSum.OUT" -> hasDataTable: true hasTimeColumns: false dataRowCount: 6 isPlottable: false
+DEBUG: [2025-08-22 14:03:57] prepareOutFiles: Filtering out non-plottable file: "SoilNBalSum.OUT" ( "lacks time-series structure" )
+DEBUG: [2025-08-22 14:03:57] isFilePlottable: "/Applications/DSSAT48/Alfalfa/SoilNi.OUT" -> hasDataTable: true hasTimeColumns: true dataRowCount: 5 isPlottable: true
+DEBUG: [2025-08-22 14:03:57] isFilePlottable: "/Applications/DSSAT48/Alfalfa/SoilNiBal.OUT" -> hasDataTable: false hasTimeColumns: false dataRowCount: 0 isPlottable: false
+DEBUG: [2025-08-22 14:03:57] prepareOutFiles: Filtering out non-plottable file: "SoilNiBal.OUT" ( "lacks time-series structure" )
+DEBUG: [2025-08-22 14:03:57] isFilePlottable: "/Applications/DSSAT48/Alfalfa/SoilNoBal.OUT" -> hasDataTable: false hasTimeColumns: false dataRowCount: 0 isPlottable: false
+DEBUG: [2025-08-22 14:03:57] prepareOutFiles: Filtering out non-plottable file: "SoilNoBal.OUT" ( "lacks time-series structure" )
+DEBUG: [2025-08-22 14:03:57] isFilePlottable: "/Applications/DSSAT48/Alfalfa/SoilOrg.OUT" -> hasDataTable: true hasTimeColumns: true dataRowCount: 5 isPlottable: true
+DEBUG: [2025-08-22 14:03:57] isFilePlottable: "/Applications/DSSAT48/Alfalfa/SoilTemp.OUT" -> hasDataTable: true hasTimeColumns: true dataRowCount: 5 isPlottable: true
+DEBUG: [2025-08-22 14:03:57] isFilePlottable: "/Applications/DSSAT48/Alfalfa/SoilWat.OUT" -> hasDataTable: true hasTimeColumns: true dataRowCount: 5 isPlottable: true
+DEBUG: [2025-08-22 14:03:57] isFilePlottable: "/Applications/DSSAT48/Alfalfa/SoilWatBal.OUT" -> hasDataTable: false hasTimeColumns: false dataRowCount: 0 isPlottable: false
+DEBUG: [2025-08-22 14:03:57] prepareOutFiles: Filtering out non-plottable file: "SoilWatBal.OUT" ( "lacks time-series structure" )
+DEBUG: [2025-08-22 14:03:57] isFilePlottable: "/Applications/DSSAT48/Alfalfa/SoilWater.OUT" -> hasDataTable: true hasTimeColumns: true dataRowCount: 5 isPlottable: true
+DEBUG: [2025-08-22 14:03:57] isFilePlottable: "/Applications/DSSAT48/Alfalfa/Storage.OUT" -> hasDataTable: true hasTimeColumns: true dataRowCount: 5 isPlottable: true
+DEBUG: [2025-08-22 14:03:57] prepareOutFiles: Filtering out non-plottable file: "Summary.OUT" ( "matches non-plottable pattern: summary" )
+DEBUG: [2025-08-22 14:03:57] isFilePlottable: "/Applications/DSSAT48/Alfalfa/WARNING.OUT" -> hasDataTable: false hasTimeColumns: false dataRowCount: 0 isPlottable: false
+DEBUG: [2025-08-22 14:03:57] prepareOutFiles: Filtering out non-plottable file: "WARNING.OUT" ( "lacks time-series structure" )
+DEBUG: [2025-08-22 14:03:57] isFilePlottable: "/Applications/DSSAT48/Alfalfa/Weather.OUT" -> hasDataTable: true hasTimeColumns: true dataRowCount: 5 isPlottable: true
+DEBUG: [2025-08-22 14:03:57] prepareOutFiles: After filtering, found 20 plottable files: QList("Dormancy.OUT", "ET.OUT", "ETPhot.OUT", "FORAGE.OUT", "GHG.OUT", "Mulch.OUT", "N2O.OUT", "PlantC.OUT", "PlantGro.OUT", "PlantMob.OUT", "PlantN.OUT", "SOMLITC.OUT", "SOMLITN.OUT", "SoilNi.OUT", "SoilOrg.OUT", "SoilTemp.OUT", "SoilWat.OUT", "SoilWater.OUT", "Storage.OUT", "Weather.OUT")
+DEBUG: [2025-08-22 14:03:57] populateFiles: Found 20 files: QList("Dormancy.OUT", "ET.OUT", "ETPhot.OUT", "FORAGE.OUT", "GHG.OUT", "Mulch.OUT", "N2O.OUT", "PlantC.OUT", "PlantGro.OUT", "PlantMob.OUT", "PlantN.OUT", "SOMLITC.OUT", "SOMLITN.OUT", "SoilNi.OUT", "SoilOrg.OUT", "SoilTemp.OUT", "SoilWat.OUT", "SoilWater.OUT", "Storage.OUT", "Weather.OUT")
+DEBUG: [2025-08-22 14:03:57] DataProcessor::findOutfileCde() - DSSAT Base: "/Applications/DSSAT48"
+DEBUG: [2025-08-22 14:03:57] DataProcessor::findOutfileCde() - Looking for: "/Applications/DSSAT48/OUTPUT.CDE"
+DEBUG: [2025-08-22 14:03:57] DataProcessor::findOutfileCde() - Found OUTPUT.CDE at: "/Applications/DSSAT48/OUTPUT.CDE"
+DEBUG: [2025-08-22 14:03:57] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "Daily chemical applications output file"
+DEBUG: [2025-08-22 14:03:57] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "Daily soil-plant-atmosphere output file"
+DEBUG: [2025-08-22 14:03:57] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "Daily evapotranspiration output file"
+DEBUG: [2025-08-22 14:03:57] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "Daily flood water nitrogen output file"
+DEBUG: [2025-08-22 14:03:57] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "Daily flood management output file"
+DEBUG: [2025-08-22 14:03:57] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "Daily management operations output file"
+DEBUG: [2025-08-22 14:03:57] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "Daily pest and disease damage output file"
+DEBUG: [2025-08-22 14:03:57] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "Daily plant carbon output file"
+DEBUG: [2025-08-22 14:03:57] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "Daily plant growth output file"
+DEBUG: [2025-08-22 14:03:57] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "Daily plant nitrogen output file"
+DEBUG: [2025-08-22 14:03:57] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "Daily plant phosphorus output"
+DEBUG: [2025-08-22 14:03:57] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "soil dynamics output file (temp)"
+DEBUG: [2025-08-22 14:03:57] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "Daily inorganic soil"
+DEBUG: [2025-08-22 14:03:57] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "Daily soil carbon output file"
+DEBUG: [2025-08-22 14:03:57] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "Daily inorganic soil phosphorus output file"
+DEBUG: [2025-08-22 14:03:57] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "Daily inorganic soil potassium output file"
+DEBUG: [2025-08-22 14:03:57] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "Daily soil temperature output file"
+DEBUG: [2025-08-22 14:03:57] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "Daily soil water output file"
+DEBUG: [2025-08-22 14:03:57] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "Daily soil organic matter carbon output file OUTSOMC"
+DEBUG: [2025-08-22 14:03:57] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "Daily soil organic matter nitrogen output file OUTSOMN"
+DEBUG: [2025-08-22 14:03:57] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "Daily soil organic matter phosphorus output file OUTSOMP"
+DEBUG: [2025-08-22 14:03:57] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "Daily weather output file"
+DEBUG: [2025-08-22 14:03:57] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "output from EAAMOD high water table model"
+DEBUG: [2025-08-22 14:03:57] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "fresh fruit weight"
+DEBUG: [2025-08-22 14:03:57] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "surface mulch output file"
+DEBUG: [2025-08-22 14:03:57] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "sugarcane output PSTALK"
+DEBUG: [2025-08-22 14:03:57] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "sugarcane output CSP_SENES"
+DEBUG: [2025-08-22 14:03:57] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "sugarcane output CSP_PHOTO"
+DEBUG: [2025-08-22 14:03:57] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "sugarcane output CSP_GRO"
+DEBUG: [2025-08-22 14:03:57] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "sugarcane output OUTPHNL"
+DEBUG: [2025-08-22 14:03:57] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "sugarcane output OUTKG"
+DEBUG: [2025-08-22 14:03:57] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "(temporary) output file"
+DEBUG: [2025-08-22 14:03:57] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "gas emissions report"
+DEBUG: [2025-08-22 14:03:57] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "Soil N2O and"
+DEBUG: [2025-08-22 14:03:57] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "Methane emissions daily output file"
+DEBUG: [2025-08-22 14:03:57] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "potential - daily"
+DEBUG: [2025-08-22 14:03:57] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "Wheat and barley specific output file"
+DEBUG: [2025-08-22 14:03:57] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "Wheat and barley specific output file"
+DEBUG: [2025-08-22 14:03:57] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "potential - daily"
+DEBUG: [2025-08-22 14:03:57] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "daylength signal for stolon daily output"
+DEBUG: [2025-08-22 14:03:57] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "plant mobilization and refill of storage"
+DEBUG: [2025-08-22 14:03:57] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "storage organ characteristics daily output"
+DEBUG: [2025-08-22 14:03:57] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "soil water output file by layer"
+DEBUG: [2025-08-22 14:03:57] DataProcessor::getOutfileDescriptions() - Loaded: "CSV" = "plant growth output file in"
+DEBUG: [2025-08-22 14:03:57] DataProcessor::getOutfileDescriptions() - Loaded: "CSV" = "plant nitrogen output file in"
+DEBUG: [2025-08-22 14:03:57] DataProcessor::getOutfileDescriptions() - Loaded: "CSV" = "output file (simulated vs. measured)"
+DEBUG: [2025-08-22 14:03:57] DataProcessor::getOutfileDescriptions() - Loaded: "CSV" = "plant carbon output file in"
+DEBUG: [2025-08-22 14:03:57] DataProcessor::getOutfileDescriptions() - Loaded: "CSV" = "plant growth output file in"
+DEBUG: [2025-08-22 14:03:57] DataProcessor::getOutfileDescriptions() - Loaded: "CSV" = "plant growth output file in"
+DEBUG: [2025-08-22 14:03:57] DataProcessor::getOutfileDescriptions() - Loaded: "CSV" = "soil water output file in"
+DEBUG: [2025-08-22 14:03:57] DataProcessor::getOutfileDescriptions() - Loaded: "CSV" = "soil temperature output file in"
+DEBUG: [2025-08-22 14:03:57] DataProcessor::getOutfileDescriptions() - Loaded: "CSV" = "soil-plant-atmosphere output file in"
+DEBUG: [2025-08-22 14:03:57] DataProcessor::getOutfileDescriptions() - Loaded: "CSV" = "inorganic soil N output file in"
+DEBUG: [2025-08-22 14:03:57] DataProcessor::getOutfileDescriptions() - Loaded: "CSV" = "weather output file in"
+DEBUG: [2025-08-22 14:03:57] DataProcessor::getOutfileDescriptions() - Loaded: "CSV" = "soil carbon output file in"
+DEBUG: [2025-08-22 14:03:57] DataProcessor::getOutfileDescriptions() - Loaded: "CSV" = "evapotranspiration output file in"
+DEBUG: [2025-08-22 14:03:57] DataProcessor::getOutfileDescriptions() - Loaded: "CSV" = "surface mulch output file in"
+DEBUG: [2025-08-22 14:03:57] DataProcessor::getOutfileDescriptions() - Loaded: "CSV" = "plant phosphorus output in"
+DEBUG: [2025-08-22 14:03:57] DataProcessor::getOutfileDescriptions() - Loaded: "CSV" = "inorganic soil phosphorus output file,"
+DEBUG: [2025-08-22 14:03:57] DataProcessor::getOutfileDescriptions() - Loaded: "CSV" = "N2O output file,"
+DEBUG: [2025-08-22 14:03:57] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "Environmental modifications output file"
+DEBUG: [2025-08-22 14:03:57] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "Evaluation output file (simulated vs. measured)"
+DEBUG: [2025-08-22 14:03:57] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "Management event output file"
+DEBUG: [2025-08-22 14:03:57] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "Operations summary output file"
+DEBUG: [2025-08-22 14:03:57] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "water balance file"
+DEBUG: [2025-08-22 14:03:57] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "Seasonal overview output file"
+DEBUG: [2025-08-22 14:03:57] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "currently operational PCBAL"
+DEBUG: [2025-08-22 14:03:57] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "nitrogen balance PNBAL"
+DEBUG: [2025-08-22 14:03:57] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "phosphorus balance"
+DEBUG: [2025-08-22 14:03:57] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "currently operational SOUTG"
+DEBUG: [2025-08-22 14:03:57] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "soil carbon balance"
+DEBUG: [2025-08-22 14:03:57] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "C balance summary"
+DEBUG: [2025-08-22 14:03:57] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "soil potassium balance"
+DEBUG: [2025-08-22 14:03:57] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "N balance summary"
+DEBUG: [2025-08-22 14:03:57] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "soil N balance (v4.02 and earlier)"
+DEBUG: [2025-08-22 14:03:57] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "inorganic soil N balance"
+DEBUG: [2025-08-22 14:03:57] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "organic soil N balance"
+DEBUG: [2025-08-22 14:03:57] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "P balance summary"
+DEBUG: [2025-08-22 14:03:57] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "inorganic soil P balance"
+DEBUG: [2025-08-22 14:03:57] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "organic soil P balance"
+DEBUG: [2025-08-22 14:03:57] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "soil water balance"
+DEBUG: [2025-08-22 14:03:57] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "Seasonal summary output file"
+DEBUG: [2025-08-22 14:03:57] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "currently operational SOUTWTH"
+DEBUG: [2025-08-22 14:03:57] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "Forage harvest output file FORHARV"
+DEBUG: [2025-08-22 14:03:57] DataProcessor::getOutfileDescriptions() - Loaded: "CSV" = "output file in"
+DEBUG: [2025-08-22 14:03:57] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "number for simulation"
+DEBUG: [2025-08-22 14:03:57] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "messages ERRORO"
+DEBUG: [2025-08-22 14:03:57] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "output file OUTINFO"
+DEBUG: [2025-08-22 14:03:57] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "log file"
+DEBUG: [2025-08-22 14:03:57] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "Century SOM output"
+DEBUG: [2025-08-22 14:03:57] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "messages OUTWARN"
+DEBUG: [2025-08-22 14:03:57] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "CSP information output file"
+DEBUG: [2025-08-22 14:03:57] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "Climate change summary output file"
+DEBUG: [2025-08-22 14:03:57] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "extended summary output file"
+DEBUG: [2025-08-22 14:03:57] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "phytomeric outputs SAMPHY"
+DEBUG: [2025-08-22 14:03:57] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "canopy photosynthesis outputs"
+DEBUG: [2025-08-22 14:03:57] DataProcessor::getOutfileDescriptions() - Loaded: "OUT" = "abiotic stress factors"
+DEBUG: [2025-08-22 14:03:57] DataProcessor::getOutfileDescriptions() - Loaded 2 descriptions from "/Applications/DSSAT48/OUTPUT.CDE"
+DEBUG: [2025-08-22 14:03:57] populateFiles: Loaded 2 outfile descriptions
+DEBUG: [2025-08-22 14:03:57] populateFiles: File "Dormancy.OUT" Extension: "OUT" Description: "abiotic stress factors"
+DEBUG: [2025-08-22 14:03:57] populateFiles: Set tooltip to: "OUT: abiotic stress factors"
+DEBUG: [2025-08-22 14:03:57] populateFiles: File "ET.OUT" Extension: "OUT" Description: "abiotic stress factors"
+DEBUG: [2025-08-22 14:03:57] populateFiles: Set tooltip to: "OUT: abiotic stress factors"
+DEBUG: [2025-08-22 14:03:57] populateFiles: File "ETPhot.OUT" Extension: "OUT" Description: "abiotic stress factors"
+DEBUG: [2025-08-22 14:03:57] populateFiles: Set tooltip to: "OUT: abiotic stress factors"
+DEBUG: [2025-08-22 14:03:57] populateFiles: File "FORAGE.OUT" Extension: "OUT" Description: "abiotic stress factors"
+DEBUG: [2025-08-22 14:03:57] populateFiles: Set tooltip to: "OUT: abiotic stress factors"
+DEBUG: [2025-08-22 14:03:57] populateFiles: File "GHG.OUT" Extension: "OUT" Description: "abiotic stress factors"
+DEBUG: [2025-08-22 14:03:57] populateFiles: Set tooltip to: "OUT: abiotic stress factors"
+DEBUG: [2025-08-22 14:03:57] populateFiles: File "Mulch.OUT" Extension: "OUT" Description: "abiotic stress factors"
+DEBUG: [2025-08-22 14:03:57] populateFiles: Set tooltip to: "OUT: abiotic stress factors"
+DEBUG: [2025-08-22 14:03:57] populateFiles: File "N2O.OUT" Extension: "OUT" Description: "abiotic stress factors"
+DEBUG: [2025-08-22 14:03:57] populateFiles: Set tooltip to: "OUT: abiotic stress factors"
+DEBUG: [2025-08-22 14:03:57] populateFiles: File "PlantC.OUT" Extension: "OUT" Description: "abiotic stress factors"
+DEBUG: [2025-08-22 14:03:57] populateFiles: Set tooltip to: "OUT: abiotic stress factors"
+DEBUG: [2025-08-22 14:03:57] populateFiles: File "PlantGro.OUT" Extension: "OUT" Description: "abiotic stress factors"
+DEBUG: [2025-08-22 14:03:57] populateFiles: Set tooltip to: "OUT: abiotic stress factors"
+DEBUG: [2025-08-22 14:03:57] populateFiles: File "PlantMob.OUT" Extension: "OUT" Description: "abiotic stress factors"
+DEBUG: [2025-08-22 14:03:57] populateFiles: Set tooltip to: "OUT: abiotic stress factors"
+DEBUG: [2025-08-22 14:03:57] populateFiles: File "PlantN.OUT" Extension: "OUT" Description: "abiotic stress factors"
+DEBUG: [2025-08-22 14:03:57] populateFiles: Set tooltip to: "OUT: abiotic stress factors"
+DEBUG: [2025-08-22 14:03:57] populateFiles: File "SOMLITC.OUT" Extension: "OUT" Description: "abiotic stress factors"
+DEBUG: [2025-08-22 14:03:57] populateFiles: Set tooltip to: "OUT: abiotic stress factors"
+DEBUG: [2025-08-22 14:03:57] populateFiles: File "SOMLITN.OUT" Extension: "OUT" Description: "abiotic stress factors"
+DEBUG: [2025-08-22 14:03:57] populateFiles: Set tooltip to: "OUT: abiotic stress factors"
+DEBUG: [2025-08-22 14:03:57] populateFiles: File "SoilNi.OUT" Extension: "OUT" Description: "abiotic stress factors"
+DEBUG: [2025-08-22 14:03:57] populateFiles: Set tooltip to: "OUT: abiotic stress factors"
+DEBUG: [2025-08-22 14:03:57] populateFiles: File "SoilOrg.OUT" Extension: "OUT" Description: "abiotic stress factors"
+DEBUG: [2025-08-22 14:03:57] populateFiles: Set tooltip to: "OUT: abiotic stress factors"
+DEBUG: [2025-08-22 14:03:57] populateFiles: File "SoilTemp.OUT" Extension: "OUT" Description: "abiotic stress factors"
+DEBUG: [2025-08-22 14:03:57] populateFiles: Set tooltip to: "OUT: abiotic stress factors"
+DEBUG: [2025-08-22 14:03:57] populateFiles: File "SoilWat.OUT" Extension: "OUT" Description: "abiotic stress factors"
+DEBUG: [2025-08-22 14:03:57] populateFiles: Set tooltip to: "OUT: abiotic stress factors"
+DEBUG: [2025-08-22 14:03:57] populateFiles: File "SoilWater.OUT" Extension: "OUT" Description: "abiotic stress factors"
+DEBUG: [2025-08-22 14:03:57] populateFiles: Set tooltip to: "OUT: abiotic stress factors"
+DEBUG: [2025-08-22 14:03:57] populateFiles: File "Storage.OUT" Extension: "OUT" Description: "abiotic stress factors"
+DEBUG: [2025-08-22 14:03:57] populateFiles: Set tooltip to: "OUT: abiotic stress factors"
+DEBUG: [2025-08-22 14:03:57] populateFiles: File "Weather.OUT" Extension: "OUT" Description: "abiotic stress factors"
+DEBUG: [2025-08-22 14:03:57] populateFiles: Set tooltip to: "OUT: abiotic stress factors"
+DEBUG: [2025-08-22 14:03:57] populateFiles: Looking for files in folder: "Alfalfa"
+DEBUG: [2025-08-22 14:03:57] prepareOutFiles: Checking if directory exists: "/Applications/DSSAT48/Alfalfa"
+DEBUG: [2025-08-22 14:03:57] prepareOutFiles: Directory exists, looking for files...
+DEBUG: [2025-08-22 14:03:57] prepareOutFiles: Found 32 total files: QList("Dormancy.OUT", "ET.OUT", "ETPhot.OUT", "Evaluate.OUT", "FORAGE.OUT", "GHG.OUT", "INFO.OUT", "Mulch.OUT", "N2O.OUT", "PlantC.OUT", "PlantGro.OUT", "PlantMob.OUT", "PlantN.OUT", "PlantNBal.OUT", "RunList.OUT", "SOMLITC.OUT", "SOMLITN.OUT", "SoilCBal.OUT", "SoilCBalSum.OUT", "SoilNBalSum.OUT", "SoilNi.OUT", "SoilNiBal.OUT", "SoilNoBal.OUT", "SoilOrg.OUT", "SoilTemp.OUT", "SoilWat.OUT", "SoilWatBal.OUT", "SoilWater.OUT", "Storage.OUT", "Summary.OUT", "WARNING.OUT", "Weather.OUT")
+DEBUG: [2025-08-22 14:03:57] isFilePlottable: "/Applications/DSSAT48/Alfalfa/Dormancy.OUT" -> hasDataTable: true hasTimeColumns: true dataRowCount: 5 isPlottable: true
+DEBUG: [2025-08-22 14:03:57] isFilePlottable: "/Applications/DSSAT48/Alfalfa/ET.OUT" -> hasDataTable: true hasTimeColumns: true dataRowCount: 5 isPlottable: true
+DEBUG: [2025-08-22 14:03:57] isFilePlottable: "/Applications/DSSAT48/Alfalfa/ETPhot.OUT" -> hasDataTable: true hasTimeColumns: true dataRowCount: 5 isPlottable: true
+DEBUG: [2025-08-22 14:03:57] prepareOutFiles: Filtering out non-plottable file: "Evaluate.OUT" ( "matches non-plottable pattern: evaluate" )
+DEBUG: [2025-08-22 14:03:57] isFilePlottable: "/Applications/DSSAT48/Alfalfa/FORAGE.OUT" -> hasDataTable: true hasTimeColumns: true dataRowCount: 5 isPlottable: true
+DEBUG: [2025-08-22 14:03:57] isFilePlottable: "/Applications/DSSAT48/Alfalfa/GHG.OUT" -> hasDataTable: true hasTimeColumns: true dataRowCount: 5 isPlottable: true
+DEBUG: [2025-08-22 14:03:57] isFilePlottable: "/Applications/DSSAT48/Alfalfa/INFO.OUT" -> hasDataTable: false hasTimeColumns: false dataRowCount: 0 isPlottable: false
+DEBUG: [2025-08-22 14:03:57] prepareOutFiles: Filtering out non-plottable file: "INFO.OUT" ( "lacks time-series structure" )
+DEBUG: [2025-08-22 14:03:57] isFilePlottable: "/Applications/DSSAT48/Alfalfa/Mulch.OUT" -> hasDataTable: true hasTimeColumns: true dataRowCount: 5 isPlottable: true
+DEBUG: [2025-08-22 14:03:57] isFilePlottable: "/Applications/DSSAT48/Alfalfa/N2O.OUT" -> hasDataTable: true hasTimeColumns: true dataRowCount: 5 isPlottable: true
+DEBUG: [2025-08-22 14:03:57] isFilePlottable: "/Applications/DSSAT48/Alfalfa/PlantC.OUT" -> hasDataTable: true hasTimeColumns: true dataRowCount: 5 isPlottable: true
+DEBUG: [2025-08-22 14:03:57] isFilePlottable: "/Applications/DSSAT48/Alfalfa/PlantGro.OUT" -> hasDataTable: true hasTimeColumns: true dataRowCount: 5 isPlottable: true
+DEBUG: [2025-08-22 14:03:57] isFilePlottable: "/Applications/DSSAT48/Alfalfa/PlantMob.OUT" -> hasDataTable: true hasTimeColumns: true dataRowCount: 5 isPlottable: true
+DEBUG: [2025-08-22 14:03:57] isFilePlottable: "/Applications/DSSAT48/Alfalfa/PlantN.OUT" -> hasDataTable: true hasTimeColumns: true dataRowCount: 5 isPlottable: true
+DEBUG: [2025-08-22 14:03:57] isFilePlottable: "/Applications/DSSAT48/Alfalfa/PlantNBal.OUT" -> hasDataTable: false hasTimeColumns: false dataRowCount: 0 isPlottable: false
+DEBUG: [2025-08-22 14:03:57] prepareOutFiles: Filtering out non-plottable file: "PlantNBal.OUT" ( "lacks time-series structure" )
+DEBUG: [2025-08-22 14:03:57] isFilePlottable: "/Applications/DSSAT48/Alfalfa/RunList.OUT" -> hasDataTable: false hasTimeColumns: false dataRowCount: 0 isPlottable: false
+DEBUG: [2025-08-22 14:03:57] prepareOutFiles: Filtering out non-plottable file: "RunList.OUT" ( "lacks time-series structure" )
+DEBUG: [2025-08-22 14:03:57] isFilePlottable: "/Applications/DSSAT48/Alfalfa/SOMLITC.OUT" -> hasDataTable: true hasTimeColumns: true dataRowCount: 5 isPlottable: true
+DEBUG: [2025-08-22 14:03:57] isFilePlottable: "/Applications/DSSAT48/Alfalfa/SOMLITN.OUT" -> hasDataTable: true hasTimeColumns: true dataRowCount: 5 isPlottable: true
+DEBUG: [2025-08-22 14:03:57] isFilePlottable: "/Applications/DSSAT48/Alfalfa/SoilCBal.OUT" -> hasDataTable: false hasTimeColumns: false dataRowCount: 0 isPlottable: false
+DEBUG: [2025-08-22 14:03:57] prepareOutFiles: Filtering out non-plottable file: "SoilCBal.OUT" ( "lacks time-series structure" )
+DEBUG: [2025-08-22 14:03:57] isFilePlottable: "/Applications/DSSAT48/Alfalfa/SoilCBalSum.OUT" -> hasDataTable: true hasTimeColumns: false dataRowCount: 6 isPlottable: false
+DEBUG: [2025-08-22 14:03:57] prepareOutFiles: Filtering out non-plottable file: "SoilCBalSum.OUT" ( "lacks time-series structure" )
+DEBUG: [2025-08-22 14:03:57] isFilePlottable: "/Applications/DSSAT48/Alfalfa/SoilNBalSum.OUT" -> hasDataTable: true hasTimeColumns: false dataRowCount: 6 isPlottable: false
+DEBUG: [2025-08-22 14:03:57] prepareOutFiles: Filtering out non-plottable file: "SoilNBalSum.OUT" ( "lacks time-series structure" )
+DEBUG: [2025-08-22 14:03:57] isFilePlottable: "/Applications/DSSAT48/Alfalfa/SoilNi.OUT" -> hasDataTable: true hasTimeColumns: true dataRowCount: 5 isPlottable: true
+DEBUG: [2025-08-22 14:03:57] isFilePlottable: "/Applications/DSSAT48/Alfalfa/SoilNiBal.OUT" -> hasDataTable: false hasTimeColumns: false dataRowCount: 0 isPlottable: false
+DEBUG: [2025-08-22 14:03:57] prepareOutFiles: Filtering out non-plottable file: "SoilNiBal.OUT" ( "lacks time-series structure" )
+DEBUG: [2025-08-22 14:03:57] isFilePlottable: "/Applications/DSSAT48/Alfalfa/SoilNoBal.OUT" -> hasDataTable: false hasTimeColumns: false dataRowCount: 0 isPlottable: false
+DEBUG: [2025-08-22 14:03:57] prepareOutFiles: Filtering out non-plottable file: "SoilNoBal.OUT" ( "lacks time-series structure" )
+DEBUG: [2025-08-22 14:03:57] isFilePlottable: "/Applications/DSSAT48/Alfalfa/SoilOrg.OUT" -> hasDataTable: true hasTimeColumns: true dataRowCount: 5 isPlottable: true
+DEBUG: [2025-08-22 14:03:57] isFilePlottable: "/Applications/DSSAT48/Alfalfa/SoilTemp.OUT" -> hasDataTable: true hasTimeColumns: true dataRowCount: 5 isPlottable: true
+DEBUG: [2025-08-22 14:03:57] isFilePlottable: "/Applications/DSSAT48/Alfalfa/SoilWat.OUT" -> hasDataTable: true hasTimeColumns: true dataRowCount: 5 isPlottable: true
+DEBUG: [2025-08-22 14:03:57] isFilePlottable: "/Applications/DSSAT48/Alfalfa/SoilWatBal.OUT" -> hasDataTable: false hasTimeColumns: false dataRowCount: 0 isPlottable: false
+DEBUG: [2025-08-22 14:03:57] prepareOutFiles: Filtering out non-plottable file: "SoilWatBal.OUT" ( "lacks time-series structure" )
+DEBUG: [2025-08-22 14:03:57] isFilePlottable: "/Applications/DSSAT48/Alfalfa/SoilWater.OUT" -> hasDataTable: true hasTimeColumns: true dataRowCount: 5 isPlottable: true
+DEBUG: [2025-08-22 14:03:57] isFilePlottable: "/Applications/DSSAT48/Alfalfa/Storage.OUT" -> hasDataTable: true hasTimeColumns: true dataRowCount: 5 isPlottable: true
+DEBUG: [2025-08-22 14:03:57] prepareOutFiles: Filtering out non-plottable file: "Summary.OUT" ( "matches non-plottable pattern: summary" )
+DEBUG: [2025-08-22 14:03:57] isFilePlottable: "/Applications/DSSAT48/Alfalfa/WARNING.OUT" -> hasDataTable: false hasTimeColumns: false dataRowCount: 0 isPlottable: false
+DEBUG: [2025-08-22 14:03:57] prepareOutFiles: Filtering out non-plottable file: "WARNING.OUT" ( "lacks time-series structure" )
+DEBUG: [2025-08-22 14:03:57] isFilePlottable: "/Applications/DSSAT48/Alfalfa/Weather.OUT" -> hasDataTable: true hasTimeColumns: true dataRowCount: 5 isPlottable: true
+DEBUG: [2025-08-22 14:03:57] prepareOutFiles: After filtering, found 20 plottable files: QList("Dormancy.OUT", "ET.OUT", "ETPhot.OUT", "FORAGE.OUT", "GHG.OUT", "Mulch.OUT", "N2O.OUT", "PlantC.OUT", "PlantGro.OUT", "PlantMob.OUT", "PlantN.OUT", "SOMLITC.OUT", "SOMLITN.OUT", "SoilNi.OUT", "SoilOrg.OUT", "SoilTemp.OUT", "SoilWat.OUT", "SoilWater.OUT", "Storage.OUT", "Weather.OUT")
+DEBUG: [2025-08-22 14:03:57] populateFiles: Found 20 files: QList("Dormancy.OUT", "ET.OUT", "ETPhot.OUT", "FORAGE.OUT", "GHG.OUT", "Mulch.OUT", "N2O.OUT", "PlantC.OUT", "PlantGro.OUT", "PlantMob.OUT", "PlantN.OUT", "SOMLITC.OUT", "SOMLITN.OUT", "SoilNi.OUT", "SoilOrg.OUT", "SoilTemp.OUT", "SoilWat.OUT", "SoilWater.OUT", "Storage.OUT", "Weather.OUT")
+DEBUG: [2025-08-22 14:03:57] populateFiles: Loaded 2 outfile descriptions
+DEBUG: [2025-08-22 14:03:57] populateFiles: File "Dormancy.OUT" Extension: "OUT" Description: "abiotic stress factors"
+DEBUG: [2025-08-22 14:03:57] populateFiles: Set tooltip to: "OUT: abiotic stress factors"
+DEBUG: [2025-08-22 14:03:57] populateFiles: File "ET.OUT" Extension: "OUT" Description: "abiotic stress factors"
+DEBUG: [2025-08-22 14:03:57] populateFiles: Set tooltip to: "OUT: abiotic stress factors"
+DEBUG: [2025-08-22 14:03:57] populateFiles: File "ETPhot.OUT" Extension: "OUT" Description: "abiotic stress factors"
+DEBUG: [2025-08-22 14:03:57] populateFiles: Set tooltip to: "OUT: abiotic stress factors"
+DEBUG: [2025-08-22 14:03:57] populateFiles: File "FORAGE.OUT" Extension: "OUT" Description: "abiotic stress factors"
+DEBUG: [2025-08-22 14:03:57] populateFiles: Set tooltip to: "OUT: abiotic stress factors"
+DEBUG: [2025-08-22 14:03:57] populateFiles: File "GHG.OUT" Extension: "OUT" Description: "abiotic stress factors"
+DEBUG: [2025-08-22 14:03:57] populateFiles: Set tooltip to: "OUT: abiotic stress factors"
+DEBUG: [2025-08-22 14:03:57] populateFiles: File "Mulch.OUT" Extension: "OUT" Description: "abiotic stress factors"
+DEBUG: [2025-08-22 14:03:57] populateFiles: Set tooltip to: "OUT: abiotic stress factors"
+DEBUG: [2025-08-22 14:03:57] populateFiles: File "N2O.OUT" Extension: "OUT" Description: "abiotic stress factors"
+DEBUG: [2025-08-22 14:03:57] populateFiles: Set tooltip to: "OUT: abiotic stress factors"
+DEBUG: [2025-08-22 14:03:57] populateFiles: File "PlantC.OUT" Extension: "OUT" Description: "abiotic stress factors"
+DEBUG: [2025-08-22 14:03:57] populateFiles: Set tooltip to: "OUT: abiotic stress factors"
+DEBUG: [2025-08-22 14:03:57] populateFiles: File "PlantGro.OUT" Extension: "OUT" Description: "abiotic stress factors"
+DEBUG: [2025-08-22 14:03:57] populateFiles: Set tooltip to: "OUT: abiotic stress factors"
+DEBUG: [2025-08-22 14:03:57] populateFiles: File "PlantMob.OUT" Extension: "OUT" Description: "abiotic stress factors"
+DEBUG: [2025-08-22 14:03:57] populateFiles: Set tooltip to: "OUT: abiotic stress factors"
+DEBUG: [2025-08-22 14:03:57] populateFiles: File "PlantN.OUT" Extension: "OUT" Description: "abiotic stress factors"
+DEBUG: [2025-08-22 14:03:57] populateFiles: Set tooltip to: "OUT: abiotic stress factors"
+DEBUG: [2025-08-22 14:03:57] populateFiles: File "SOMLITC.OUT" Extension: "OUT" Description: "abiotic stress factors"
+DEBUG: [2025-08-22 14:03:57] populateFiles: Set tooltip to: "OUT: abiotic stress factors"
+DEBUG: [2025-08-22 14:03:57] populateFiles: File "SOMLITN.OUT" Extension: "OUT" Description: "abiotic stress factors"
+DEBUG: [2025-08-22 14:03:57] populateFiles: Set tooltip to: "OUT: abiotic stress factors"
+DEBUG: [2025-08-22 14:03:57] populateFiles: File "SoilNi.OUT" Extension: "OUT" Description: "abiotic stress factors"
+DEBUG: [2025-08-22 14:03:57] populateFiles: Set tooltip to: "OUT: abiotic stress factors"
+DEBUG: [2025-08-22 14:03:57] populateFiles: File "SoilOrg.OUT" Extension: "OUT" Description: "abiotic stress factors"
+DEBUG: [2025-08-22 14:03:57] populateFiles: Set tooltip to: "OUT: abiotic stress factors"
+DEBUG: [2025-08-22 14:03:57] populateFiles: File "SoilTemp.OUT" Extension: "OUT" Description: "abiotic stress factors"
+DEBUG: [2025-08-22 14:03:57] populateFiles: Set tooltip to: "OUT: abiotic stress factors"
+DEBUG: [2025-08-22 14:03:57] populateFiles: File "SoilWat.OUT" Extension: "OUT" Description: "abiotic stress factors"
+DEBUG: [2025-08-22 14:03:57] populateFiles: Set tooltip to: "OUT: abiotic stress factors"
+DEBUG: [2025-08-22 14:03:57] populateFiles: File "SoilWater.OUT" Extension: "OUT" Description: "abiotic stress factors"
+DEBUG: [2025-08-22 14:03:57] populateFiles: Set tooltip to: "OUT: abiotic stress factors"
+DEBUG: [2025-08-22 14:03:57] populateFiles: File "Storage.OUT" Extension: "OUT" Description: "abiotic stress factors"
+DEBUG: [2025-08-22 14:03:57] populateFiles: Set tooltip to: "OUT: abiotic stress factors"
+DEBUG: [2025-08-22 14:03:57] populateFiles: File "Weather.OUT" Extension: "OUT" Description: "abiotic stress factors"
+DEBUG: [2025-08-22 14:03:57] populateFiles: Set tooltip to: "OUT: abiotic stress factors"
+WARNING: [2025-08-22 14:03:57] Unknown property box-shadow
+WARNING: [2025-08-22 14:03:57] Insufficient parameters: QList("--help")
+DEBUG: [2025-08-22 14:03:57] No valid command line arguments provided, starting normally
+INFO: [2025-08-22 14:03:57] Application started successfully
+DEBUG: [2025-08-22 14:04:01] MainWindow::onFileSelectionChanged() - File selection changed!
+DEBUG: [2025-08-22 14:04:01] MainWindow::onFileSelectionChanged() - Selected items count: 1
+DEBUG: [2025-08-22 14:04:01] MainWindow::onFileSelectionChanged() - Enabling update button
+DEBUG: [2025-08-22 14:04:01] MainWindow::onFileSelectionChanged() - Processing selected file...
+DEBUG: [2025-08-22 14:04:01] MainWindow::onFileSelectionChanged() - Selected file name: "PlantGro.OUT"
+DEBUG: [2025-08-22 14:04:01] MainWindow::onFileSelectionChanged() - Getting DSSAT base path...
+DEBUG: [2025-08-22 14:04:01] MainWindow::onFileSelectionChanged() - DSSAT base: "/Applications/DSSAT48"
+DEBUG: [2025-08-22 14:04:01] MainWindow::onFileSelectionChanged() - Selected folder: "Alfalfa"
+DEBUG: [2025-08-22 14:04:01] MainWindow: Selected simulated file path: "/Applications/DSSAT48/Alfalfa/PlantGro.OUT"
+DEBUG: [2025-08-22 14:04:01] MainWindow::onFileSelectionChanged() - About to call loadFile...
+DEBUG: [2025-08-22 14:04:01] MainWindow::loadFile() called with: "/Applications/DSSAT48/Alfalfa/PlantGro.OUT"
+DEBUG: [2025-08-22 14:04:01] MainWindow: File size: 2086426 bytes
+DEBUG: [2025-08-22 14:04:01] MainWindow: Calling readFile on DataProcessor...
+DEBUG: [2025-08-22 14:04:01] DataProcessor::readOutFile() called with: "/Applications/DSSAT48/Alfalfa/PlantGro.OUT"
+DEBUG: [2025-08-22 14:04:01] DataProcessor: File opened successfully, size: 2086426
+DEBUG: [2025-08-22 14:04:01] DataProcessor: Read 1000 lines so far...
+DEBUG: [2025-08-22 14:04:01] DataProcessor: Read 2000 lines so far...
+DEBUG: [2025-08-22 14:04:01] DataProcessor: Read 3000 lines so far...
+DEBUG: [2025-08-22 14:04:01] DataProcessor: Read 4000 lines so far...
+DEBUG: [2025-08-22 14:04:01] DataProcessor: Read 5000 lines so far...
+DEBUG: [2025-08-22 14:04:01] DataProcessor: Read 6000 lines so far...
+DEBUG: [2025-08-22 14:04:01] DataProcessor: Read 6277 total lines
+DEBUG: [2025-08-22 14:04:01] DataProcessor: Starting file parsing...
+DEBUG: [2025-08-22 14:04:01] DataProcessor: readOutFile completed successfully
+DEBUG: [2025-08-22 14:04:01] MainWindow: readFile result: true
+DEBUG: [2025-08-22 14:04:01] MainWindow: File loaded successfully, rows: 6216
+DEBUG: [2025-08-22 14:04:01] MainWindow::onFileSelectionChanged() - loadFile completed
+DEBUG: [2025-08-22 14:04:01] MainWindow: Extracted unique Experiment Codes from simulated data: QList("AGZG1502", "AGZG1219")
+DEBUG: [2025-08-22 14:04:01] MainWindow: Extracted Treatment Names: QMap(("AGZG1219", QMap(("1", "finca -obs harv,data")("2", "finca fixed 34 days")("3", "finca - 630 GDD Harv")))("AGZG1502", QMap(("1", "Montanana Sp, Fix Mow")("2", "Montanana Sp, 40d Harv")("3", "Montanana Sp, GDD Harv"))))
+DEBUG: [2025-08-22 14:04:01] MainWindow: Setting m_selectedExperiment to: "AGZG1502"
+DEBUG: [2025-08-22 14:04:01] MainWindow: Determined Crop Code: "XX"
+DEBUG: [2025-08-22 14:04:01] MainWindow: Added CROP column with code: "XX" to simulated data
+DEBUG: [2025-08-22 14:04:01] DataProcessor: Attempting to find and read observed data for: "/Applications/DSSAT48/Alfalfa/PlantGro.OUT" , Exp Code: "AGZG1502" , Crop Code: "XX"
+DEBUG: [2025-08-22 14:04:01] DataProcessor: Checking for observed file: "/Applications/DSSAT48/Alfalfa/AGZG1502.TMT"
+DEBUG: [2025-08-22 14:04:01] DataProcessor: Checking for observed file: "/Applications/DSSAT48/Alfalfa/AGZG1502.T"
+DEBUG: [2025-08-22 14:04:01] DataProcessor: No observed data file found for: "/Applications/DSSAT48/Alfalfa/PlantGro.OUT"
+DEBUG: [2025-08-22 14:04:01] DataProcessor: Attempting to find and read observed data for: "/Applications/DSSAT48/Alfalfa/PlantGro.OUT" , Exp Code: "AGZG1219" , Crop Code: "XX"
+DEBUG: [2025-08-22 14:04:01] DataProcessor: Checking for observed file: "/Applications/DSSAT48/Alfalfa/AGZG1219.TMT"
+DEBUG: [2025-08-22 14:04:01] DataProcessor: Checking for observed file: "/Applications/DSSAT48/Alfalfa/AGZG1219.T"
+DEBUG: [2025-08-22 14:04:01] DataProcessor: No observed data file found for: "/Applications/DSSAT48/Alfalfa/PlantGro.OUT"
+DEBUG: [2025-08-22 14:04:01] MainWindow::onFileSelectionChanged() - Data loaded, marked for table refresh.
+DEBUG: [2025-08-22 14:04:01] MainWindow::onFileSelectionChanged() - Function completed successfully; table data not yet set.
+DEBUG: [2025-08-22 14:04:01] MainWindow::onFileSelectionChanged() - Function finished

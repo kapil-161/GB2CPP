@@ -1,0 +1,7 @@
+{
+	"InstallScripts" : 
+	[
+		"/Applications/DSSAT48/Tools/GBTOOLS/GB2CPP/build_macos/cmake_install.cmake"
+	],
+	"Parallel" : false
+}

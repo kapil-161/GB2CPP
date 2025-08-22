@@ -1,0 +1,5 @@
+C:/DSSAT48/Tools/GBCpp/build_win/CMakeFiles/GB2.dir
+C:/DSSAT48/Tools/GBCpp/build_win/CMakeFiles/edit_cache.dir
+C:/DSSAT48/Tools/GBCpp/build_win/CMakeFiles/rebuild_cache.dir
+C:/DSSAT48/Tools/GBCpp/build_win/CMakeFiles/GB2_autogen_timestamp_deps.dir
+C:/DSSAT48/Tools/GBCpp/build_win/CMakeFiles/GB2_autogen.dir

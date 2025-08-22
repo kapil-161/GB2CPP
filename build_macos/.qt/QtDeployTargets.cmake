@@ -1,0 +1,2 @@
+set(__QT_DEPLOY_TARGET_GB2_FILE /Applications/DSSAT48/Tools/GBTOOLS/GB2CPP/build_macos/bin/GB2.app/Contents/MacOS/GB2)
+set(__QT_DEPLOY_TARGET_GB2_TYPE EXECUTABLE)

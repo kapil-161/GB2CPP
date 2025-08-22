@@ -1,0 +1,5 @@
+/Applications/DSSAT48/Tools/GBTOOLS/GB2CPP/build_macos/CMakeFiles/GB2.dir
+/Applications/DSSAT48/Tools/GBTOOLS/GB2CPP/build_macos/CMakeFiles/edit_cache.dir
+/Applications/DSSAT48/Tools/GBTOOLS/GB2CPP/build_macos/CMakeFiles/rebuild_cache.dir
+/Applications/DSSAT48/Tools/GBTOOLS/GB2CPP/build_macos/CMakeFiles/GB2_autogen_timestamp_deps.dir
+/Applications/DSSAT48/Tools/GBTOOLS/GB2CPP/build_macos/CMakeFiles/GB2_autogen.dir
