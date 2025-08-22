@@ -1,6 +1,6 @@
 CMakeFiles/GB2.dir/src/MetricsDialog.cpp.obj: \
- C:\DSSAT48\Tools\GBCpp\src\MetricsDialog.cpp \
- C:/DSSAT48/Tools/GBCpp/include/MetricsDialog.h \
+ C:\DSSAT48\Tools\GB2CPP\src\MetricsDialog.cpp \
+ C:/DSSAT48/Tools/GB2CPP/include/MetricsDialog.h \
  C:/Qt/6.9.1/mingw_64/include/QtWidgets/QDialog \
  C:/Qt/6.9.1/mingw_64/include/QtWidgets/qdialog.h \
  C:/Qt/6.9.1/mingw_64/include/QtWidgets/qtwidgetsglobal.h \
@@ -396,7 +396,7 @@ CMakeFiles/GB2.dir/src/MetricsDialog.cpp.obj: \
  C:/Qt/6.9.1/mingw_64/include/QtCore/qlist.h \
  C:/Qt/6.9.1/mingw_64/include/QtCore/QVariant \
  C:/Qt/6.9.1/mingw_64/include/QtCore/qvariant.h \
- C:/DSSAT48/Tools/GBCpp/include/MetricsTableWidget.h \
+ C:/DSSAT48/Tools/GB2CPP/include/MetricsTableWidget.h \
  C:/Qt/6.9.1/mingw_64/include/QtWidgets/QWidget \
  C:/Qt/6.9.1/mingw_64/include/QtWidgets/qwidget.h \
  C:/Qt/6.9.1/mingw_64/include/QtWidgets/QLabel \

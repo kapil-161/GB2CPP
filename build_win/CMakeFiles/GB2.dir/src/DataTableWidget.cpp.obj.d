@@ -1,6 +1,6 @@
 CMakeFiles/GB2.dir/src/DataTableWidget.cpp.obj: \
- C:\DSSAT48\Tools\GBCpp\src\DataTableWidget.cpp \
- C:/DSSAT48/Tools/GBCpp/include/DataTableWidget.h \
+ C:\DSSAT48\Tools\GB2CPP\src\DataTableWidget.cpp \
+ C:/DSSAT48/Tools/GB2CPP/include/DataTableWidget.h \
  C:/Qt/6.9.1/mingw_64/include/QtWidgets/QWidget \
  C:/Qt/6.9.1/mingw_64/include/QtWidgets/qwidget.h \
  C:/Qt/6.9.1/mingw_64/include/QtWidgets/qtwidgetsglobal.h \
@@ -470,7 +470,7 @@ CMakeFiles/GB2.dir/src/DataTableWidget.cpp.obj: \
  C:/Qt/6.9.1/mingw_64/include/QtCore/qstandardpaths.h \
  C:/Qt/6.9.1/mingw_64/include/QtCore/QTextStream \
  C:/Qt/6.9.1/mingw_64/include/QtCore/qtextstream.h \
- C:/DSSAT48/Tools/GBCpp/include/PandasTableModel.h \
+ C:/DSSAT48/Tools/GB2CPP/include/PandasTableModel.h \
  C:/Qt/6.9.1/mingw_64/include/QtCore/QAbstractTableModel \
  C:/Qt/6.9.1/mingw_64/include/QtCore/qabstractitemmodel.h \
  C:/Qt/6.9.1/mingw_64/include/QtCore/QVariant \
@@ -481,7 +481,7 @@ CMakeFiles/GB2.dir/src/DataTableWidget.cpp.obj: \
  C:/Qt/6.9.1/mingw_64/include/QtCore/qvector.h \
  C:/Qt/6.9.1/mingw_64/include/QtCore/QMap \
  C:/Qt/6.9.1/mingw_64/include/QtCore/qmap.h \
- C:/DSSAT48/Tools/GBCpp/include/DataProcessor.h \
+ C:/DSSAT48/Tools/GB2CPP/include/DataProcessor.h \
  C:/Qt/6.9.1/mingw_64/include/QtCore/QString \
  C:/Qt/6.9.1/mingw_64/include/QtCore/qstring.h \
  C:/Qt/6.9.1/mingw_64/include/QtCore/QDateTime \

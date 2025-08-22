@@ -1,6 +1,6 @@
 CMakeFiles/GB2.dir/src/StatusWidget.cpp.obj: \
- C:\DSSAT48\Tools\GBCpp\src\StatusWidget.cpp \
- C:/DSSAT48/Tools/GBCpp/include/StatusWidget.h \
+ C:\DSSAT48\Tools\GB2CPP\src\StatusWidget.cpp \
+ C:/DSSAT48/Tools/GB2CPP/include/StatusWidget.h \
  C:/Qt/6.9.1/mingw_64/include/QtWidgets/QWidget \
  C:/Qt/6.9.1/mingw_64/include/QtWidgets/qwidget.h \
  C:/Qt/6.9.1/mingw_64/include/QtWidgets/qtwidgetsglobal.h \
@@ -408,7 +408,7 @@ CMakeFiles/GB2.dir/src/StatusWidget.cpp.obj: \
  C:/Qt/6.9.1/mingw_64/include/QtWidgets/qmessagebox.h \
  C:/Qt/6.9.1/mingw_64/include/QtWidgets/qdialog.h \
  C:/Qt/6.9.1/mingw_64/include/QtWidgets/qdialogbuttonbox.h \
- C:/DSSAT48/Tools/GBCpp/include/Config.h \
+ C:/DSSAT48/Tools/GB2CPP/include/Config.h \
  C:/Qt/6.9.1/mingw_64/include/QtCore/QString \
  C:/Qt/6.9.1/mingw_64/include/QtCore/qstring.h \
  C:/Qt/6.9.1/mingw_64/include/QtCore/QStringList \

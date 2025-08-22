@@ -1,5 +1,5 @@
 CMakeFiles/GB2.dir/src/PlotWidget.cpp.obj: \
- C:\DSSAT48\Tools\GBCpp\src\PlotWidget.cpp \
+ C:\DSSAT48\Tools\GB2CPP\src\PlotWidget.cpp \
  C:/Qt/6.9.1/mingw_64/include/QtCore/QSharedPointer \
  C:/Qt/6.9.1/mingw_64/include/QtCore/qsharedpointer.h \
  C:/Qt/6.9.1/mingw_64/include/QtCore/qglobal.h \
@@ -320,7 +320,7 @@ CMakeFiles/GB2.dir/src/PlotWidget.cpp.obj: \
  C:/Qt/6.9.1/mingw_64/include/QtCore/qstringmatcher.h \
  C:/Qt/6.9.1/mingw_64/include/QtCore/QVector \
  C:/Qt/6.9.1/mingw_64/include/QtCore/qvector.h \
- C:/DSSAT48/Tools/GBCpp/include/PlotWidget.h \
+ C:/DSSAT48/Tools/GB2CPP/include/PlotWidget.h \
  C:/Qt/6.9.1/mingw_64/include/QtWidgets/QWidget \
  C:/Qt/6.9.1/mingw_64/include/QtWidgets/qwidget.h \
  C:/Qt/6.9.1/mingw_64/include/QtWidgets/qtwidgetsglobal.h \
@@ -507,7 +507,7 @@ CMakeFiles/GB2.dir/src/PlotWidget.cpp.obj: \
  C:/Qt/6.9.1/mingw_64/include/QtWidgets/qgridlayout.h \
  C:/Qt/6.9.1/mingw_64/include/QtWidgets/QSpinBox \
  C:/Qt/6.9.1/mingw_64/include/QtWidgets/qspinbox.h \
- C:/DSSAT48/Tools/GBCpp/include/PlotSettingsDialog.h \
+ C:/DSSAT48/Tools/GB2CPP/include/PlotSettingsDialog.h \
  C:/Qt/6.9.1/mingw_64/include/QtWidgets/QDialog \
  C:/Qt/6.9.1/mingw_64/include/QtWidgets/qdialog.h \
  C:/Qt/6.9.1/mingw_64/include/QtWidgets/QDoubleSpinBox \
@@ -537,7 +537,7 @@ CMakeFiles/GB2.dir/src/PlotWidget.cpp.obj: \
  C:/Qt/6.9.1/mingw_64/include/QtCore/qmap.h \
  C:/Qt/6.9.1/mingw_64/include/QtCore/QPointer \
  C:/Qt/6.9.1/mingw_64/include/QtCore/qpointer.h \
- C:/DSSAT48/Tools/GBCpp/include/DataProcessor.h \
+ C:/DSSAT48/Tools/GB2CPP/include/DataProcessor.h \
  C:/Qt/6.9.1/mingw_64/include/QtCore/QString \
  C:/Qt/6.9.1/mingw_64/include/QtCore/qstring.h \
  C:/Qt/6.9.1/mingw_64/include/QtCore/QStringList \
@@ -547,12 +547,12 @@ CMakeFiles/GB2.dir/src/PlotWidget.cpp.obj: \
  C:/Qt/6.9.1/mingw_64/include/QtCore/qdatetime.h \
  C:/Qt/6.9.1/mingw_64/include/QtCore/qcalendar.h \
  C:/Qt/6.9.1/mingw_64/include/QtCore/QObject \
- C:/DSSAT48/Tools/GBCpp/include/MetricsCalculator.h \
+ C:/DSSAT48/Tools/GB2CPP/include/MetricsCalculator.h \
  C:/Qt/6.9.1/mingw_64/include/QtCore/QVariantMap \
  C:/Qt/6.9.1/mingw_64/include/QtCore/qvariantmap.h \
  C:/Qt/6.9.1/mingw_64/include/QtCore/QMap \
  C:/Qt/6.9.1/mingw_64/include/QtCore/QString \
- C:/DSSAT48/Tools/GBCpp/include/Config.h \
+ C:/DSSAT48/Tools/GB2CPP/include/Config.h \
  C:/Qt/6.9.1/mingw_64/include/QtGui/QColor \
  C:/Qt/6.9.1/mingw_64/include/QtGui/qcolor.h \
  C:/Qt/6.9.1/mingw_64/include/QtCore/QSize \

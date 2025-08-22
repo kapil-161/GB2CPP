@@ -1,6 +1,6 @@
 CMakeFiles/GB2.dir/src/MetricsTableWidget.cpp.obj: \
- C:\DSSAT48\Tools\GBCpp\src\MetricsTableWidget.cpp \
- C:/DSSAT48/Tools/GBCpp/include/MetricsTableWidget.h \
+ C:\DSSAT48\Tools\GB2CPP\src\MetricsTableWidget.cpp \
+ C:/DSSAT48/Tools/GB2CPP/include/MetricsTableWidget.h \
  C:/Qt/6.9.1/mingw_64/include/QtWidgets/QWidget \
  C:/Qt/6.9.1/mingw_64/include/QtWidgets/qwidget.h \
  C:/Qt/6.9.1/mingw_64/include/QtWidgets/qtwidgetsglobal.h \

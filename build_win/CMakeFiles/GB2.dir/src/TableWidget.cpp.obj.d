@@ -1,6 +1,6 @@
 CMakeFiles/GB2.dir/src/TableWidget.cpp.obj: \
- C:\DSSAT48\Tools\GBCpp\src\TableWidget.cpp \
- C:/DSSAT48/Tools/GBCpp/include/TableWidget.h \
+ C:\DSSAT48\Tools\GB2CPP\src\TableWidget.cpp \
+ C:/DSSAT48/Tools/GB2CPP/include/TableWidget.h \
  C:/Qt/6.9.1/mingw_64/include/QtWidgets/QWidget \
  C:/Qt/6.9.1/mingw_64/include/QtWidgets/qwidget.h \
  C:/Qt/6.9.1/mingw_64/include/QtWidgets/qtwidgetsglobal.h \
@@ -426,7 +426,7 @@ CMakeFiles/GB2.dir/src/TableWidget.cpp.obj: \
  C:/Qt/6.9.1/mingw_64/include/QtWidgets/qlabel.h \
  C:/Qt/6.9.1/mingw_64/include/QtGui/qpicture.h \
  C:/Qt/6.9.1/mingw_64/include/QtCore/qiodevice.h \
- C:/DSSAT48/Tools/GBCpp/include/DataProcessor.h \
+ C:/DSSAT48/Tools/GB2CPP/include/DataProcessor.h \
  C:/Qt/6.9.1/mingw_64/include/QtCore/QString \
  C:/Qt/6.9.1/mingw_64/include/QtCore/qstring.h \
  C:/Qt/6.9.1/mingw_64/include/QtCore/QStringList \

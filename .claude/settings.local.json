@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(mv:*)",
+      "Bash(./GB2.exe --version)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

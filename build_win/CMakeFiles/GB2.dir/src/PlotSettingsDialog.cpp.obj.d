@@ -1,6 +1,6 @@
 CMakeFiles/GB2.dir/src/PlotSettingsDialog.cpp.obj: \
- C:\DSSAT48\Tools\GBCpp\src\PlotSettingsDialog.cpp \
- C:/DSSAT48/Tools/GBCpp/include/PlotSettingsDialog.h \
+ C:\DSSAT48\Tools\GB2CPP\src\PlotSettingsDialog.cpp \
+ C:/DSSAT48/Tools/GB2CPP/include/PlotSettingsDialog.h \
  C:/Qt/6.9.1/mingw_64/include/QtWidgets/QDialog \
  C:/Qt/6.9.1/mingw_64/include/QtWidgets/qdialog.h \
  C:/Qt/6.9.1/mingw_64/include/QtWidgets/qtwidgetsglobal.h \
@@ -434,7 +434,7 @@ CMakeFiles/GB2.dir/src/PlotSettingsDialog.cpp.obj: \
  C:/Qt/6.9.1/mingw_64/include/QtGui/qtextformat.h \
  C:/Qt/6.9.1/mingw_64/include/QtGui/qpen.h \
  C:/Qt/6.9.1/mingw_64/include/QtGui/qtextoption.h \
- C:/DSSAT48/Tools/GBCpp/include/PlotWidget.h \
+ C:/DSSAT48/Tools/GB2CPP/include/PlotWidget.h \
  C:/Qt/6.9.1/mingw_64/include/QtWidgets/QWidget \
  C:/Qt/6.9.1/mingw_64/include/QtWidgets/qwidget.h \
  C:/Qt/6.9.1/mingw_64/include/QtGui/QResizeEvent \
@@ -518,7 +518,7 @@ CMakeFiles/GB2.dir/src/PlotSettingsDialog.cpp.obj: \
  C:/Qt/6.9.1/mingw_64/include/QtCharts/qvalueaxis.h \
  C:/Qt/6.9.1/mingw_64/include/QtCharts/QDateTimeAxis \
  C:/Qt/6.9.1/mingw_64/include/QtCharts/qdatetimeaxis.h \
- C:/DSSAT48/Tools/GBCpp/include/PlotSettingsDialog.h \
+ C:/DSSAT48/Tools/GB2CPP/include/PlotSettingsDialog.h \
  C:/Qt/6.9.1/mingw_64/include/QtWidgets/QScrollArea \
  C:/Qt/6.9.1/mingw_64/include/QtWidgets/qscrollarea.h \
  C:/Qt/6.9.1/mingw_64/include/QtWidgets/QListWidget \
@@ -536,7 +536,7 @@ CMakeFiles/GB2.dir/src/PlotSettingsDialog.cpp.obj: \
  C:/Qt/6.9.1/mingw_64/include/QtCore/qsharedpointer.h \
  C:/Qt/6.9.1/mingw_64/include/QtCore/QPointer \
  C:/Qt/6.9.1/mingw_64/include/QtCore/qpointer.h \
- C:/DSSAT48/Tools/GBCpp/include/DataProcessor.h \
+ C:/DSSAT48/Tools/GB2CPP/include/DataProcessor.h \
  C:/Qt/6.9.1/mingw_64/include/QtCore/QString \
  C:/Qt/6.9.1/mingw_64/include/QtCore/qstring.h \
  C:/Qt/6.9.1/mingw_64/include/QtCore/QStringList \

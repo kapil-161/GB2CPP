@@ -156,7 +156,7 @@ if exist resources xcopy /E /I resources manual_deployment\resources
 
 echo.
 echo Step 5: Deploying Qt6 dependencies...
-"%QT_DIR%\bin\windeployqt.exe" --release --no-translations manual_deployment\GB2.exe
+"%QT_DIR%\bin\windeployqt.exe" --release --no-translations --no-system-d3d-compiler --no-opengl-sw manual_deployment\GB2.exe
 
 if %ERRORLEVEL% neq 0 (
     echo ERROR: windeployqt failed!
@@ -164,11 +164,27 @@ if %ERRORLEVEL% neq 0 (
     exit /b 1
 )
 
-REM Copy additional system libraries if available
-copy "C:\Windows\System32\D3Dcompiler_47.dll" manual_deployment\ 2>nul
+echo.
+echo Step 6: Removing unnecessary files and folders...
+REM Remove unwanted plugin folders (KEEP platforms folder - it's essential!)
+if exist manual_deployment\generic rmdir /s /q manual_deployment\generic
+if exist manual_deployment\iconengines rmdir /s /q manual_deployment\iconengines  
+if exist manual_deployment\imageformats rmdir /s /q manual_deployment\imageformats
+if exist manual_deployment\networkinformation rmdir /s /q manual_deployment\networkinformation
+if exist manual_deployment\styles rmdir /s /q manual_deployment\styles
+if exist manual_deployment\tls rmdir /s /q manual_deployment\tls
+
+REM Remove unwanted DLL files (KEEP libgcc_s_seh-1.dll and libwinpthread-1.dll - they're needed!)
+if exist manual_deployment\Qt6Network.dll del manual_deployment\Qt6Network.dll
+if exist manual_deployment\Qt6Svg.dll del manual_deployment\Qt6Svg.dll
+if exist manual_deployment\D3Dcompiler_47.dll del manual_deployment\D3Dcompiler_47.dll
+if exist manual_deployment\opengl32sw.dll del manual_deployment\opengl32sw.dll
+
+echo Removed unnecessary files to minimize deployment size
+echo KEPT: platforms folder (Qt platform plugin), libgcc_s_seh-1.dll, libwinpthread-1.dll
 
 echo.
-echo Step 6: Testing deployment...
+echo Step 7: Testing deployment...
 cd manual_deployment
 echo Testing if GB2.exe runs...
 start "" GB2.exe

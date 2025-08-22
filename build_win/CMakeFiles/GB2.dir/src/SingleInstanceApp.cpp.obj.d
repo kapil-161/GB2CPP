@@ -1,6 +1,6 @@
 CMakeFiles/GB2.dir/src/SingleInstanceApp.cpp.obj: \
- C:\DSSAT48\Tools\GBCpp\src\SingleInstanceApp.cpp \
- C:/DSSAT48/Tools/GBCpp/include/SingleInstanceApp.h \
+ C:\DSSAT48\Tools\GB2CPP\src\SingleInstanceApp.cpp \
+ C:/DSSAT48/Tools/GB2CPP/include/SingleInstanceApp.h \
  C:/Qt/6.9.1/mingw_64/include/QtWidgets/QApplication \
  C:/Qt/6.9.1/mingw_64/include/QtWidgets/qapplication.h \
  C:/Qt/6.9.1/mingw_64/include/QtWidgets/qtwidgetsglobal.h \

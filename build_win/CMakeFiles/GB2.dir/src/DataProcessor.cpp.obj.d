@@ -1,6 +1,6 @@
 CMakeFiles/GB2.dir/src/DataProcessor.cpp.obj: \
- C:\DSSAT48\Tools\GBCpp\src\DataProcessor.cpp \
- C:/DSSAT48/Tools/GBCpp/include/DataProcessor.h \
+ C:\DSSAT48\Tools\GB2CPP\src\DataProcessor.cpp \
+ C:/DSSAT48/Tools/GB2CPP/include/DataProcessor.h \
  C:/Qt/6.9.1/mingw_64/include/QtCore/QString \
  C:/Qt/6.9.1/mingw_64/include/QtCore/qstring.h \
  C:/Qt/6.9.1/mingw_64/include/QtCore/qchar.h \
@@ -356,7 +356,7 @@ CMakeFiles/GB2.dir/src/DataProcessor.cpp.obj: \
  C:/Qt/6.9.1/mingw_64/include/QtCore/qvector.h \
  C:/Qt/6.9.1/mingw_64/include/QtCore/QObject \
  C:/Qt/6.9.1/mingw_64/include/QtCore/qobject.h \
- C:/DSSAT48/Tools/GBCpp/include/Config.h \
+ C:/DSSAT48/Tools/GB2CPP/include/Config.h \
  C:/Qt/6.9.1/mingw_64/include/QtGui/QColor \
  C:/Qt/6.9.1/mingw_64/include/QtGui/qcolor.h \
  C:/Qt/6.9.1/mingw_64/include/QtGui/qtguiglobal.h \

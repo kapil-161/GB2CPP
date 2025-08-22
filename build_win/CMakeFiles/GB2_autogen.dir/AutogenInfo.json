@@ -1,16 +1,16 @@
 {
 	"AUTOGEN_COMMAND_LINE_LENGTH_MAX" : 32000,
-	"BUILD_DIR" : "C:/DSSAT48/Tools/GBCpp/build_win/GB2_autogen",
-	"CMAKE_BINARY_DIR" : "C:/DSSAT48/Tools/GBCpp/build_win",
-	"CMAKE_CURRENT_BINARY_DIR" : "C:/DSSAT48/Tools/GBCpp/build_win",
-	"CMAKE_CURRENT_SOURCE_DIR" : "C:/DSSAT48/Tools/GBCpp",
+	"BUILD_DIR" : "C:/DSSAT48/Tools/GB2CPP/build_win/GB2_autogen",
+	"CMAKE_BINARY_DIR" : "C:/DSSAT48/Tools/GB2CPP/build_win",
+	"CMAKE_CURRENT_BINARY_DIR" : "C:/DSSAT48/Tools/GB2CPP/build_win",
+	"CMAKE_CURRENT_SOURCE_DIR" : "C:/DSSAT48/Tools/GB2CPP",
 	"CMAKE_EXECUTABLE" : "C:/Qt/Tools/CMake_64/bin/cmake.exe",
 	"CMAKE_LIST_FILES" : 
 	[
-		"C:/DSSAT48/Tools/GBCpp/CMakeLists.txt",
+		"C:/DSSAT48/Tools/GB2CPP/CMakeLists.txt",
 		"C:/Qt/Tools/CMake_64/share/cmake-3.30/Modules/CMakeDetermineSystem.cmake",
 		"C:/Qt/Tools/CMake_64/share/cmake-3.30/Modules/CMakeSystem.cmake.in",
-		"C:/DSSAT48/Tools/GBCpp/build_win/CMakeFiles/3.30.5/CMakeSystem.cmake",
+		"C:/DSSAT48/Tools/GB2CPP/build_win/CMakeFiles/3.30.5/CMakeSystem.cmake",
 		"C:/Qt/Tools/CMake_64/share/cmake-3.30/Modules/CMakeSystemSpecificInitialize.cmake",
 		"C:/Qt/Tools/CMake_64/share/cmake-3.30/Modules/Platform/Windows-Initialize.cmake",
 		"C:/Qt/Tools/CMake_64/share/cmake-3.30/Modules/CMakeDetermineCXXCompiler.cmake",
@@ -63,7 +63,7 @@
 		"C:/Qt/Tools/CMake_64/share/cmake-3.30/Modules/CMakeFindBinUtils.cmake",
 		"C:/Qt/Tools/CMake_64/share/cmake-3.30/Modules/Compiler/GNU-FindBinUtils.cmake",
 		"C:/Qt/Tools/CMake_64/share/cmake-3.30/Modules/CMakeCXXCompiler.cmake.in",
-		"C:/DSSAT48/Tools/GBCpp/build_win/CMakeFiles/3.30.5/CMakeCXXCompiler.cmake",
+		"C:/DSSAT48/Tools/GB2CPP/build_win/CMakeFiles/3.30.5/CMakeCXXCompiler.cmake",
 		"C:/Qt/Tools/CMake_64/share/cmake-3.30/Modules/CMakeSystemSpecificInformation.cmake",
 		"C:/Qt/Tools/CMake_64/share/cmake-3.30/Modules/CMakeGenericSystem.cmake",
 		"C:/Qt/Tools/CMake_64/share/cmake-3.30/Modules/CMakeInitializeConfigs.cmake",
@@ -78,7 +78,7 @@
 		"C:/Qt/Tools/CMake_64/share/cmake-3.30/Modules/Platform/Windows-GNU.cmake",
 		"C:/Qt/Tools/CMake_64/share/cmake-3.30/Modules/CMakeDetermineRCCompiler.cmake",
 		"C:/Qt/Tools/CMake_64/share/cmake-3.30/Modules/CMakeRCCompiler.cmake.in",
-		"C:/DSSAT48/Tools/GBCpp/build_win/CMakeFiles/3.30.5/CMakeRCCompiler.cmake",
+		"C:/DSSAT48/Tools/GB2CPP/build_win/CMakeFiles/3.30.5/CMakeRCCompiler.cmake",
 		"C:/Qt/Tools/CMake_64/share/cmake-3.30/Modules/CMakeRCInformation.cmake",
 		"C:/Qt/Tools/CMake_64/share/cmake-3.30/Modules/Platform/Windows-windres.cmake",
 		"C:/Qt/Tools/CMake_64/share/cmake-3.30/Modules/CMakeTestRCCompiler.cmake",
@@ -95,7 +95,7 @@
 		"C:/Qt/Tools/CMake_64/share/cmake-3.30/Modules/CMakeDetermineCompilerSupport.cmake",
 		"C:/Qt/Tools/CMake_64/share/cmake-3.30/Modules/Internal/FeatureTesting.cmake",
 		"C:/Qt/Tools/CMake_64/share/cmake-3.30/Modules/CMakeCXXCompiler.cmake.in",
-		"C:/DSSAT48/Tools/GBCpp/build_win/CMakeFiles/3.30.5/CMakeCXXCompiler.cmake",
+		"C:/DSSAT48/Tools/GB2CPP/build_win/CMakeFiles/3.30.5/CMakeCXXCompiler.cmake",
 		"C:/Qt/Tools/CMake_64/share/cmake-3.30/Modules/Platform/Windows-GNU-CXX-ABI.cmake",
 		"C:/Qt/6.9.1/mingw_64/lib/cmake/Qt6/Qt6ConfigVersion.cmake",
 		"C:/Qt/6.9.1/mingw_64/lib/cmake/Qt6/Qt6ConfigVersionImpl.cmake",
@@ -406,100 +406,100 @@
 		"C:/Qt/6.9.1/mingw_64/lib/cmake/Qt6ChartsPrivate/Qt6ChartsPrivateVersionlessAliasTargets.cmake",
 		"C:/Qt/6.9.1/mingw_64/lib/cmake/Qt6Charts/Qt6ChartsVersionlessAliasTargets.cmake"
 	],
-	"CMAKE_SOURCE_DIR" : "C:/DSSAT48/Tools/GBCpp",
+	"CMAKE_SOURCE_DIR" : "C:/DSSAT48/Tools/GB2CPP",
 	"CROSS_CONFIG" : false,
-	"DEP_FILE" : "C:/DSSAT48/Tools/GBCpp/build_win/GB2_autogen/deps",
+	"DEP_FILE" : "C:/DSSAT48/Tools/GB2CPP/build_win/GB2_autogen/deps",
 	"DEP_FILE_RULE_NAME" : "GB2_autogen/timestamp",
 	"HEADERS" : 
 	[
 		[
-			"C:/DSSAT48/Tools/GBCpp/include/CommandLineHandler.h",
+			"C:/DSSAT48/Tools/GB2CPP/include/CommandLineHandler.h",
 			"MU",
 			"6YEA5652QU/moc_CommandLineHandler.cpp",
 			null
 		],
 		[
-			"C:/DSSAT48/Tools/GBCpp/include/Config.h",
+			"C:/DSSAT48/Tools/GB2CPP/include/Config.h",
 			"MU",
 			"6YEA5652QU/moc_Config.cpp",
 			null
 		],
 		[
-			"C:/DSSAT48/Tools/GBCpp/include/DataProcessor.h",
+			"C:/DSSAT48/Tools/GB2CPP/include/DataProcessor.h",
 			"MU",
 			"6YEA5652QU/moc_DataProcessor.cpp",
 			null
 		],
 		[
-			"C:/DSSAT48/Tools/GBCpp/include/DataTableWidget.h",
+			"C:/DSSAT48/Tools/GB2CPP/include/DataTableWidget.h",
 			"MU",
 			"6YEA5652QU/moc_DataTableWidget.cpp",
 			null
 		],
 		[
-			"C:/DSSAT48/Tools/GBCpp/include/MainWindow.h",
+			"C:/DSSAT48/Tools/GB2CPP/include/MainWindow.h",
 			"MU",
 			"6YEA5652QU/moc_MainWindow.cpp",
 			null
 		],
 		[
-			"C:/DSSAT48/Tools/GBCpp/include/MetricsCalculator.h",
+			"C:/DSSAT48/Tools/GB2CPP/include/MetricsCalculator.h",
 			"MU",
 			"6YEA5652QU/moc_MetricsCalculator.cpp",
 			null
 		],
 		[
-			"C:/DSSAT48/Tools/GBCpp/include/MetricsDialog.h",
+			"C:/DSSAT48/Tools/GB2CPP/include/MetricsDialog.h",
 			"MU",
 			"6YEA5652QU/moc_MetricsDialog.cpp",
 			null
 		],
 		[
-			"C:/DSSAT48/Tools/GBCpp/include/MetricsTableWidget.h",
+			"C:/DSSAT48/Tools/GB2CPP/include/MetricsTableWidget.h",
 			"MU",
 			"6YEA5652QU/moc_MetricsTableWidget.cpp",
 			null
 		],
 		[
-			"C:/DSSAT48/Tools/GBCpp/include/PandasTableModel.h",
+			"C:/DSSAT48/Tools/GB2CPP/include/PandasTableModel.h",
 			"MU",
 			"6YEA5652QU/moc_PandasTableModel.cpp",
 			null
 		],
 		[
-			"C:/DSSAT48/Tools/GBCpp/include/PlotSettingsDialog.h",
+			"C:/DSSAT48/Tools/GB2CPP/include/PlotSettingsDialog.h",
 			"MU",
 			"6YEA5652QU/moc_PlotSettingsDialog.cpp",
 			null
 		],
 		[
-			"C:/DSSAT48/Tools/GBCpp/include/PlotWidget.h",
+			"C:/DSSAT48/Tools/GB2CPP/include/PlotWidget.h",
 			"MU",
 			"6YEA5652QU/moc_PlotWidget.cpp",
 			null
 		],
 		[
-			"C:/DSSAT48/Tools/GBCpp/include/SingleInstanceApp.h",
+			"C:/DSSAT48/Tools/GB2CPP/include/SingleInstanceApp.h",
 			"MU",
 			"6YEA5652QU/moc_SingleInstanceApp.cpp",
 			null
 		],
 		[
-			"C:/DSSAT48/Tools/GBCpp/include/StatusWidget.h",
+			"C:/DSSAT48/Tools/GB2CPP/include/StatusWidget.h",
 			"MU",
 			"6YEA5652QU/moc_StatusWidget.cpp",
 			null
 		],
 		[
-			"C:/DSSAT48/Tools/GBCpp/include/TableWidget.h",
+			"C:/DSSAT48/Tools/GB2CPP/include/TableWidget.h",
 			"MU",
 			"6YEA5652QU/moc_TableWidget.cpp",
 			null
 		]
 	],
 	"HEADER_EXTENSIONS" : [ "h", "hh", "h++", "hm", "hpp", "hxx", "in", "txx" ],
-	"INCLUDE_DIR" : "C:/DSSAT48/Tools/GBCpp/build_win/GB2_autogen/include",
-	"MOC_COMPILATION_FILE" : "C:/DSSAT48/Tools/GBCpp/build_win/GB2_autogen/mocs_compilation.cpp",
+	"INCLUDE_DIR" : "C:/DSSAT48/Tools/GB2CPP/build_win/GB2_autogen/include",
+	"MOC_COMPILATION_FILE" : "C:/DSSAT48/Tools/GB2CPP/build_win/GB2_autogen/mocs_compilation.cpp",
 	"MOC_DEFINITIONS" : 
 	[
 		"MINGW_HAS_SECURE_API=1",
@@ -527,8 +527,8 @@
 	],
 	"MOC_INCLUDES" : 
 	[
-		"C:/DSSAT48/Tools/GBCpp/src",
-		"C:/DSSAT48/Tools/GBCpp/include",
+		"C:/DSSAT48/Tools/GB2CPP/src",
+		"C:/DSSAT48/Tools/GB2CPP/include",
 		"C:/Qt/6.9.1/mingw_64/include/QtCore",
 		"C:/Qt/6.9.1/mingw_64/include",
 		"C:/Qt/6.9.1/mingw_64/mkspecs/win32-g++",
@@ -564,33 +564,33 @@
 		"-c",
 		"C:/Qt/Tools/CMake_64/share/cmake-3.30/Modules/CMakeCXXCompilerABI.cpp"
 	],
-	"MOC_PREDEFS_FILE" : "C:/DSSAT48/Tools/GBCpp/build_win/GB2_autogen/moc_predefs.h",
+	"MOC_PREDEFS_FILE" : "C:/DSSAT48/Tools/GB2CPP/build_win/GB2_autogen/moc_predefs.h",
 	"MOC_RELAXED_MODE" : false,
 	"MOC_SKIP" : [],
 	"MULTI_CONFIG" : false,
-	"PARALLEL" : 4,
-	"PARSE_CACHE_FILE" : "C:/DSSAT48/Tools/GBCpp/build_win/CMakeFiles/GB2_autogen.dir/ParseCache.txt",
+	"PARALLEL" : 6,
+	"PARSE_CACHE_FILE" : "C:/DSSAT48/Tools/GB2CPP/build_win/CMakeFiles/GB2_autogen.dir/ParseCache.txt",
 	"QT_MOC_EXECUTABLE" : "C:/Qt/6.9.1/mingw_64/bin/moc.exe",
 	"QT_UIC_EXECUTABLE" : "C:/Qt/6.9.1/mingw_64/bin/uic.exe",
 	"QT_VERSION_MAJOR" : 6,
 	"QT_VERSION_MINOR" : 9,
-	"SETTINGS_FILE" : "C:/DSSAT48/Tools/GBCpp/build_win/CMakeFiles/GB2_autogen.dir/AutogenUsed.txt",
+	"SETTINGS_FILE" : "C:/DSSAT48/Tools/GB2CPP/build_win/CMakeFiles/GB2_autogen.dir/AutogenUsed.txt",
 	"SOURCES" : 
 	[
-		[ "C:/DSSAT48/Tools/GBCpp/src/CommandLineHandler.cpp", "MU", null ],
-		[ "C:/DSSAT48/Tools/GBCpp/src/DataProcessor.cpp", "MU", null ],
-		[ "C:/DSSAT48/Tools/GBCpp/src/DataTableWidget.cpp", "MU", null ],
-		[ "C:/DSSAT48/Tools/GBCpp/src/MainWindow.cpp", "MU", null ],
-		[ "C:/DSSAT48/Tools/GBCpp/src/MetricsCalculator.cpp", "MU", null ],
-		[ "C:/DSSAT48/Tools/GBCpp/src/MetricsDialog.cpp", "MU", null ],
-		[ "C:/DSSAT48/Tools/GBCpp/src/MetricsTableWidget.cpp", "MU", null ],
-		[ "C:/DSSAT48/Tools/GBCpp/src/PandasTableModel.cpp", "MU", null ],
-		[ "C:/DSSAT48/Tools/GBCpp/src/PlotSettingsDialog.cpp", "MU", null ],
-		[ "C:/DSSAT48/Tools/GBCpp/src/PlotWidget.cpp", "MU", null ],
-		[ "C:/DSSAT48/Tools/GBCpp/src/SingleInstanceApp.cpp", "MU", null ],
-		[ "C:/DSSAT48/Tools/GBCpp/src/StatusWidget.cpp", "MU", null ],
-		[ "C:/DSSAT48/Tools/GBCpp/src/TableWidget.cpp", "MU", null ],
-		[ "C:/DSSAT48/Tools/GBCpp/src/main.cpp", "MU", null ]
+		[ "C:/DSSAT48/Tools/GB2CPP/src/CommandLineHandler.cpp", "MU", null ],
+		[ "C:/DSSAT48/Tools/GB2CPP/src/DataProcessor.cpp", "MU", null ],
+		[ "C:/DSSAT48/Tools/GB2CPP/src/DataTableWidget.cpp", "MU", null ],
+		[ "C:/DSSAT48/Tools/GB2CPP/src/MainWindow.cpp", "MU", null ],
+		[ "C:/DSSAT48/Tools/GB2CPP/src/MetricsCalculator.cpp", "MU", null ],
+		[ "C:/DSSAT48/Tools/GB2CPP/src/MetricsDialog.cpp", "MU", null ],
+		[ "C:/DSSAT48/Tools/GB2CPP/src/MetricsTableWidget.cpp", "MU", null ],
+		[ "C:/DSSAT48/Tools/GB2CPP/src/PandasTableModel.cpp", "MU", null ],
+		[ "C:/DSSAT48/Tools/GB2CPP/src/PlotSettingsDialog.cpp", "MU", null ],
+		[ "C:/DSSAT48/Tools/GB2CPP/src/PlotWidget.cpp", "MU", null ],
+		[ "C:/DSSAT48/Tools/GB2CPP/src/SingleInstanceApp.cpp", "MU", null ],
+		[ "C:/DSSAT48/Tools/GB2CPP/src/StatusWidget.cpp", "MU", null ],
+		[ "C:/DSSAT48/Tools/GB2CPP/src/TableWidget.cpp", "MU", null ],
+		[ "C:/DSSAT48/Tools/GB2CPP/src/main.cpp", "MU", null ]
 	],
 	"UIC_OPTIONS" : [],
 	"UIC_SEARCH_PATHS" : [],

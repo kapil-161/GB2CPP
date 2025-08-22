@@ -1,7 +1,7 @@
-C:/DSSAT48/Tools/GBCpp/build_win/GB2_autogen/6YEA5652QU/moc_PlotWidget.cpp: C:/DSSAT48/Tools/GBCpp/include/PlotWidget.h \
-  C:/DSSAT48/Tools/GBCpp/build_win/GB2_autogen/moc_predefs.h \
-  C:/DSSAT48/Tools/GBCpp/include/DataProcessor.h \
-  C:/DSSAT48/Tools/GBCpp/include/PlotSettingsDialog.h \
+C:/DSSAT48/Tools/GB2CPP/build_win/GB2_autogen/6YEA5652QU/moc_PlotWidget.cpp: C:/DSSAT48/Tools/GB2CPP/include/PlotWidget.h \
+  C:/DSSAT48/Tools/GB2CPP/build_win/GB2_autogen/moc_predefs.h \
+  C:/DSSAT48/Tools/GB2CPP/include/DataProcessor.h \
+  C:/DSSAT48/Tools/GB2CPP/include/PlotSettingsDialog.h \
   C:/Qt/6.9.1/mingw_64/include/QtCharts/QAbstractAxis \
   C:/Qt/6.9.1/mingw_64/include/QtCharts/QAbstractSeries \
   C:/Qt/6.9.1/mingw_64/include/QtCharts/QChart \

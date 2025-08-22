@@ -52,10 +52,10 @@ RM = C:\Qt\Tools\CMake_64\bin\cmake.exe -E rm -f
 EQUALS = =
 
 # The top-level source directory on which CMake was run.
-CMAKE_SOURCE_DIR = C:\DSSAT48\Tools\GBCpp
+CMAKE_SOURCE_DIR = C:\DSSAT48\Tools\GB2CPP
 
 # The top-level build directory on which CMake was run.
-CMAKE_BINARY_DIR = C:\DSSAT48\Tools\GBCpp\build_win
+CMAKE_BINARY_DIR = C:\DSSAT48\Tools\GB2CPP\build_win
 
 # Utility rule file for GB2_autogen.
 
@@ -70,9 +70,9 @@ CMakeFiles/GB2_autogen: GB2_autogen/timestamp
 GB2_autogen/timestamp: C:/Qt/6.9.1/mingw_64/bin/moc.exe
 GB2_autogen/timestamp: C:/Qt/6.9.1/mingw_64/bin/uic.exe
 GB2_autogen/timestamp: CMakeFiles/GB2_autogen.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --blue --bold --progress-dir=C:\DSSAT48\Tools\GBCpp\build_win\CMakeFiles --progress-num=$(CMAKE_PROGRESS_1) "Automatic MOC and UIC for target GB2"
-	C:\Qt\Tools\CMake_64\bin\cmake.exe -E cmake_autogen C:/DSSAT48/Tools/GBCpp/build_win/CMakeFiles/GB2_autogen.dir/AutogenInfo.json Release
-	C:\Qt\Tools\CMake_64\bin\cmake.exe -E touch C:/DSSAT48/Tools/GBCpp/build_win/GB2_autogen/timestamp
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --blue --bold --progress-dir=C:\DSSAT48\Tools\GB2CPP\build_win\CMakeFiles --progress-num=$(CMAKE_PROGRESS_1) "Automatic MOC and UIC for target GB2"
+	C:\Qt\Tools\CMake_64\bin\cmake.exe -E cmake_autogen C:/DSSAT48/Tools/GB2CPP/build_win/CMakeFiles/GB2_autogen.dir/AutogenInfo.json Release
+	C:\Qt\Tools\CMake_64\bin\cmake.exe -E touch C:/DSSAT48/Tools/GB2CPP/build_win/GB2_autogen/timestamp
 
 GB2_autogen: CMakeFiles/GB2_autogen
 GB2_autogen: GB2_autogen/timestamp
@@ -88,6 +88,6 @@ CMakeFiles/GB2_autogen.dir/clean:
 .PHONY : CMakeFiles/GB2_autogen.dir/clean
 
 CMakeFiles/GB2_autogen.dir/depend:
-	$(CMAKE_COMMAND) -E cmake_depends "MinGW Makefiles" C:\DSSAT48\Tools\GBCpp C:\DSSAT48\Tools\GBCpp C:\DSSAT48\Tools\GBCpp\build_win C:\DSSAT48\Tools\GBCpp\build_win C:\DSSAT48\Tools\GBCpp\build_win\CMakeFiles\GB2_autogen.dir\DependInfo.cmake "--color=$(COLOR)"
+	$(CMAKE_COMMAND) -E cmake_depends "MinGW Makefiles" C:\DSSAT48\Tools\GB2CPP C:\DSSAT48\Tools\GB2CPP C:\DSSAT48\Tools\GB2CPP\build_win C:\DSSAT48\Tools\GB2CPP\build_win C:\DSSAT48\Tools\GB2CPP\build_win\CMakeFiles\GB2_autogen.dir\DependInfo.cmake "--color=$(COLOR)"
 .PHONY : CMakeFiles/GB2_autogen.dir/depend
 

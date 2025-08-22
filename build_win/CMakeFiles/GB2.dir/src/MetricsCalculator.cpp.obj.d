@@ -1,6 +1,6 @@
 CMakeFiles/GB2.dir/src/MetricsCalculator.cpp.obj: \
- C:\DSSAT48\Tools\GBCpp\src\MetricsCalculator.cpp \
- C:/DSSAT48/Tools/GBCpp/include/MetricsCalculator.h \
+ C:\DSSAT48\Tools\GB2CPP\src\MetricsCalculator.cpp \
+ C:/DSSAT48/Tools/GB2CPP/include/MetricsCalculator.h \
  C:/Qt/6.9.1/mingw_64/include/QtCore/QVector \
  C:/Qt/6.9.1/mingw_64/include/QtCore/qvector.h \
  C:/Qt/6.9.1/mingw_64/include/QtCore/qlist.h \

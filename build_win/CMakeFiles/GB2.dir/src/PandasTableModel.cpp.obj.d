@@ -1,6 +1,6 @@
 CMakeFiles/GB2.dir/src/PandasTableModel.cpp.obj: \
- C:\DSSAT48\Tools\GBCpp\src\PandasTableModel.cpp \
- C:/DSSAT48/Tools/GBCpp/include/PandasTableModel.h \
+ C:\DSSAT48\Tools\GB2CPP\src\PandasTableModel.cpp \
+ C:/DSSAT48/Tools/GB2CPP/include/PandasTableModel.h \
  C:/Qt/6.9.1/mingw_64/include/QtCore/QAbstractTableModel \
  C:/Qt/6.9.1/mingw_64/include/QtCore/qabstractitemmodel.h \
  C:/Qt/6.9.1/mingw_64/include/QtCore/qcompare.h \
@@ -350,7 +350,7 @@ CMakeFiles/GB2.dir/src/PandasTableModel.cpp.obj: \
  C:/Qt/6.9.1/mingw_64/include/QtCore/qvector.h \
  C:/Qt/6.9.1/mingw_64/include/QtCore/QMap \
  C:/Qt/6.9.1/mingw_64/include/QtCore/qmap.h \
- C:/DSSAT48/Tools/GBCpp/include/DataProcessor.h \
+ C:/DSSAT48/Tools/GB2CPP/include/DataProcessor.h \
  C:/Qt/6.9.1/mingw_64/include/QtCore/QString \
  C:/Qt/6.9.1/mingw_64/include/QtCore/qstring.h \
  C:/Qt/6.9.1/mingw_64/include/QtCore/QDateTime \
