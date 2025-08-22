@@ -1079,58 +1079,88 @@ void MainWindow::onFileSelectionChanged()
     qDebug() << "MainWindow::onFileSelectionChanged() - Enabling update button";
     m_updatePlotButton->setEnabled(true);
 
-    // For now, load the first selected file
+    // Load data from all selected files to get comprehensive Y variable list
     if (!selectedItems.isEmpty()) {
-        qDebug() << "MainWindow::onFileSelectionChanged() - Processing selected file...";
-        QString selectedFile = selectedItems.first()->text();
-        qDebug() << "MainWindow::onFileSelectionChanged() - Selected file name:" << selectedFile;
+        qDebug() << "MainWindow::onFileSelectionChanged() - Processing" << selectedItems.size() << "selected files...";
         
-        if (selectedFile != "No .OUT files found") {
-            qDebug() << "MainWindow::onFileSelectionChanged() - Getting DSSAT base path...";
-            QString dssatBase = m_dataProcessor->getDSSATBase();
-            qDebug() << "MainWindow::onFileSelectionChanged() - DSSAT base:" << dssatBase;
-            qDebug() << "MainWindow::onFileSelectionChanged() - Selected folder:" << m_selectedFolder;
-            
-            // Get the actual path used by prepareOutFiles instead of reconstructing it
-            QString folderPath = m_dataProcessor->getActualFolderPath(m_selectedFolder);
-            QString filePath;
-            if (!folderPath.isEmpty()) {
-                filePath = QDir(folderPath).absoluteFilePath(selectedFile);
-            } else {
-                filePath = QDir(dssatBase).absoluteFilePath(m_selectedFolder + QDir::separator() + selectedFile);
-            }
-            qDebug() << "MainWindow: Selected simulated file path:" << filePath;
-            
-            qDebug() << "MainWindow::onFileSelectionChanged() - About to call loadFile...";
-            // Load simulated data (but don't plot automatically)
-            loadFile(filePath);
-            qDebug() << "MainWindow::onFileSelectionChanged() - loadFile completed";
+        // Clear previous data
+        m_currentData.clear();
+        m_currentObsData.clear();
+        
+        // Load and merge data from all selected files
+        QSet<QString> uniqueExperimentCodes;
+        QMap<QString, QMap<QString, QString>> extractedTreatmentNames;
+        QString firstValidFile;
+        
+        for (QListWidgetItem* selectedItem : selectedItems) {
+            QString selectedFile = selectedItem->text();
+            qDebug() << "MainWindow::onFileSelectionChanged() - Processing file:" << selectedFile;
+        
+            if (selectedFile != "No .OUT files found") {
+                qDebug() << "MainWindow::onFileSelectionChanged() - Getting DSSAT base path...";
+                QString dssatBase = m_dataProcessor->getDSSATBase();
+                qDebug() << "MainWindow::onFileSelectionChanged() - DSSAT base:" << dssatBase;
+                qDebug() << "MainWindow::onFileSelectionChanged() - Selected folder:" << m_selectedFolder;
+                
+                // Get the actual path used by prepareOutFiles instead of reconstructing it
+                QString folderPath = m_dataProcessor->getActualFolderPath(m_selectedFolder);
+                QString filePath;
+                if (!folderPath.isEmpty()) {
+                    filePath = QDir(folderPath).absoluteFilePath(selectedFile);
+                } else {
+                    filePath = QDir(dssatBase).absoluteFilePath(m_selectedFolder + QDir::separator() + selectedFile);
+                }
+                qDebug() << "MainWindow: Selected simulated file path:" << filePath;
+                
+                // Load data from current file
+                DataTable fileData;
+                if (m_dataProcessor->readFile(filePath, fileData)) {
+                    qDebug() << "MainWindow::onFileSelectionChanged() - Successfully loaded file:" << selectedFile;
+                    
+                    // Keep track of first valid file for later processing
+                    if (firstValidFile.isEmpty()) {
+                        firstValidFile = filePath;
+                    }
+                    
+                    // Merge this file's data with m_currentData
+                    if (m_currentData.rowCount == 0) {
+                        // First file - copy entirely
+                        m_currentData = fileData;
+                    } else {
+                        // Subsequent files - merge data
+                        m_currentData.merge(fileData);
+                    }
+                    
+                    // Extract experiment codes and treatment names from this file
+                    if (fileData.columnNames.contains("EXPERIMENT") && fileData.columnNames.contains("TRT") && fileData.columnNames.contains("TNAME")) {
+                        const DataColumn* expCol = fileData.getColumn("EXPERIMENT");
+                        const DataColumn* trtCol = fileData.getColumn("TRT");
+                        const DataColumn* tnameCol = fileData.getColumn("TNAME");
 
-            // Extract all unique experiment codes from the loaded simulated data
-            QSet<QString> uniqueExperimentCodes;
-            QMap<QString, QMap<QString, QString>> extractedTreatmentNames; // New map to store extracted treatment names
+                        if (expCol && trtCol && tnameCol) {
+                            for (int i = 0; i < fileData.rowCount; ++i) {
+                                QString expCode = expCol->data[i].toString().trimmed();
+                                QString trtCode = trtCol->data[i].toString().trimmed();
+                                QString tname = tnameCol->data[i].toString().trimmed();
 
-            if (m_currentData.columnNames.contains("EXPERIMENT") && m_currentData.columnNames.contains("TRT") && m_currentData.columnNames.contains("TNAME")) {
-                const DataColumn* expCol = m_currentData.getColumn("EXPERIMENT");
-                const DataColumn* trtCol = m_currentData.getColumn("TRT");
-                const DataColumn* tnameCol = m_currentData.getColumn("TNAME");
-
-                if (expCol && trtCol && tnameCol) {
-                    for (int i = 0; i < m_currentData.rowCount; ++i) {
-                        QString expCode = expCol->data[i].toString().trimmed();
-                        QString trtCode = trtCol->data[i].toString().trimmed();
-                        QString tname = tnameCol->data[i].toString().trimmed();
-
-                        if (!expCode.isEmpty() && expCode != "DEFAULT") {
-                            uniqueExperimentCodes.insert(expCode);
-                        }
-                        if (!expCode.isEmpty() && !trtCode.isEmpty() && !tname.isEmpty()) {
-                            extractedTreatmentNames[expCode][trtCode] = tname;
+                                if (!expCode.isEmpty() && expCode != "DEFAULT") {
+                                    uniqueExperimentCodes.insert(expCode);
+                                }
+                                if (!expCode.isEmpty() && !trtCode.isEmpty() && !tname.isEmpty()) {
+                                    extractedTreatmentNames[expCode][trtCode] = tname;
+                                }
+                            }
                         }
                     }
+                } else {
+                    qDebug() << "MainWindow::onFileSelectionChanged() - Failed to load file:" << selectedFile;
                 }
             }
-            qDebug() << "MainWindow: Extracted unique Experiment Codes from simulated data:" << QList<QString>(uniqueExperimentCodes.values());
+        }
+        
+        if (m_currentData.rowCount > 0) {
+            qDebug() << "MainWindow::onFileSelectionChanged() - Merged data from" << selectedItems.size() << "files, total rows:" << m_currentData.rowCount;
+            qDebug() << "MainWindow: Extracted unique Experiment Codes from all files:" << QList<QString>(uniqueExperimentCodes.values());
             qDebug() << "MainWindow: Extracted Treatment Names:" << extractedTreatmentNames;
             m_treatmentNames = extractedTreatmentNames; // Assign to member variable
 
@@ -1165,13 +1195,11 @@ void MainWindow::onFileSelectionChanged()
                 qDebug() << "MainWindow: Added CROP column with code:" << cropCode << "to simulated data";
             }
 
-            // Clear previous observed data
-            m_currentObsData.clear();
-
             // Attempt to load and merge observed data for each unique experiment code
             for (const QString& expCode : uniqueExperimentCodes) {
                 DataTable tempObsData;
-                if (m_dataProcessor->readObservedData(filePath, expCode, cropCode, tempObsData)) {
+                // Use the first valid file path for observed data lookup
+                if (!firstValidFile.isEmpty() && m_dataProcessor->readObservedData(firstValidFile, expCode, cropCode, tempObsData)) {
                     m_currentObsData.merge(tempObsData);
                 }
             }
@@ -1188,7 +1216,7 @@ void MainWindow::onFileSelectionChanged()
 
             // Mark data as needing refresh for the data table, but don't set it yet
             markDataNeedsRefresh();
-            qDebug() << "MainWindow::onFileSelectionChanged() - Data loaded, marked for table refresh.";
+            qDebug() << "MainWindow::onFileSelectionChanged() - Data loaded from" << selectedItems.size() << "files, marked for table refresh.";
             qDebug() << "MainWindow::onFileSelectionChanged() - Function completed successfully; table data not yet set.";
         }
     }

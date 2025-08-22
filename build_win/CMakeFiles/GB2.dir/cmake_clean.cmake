@@ -4,6 +4,7 @@ file(REMOVE_RECURSE
   "GB2_autogen"
   "CMakeFiles/GB2.dir/GB2_autogen/mocs_compilation.cpp.obj"
   "CMakeFiles/GB2.dir/GB2_autogen/mocs_compilation.cpp.obj.d"
+  "CMakeFiles/GB2.dir/resources/version.rc.obj"
   "CMakeFiles/GB2.dir/src/CommandLineHandler.cpp.obj"
   "CMakeFiles/GB2.dir/src/CommandLineHandler.cpp.obj.d"
   "CMakeFiles/GB2.dir/src/DataProcessor.cpp.obj"
@@ -41,6 +42,6 @@ file(REMOVE_RECURSE
 )
 
 # Per-language clean rules from dependency scanning.
-foreach(lang CXX)
+foreach(lang CXX RC)
   include(CMakeFiles/GB2.dir/cmake_clean_${lang}.cmake OPTIONAL)
 endforeach()

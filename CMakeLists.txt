@@ -72,8 +72,13 @@ set(HEADERS
     include/PlotSettingsDialog.h
 )
 
+# Add version resource for Windows
+if(WIN32)
+    set(RESOURCE_FILES resources/version.rc)
+endif()
+
 # Create executable
-add_executable(GB2 ${SOURCES} ${HEADERS})
+add_executable(GB2 ${SOURCES} ${HEADERS} ${RESOURCE_FILES})
 
 # Link Qt6 libraries with static preference
 target_link_libraries(GB2 Qt6::Core Qt6::Widgets Qt6::Charts)
