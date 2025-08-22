@@ -997,14 +997,14 @@ void MainWindow::populateFiles(const QString &folderName)
     for (const QString &file : outFiles) {
         QListWidgetItem *item = new QListWidgetItem(file);
         
-        // Extract file extension and get description
-        QString extension = QFileInfo(file).suffix().toUpper();
-        QString description = outfileDescriptions.value(extension, QString());
+        // Extract base filename (without extension) and get description
+        QString baseFilename = QFileInfo(file).baseName();
+        QString description = outfileDescriptions.value(baseFilename, QString());
         
-        qDebug() << "populateFiles: File" << file << "Extension:" << extension << "Description:" << description;
+        qDebug() << "populateFiles: File" << file << "BaseFilename:" << baseFilename << "Description:" << description;
         
         if (!description.isEmpty()) {
-            item->setToolTip(QString("%1: %2").arg(extension).arg(description));
+            item->setToolTip(QString("%1: %2").arg(file).arg(description));
             qDebug() << "populateFiles: Set tooltip to:" << item->toolTip();
         } else {
             item->setToolTip(QString("DSSAT output file: %1").arg(file));

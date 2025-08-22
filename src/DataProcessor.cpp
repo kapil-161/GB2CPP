@@ -2059,14 +2059,14 @@ QMap<QString, QString> DataProcessor::getOutfileDescriptions()
     
     QString outfilePath = findOutfileCde();
     if (outfilePath.isEmpty()) {
-        qDebug() << "DataProcessor::getOutfileDescriptions() - OUTFILE.CDE not found";
+        qDebug() << "DataProcessor::getOutfileDescriptions() - OUTPUT.CDE not found";
         loaded = true;
         return outfileDescriptions;
     }
     
     QFile file(outfilePath);
     if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
-        qDebug() << "DataProcessor::getOutfileDescriptions() - Cannot open OUTFILE.CDE:" << outfilePath;
+        qDebug() << "DataProcessor::getOutfileDescriptions() - Cannot open OUTPUT.CDE:" << outfilePath;
         loaded = true;
         return outfileDescriptions;
     }
@@ -2082,24 +2082,32 @@ QMap<QString, QString> DataProcessor::getOutfileDescriptions()
             continue;
         }
         
-        // Parse lines in OUTPUT.CDE format: FileName CDE Description
-        // Example: Chemical.OUT    CH Daily chemical applications output file            OUTCH
+        // Parse lines in OUTPUT.CDE format
+        // Example formats:
+        // Chemical.OUT    CH Daily chemical applications output file            OUTCH
+        // PlantP.OUT      PP Daily plant phosphorus output
+        // Weather.OUT     WE Daily weather output file                          OUTWTH
         if (line.contains(".OUT") || line.contains(".csv")) {
-            // Split by whitespace and extract filename and description
             QStringList parts = line.split(QRegularExpression("\\s+"), Qt::SkipEmptyParts);
-            if (parts.size() >= 3) {
+            if (parts.size() >= 2) {
                 QString filename = parts[0].trimmed();
-                QString extension = QFileInfo(filename).suffix().toUpper();
+                QString baseFilename = QFileInfo(filename).baseName(); // Get filename without extension
                 
-                // Find the description part (skip the CDE code which is usually 2-3 chars)
                 QString description;
-                int descStartIndex = 2; // Skip filename and CDE code
+                
+                // Determine description start index based on whether there's a short CDE code
+                int descStartIndex = 1;
+                if (parts.size() >= 3 && parts[1].length() <= 3 && parts[1] == parts[1].toUpper()) {
+                    // Second part looks like a CDE code (2-3 uppercase chars), skip it
+                    descStartIndex = 2;
+                }
+                
                 if (parts.size() > descStartIndex) {
-                    // Join description parts, but stop before alias if present
                     QStringList descParts;
                     for (int i = descStartIndex; i < parts.size(); ++i) {
-                        // Stop if we hit what looks like an alias (short uppercase word)
-                        if (parts[i].length() <= 6 && parts[i] == parts[i].toUpper() && i > descStartIndex + 2) {
+                        // Stop if we hit what looks like an alias at the end (short uppercase word)
+                        if (i > descStartIndex + 2 && parts[i].length() <= 8 && parts[i] == parts[i].toUpper() && 
+                            (parts[i].startsWith("OUT") || parts[i].startsWith("CSP_") || i == parts.size() - 1)) {
                             break;
                         }
                         descParts.append(parts[i]);
@@ -2107,9 +2115,9 @@ QMap<QString, QString> DataProcessor::getOutfileDescriptions()
                     description = descParts.join(" ").trimmed();
                 }
                 
-                if (!extension.isEmpty() && !description.isEmpty()) {
-                    outfileDescriptions[extension] = description;
-                    qDebug() << "DataProcessor::getOutfileDescriptions() - Loaded:" << extension << "=" << description;
+                if (!baseFilename.isEmpty() && !description.isEmpty()) {
+                    outfileDescriptions[baseFilename] = description;
+                    qDebug() << "DataProcessor::getOutfileDescriptions() - Loaded:" << baseFilename << "=" << description;
                 }
             }
         }
