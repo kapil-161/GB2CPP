@@ -178,6 +178,14 @@ GB2_autogen/mocs_compilation.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles\GB2.dir\build.make CMakeFiles/GB2.dir/GB2_autogen/mocs_compilation.cpp.s
 .PHONY : GB2_autogen/mocs_compilation.cpp.s
 
+resources/version.obj: resources/version.rc.obj
+.PHONY : resources/version.obj
+
+# target to build an object file
+resources/version.rc.obj:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\GB2.dir\build.make CMakeFiles/GB2.dir/resources/version.rc.obj
+.PHONY : resources/version.rc.obj
+
 src/CommandLineHandler.obj: src/CommandLineHandler.cpp.obj
 .PHONY : src/CommandLineHandler.obj
 
@@ -528,6 +536,7 @@ help:
 	@echo ... GB2_autogen/mocs_compilation.obj
 	@echo ... GB2_autogen/mocs_compilation.i
 	@echo ... GB2_autogen/mocs_compilation.s
+	@echo ... resources/version.obj
 	@echo ... src/CommandLineHandler.obj
 	@echo ... src/CommandLineHandler.i
 	@echo ... src/CommandLineHandler.s

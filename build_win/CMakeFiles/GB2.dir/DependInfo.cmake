@@ -4,6 +4,45 @@ set(CMAKE_DEPENDS_IN_PROJECT_ONLY OFF)
 
 # The set of languages for which implicit dependencies are needed:
 set(CMAKE_DEPENDS_LANGUAGES
+  "RC"
+  )
+# The set of files for implicit dependencies of each language:
+set(CMAKE_DEPENDS_CHECK_RC
+  "C:/DSSAT48/Tools/GB2CPP/resources/version.rc" "C:/DSSAT48/Tools/GB2CPP/build_win/CMakeFiles/GB2.dir/resources/version.rc.obj"
+  )
+
+# Preprocessor definitions for this target.
+set(CMAKE_TARGET_DEFINITIONS_RC
+  "MINGW_HAS_SECURE_API=1"
+  "QT_CHARTS_LIB"
+  "QT_CORE_LIB"
+  "QT_GUI_LIB"
+  "QT_NEEDS_QMAIN"
+  "QT_NO_DEBUG"
+  "QT_OPENGLWIDGETS_LIB"
+  "QT_OPENGL_LIB"
+  "QT_WIDGETS_LIB"
+  "UNICODE"
+  "WIN32"
+  "WIN64"
+  "_ENABLE_EXTENDED_ALIGNED_STORAGE"
+  "_UNICODE"
+  "_WIN64"
+  )
+
+# The include file search paths:
+set(CMAKE_RC_TARGET_INCLUDE_PATH
+  "GB2_autogen/include"
+  "C:/DSSAT48/Tools/GB2CPP/src"
+  "C:/DSSAT48/Tools/GB2CPP/include"
+  "C:/Qt/6.9.1/mingw_64/include/QtCore"
+  "C:/Qt/6.9.1/mingw_64/include"
+  "C:/Qt/6.9.1/mingw_64/mkspecs/win32-g++"
+  "C:/Qt/6.9.1/mingw_64/include/QtWidgets"
+  "C:/Qt/6.9.1/mingw_64/include/QtGui"
+  "C:/Qt/6.9.1/mingw_64/include/QtCharts"
+  "C:/Qt/6.9.1/mingw_64/include/QtOpenGL"
+  "C:/Qt/6.9.1/mingw_64/include/QtOpenGLWidgets"
   )
 
 # The set of dependency files which are needed:
