@@ -928,10 +928,8 @@ QStringList DataProcessor::prepareFolders(bool includeExtraFolders)
     
     // Add extra non-crop folders if requested
     if (includeExtraFolders) {
-        QStringList extraFolders = {
-            "SensWork", "Seasonal", "Spatial", "Sequence", "YieldForecast"
-        };
-        folders.append(extraFolders);
+        // Only SensWork is treated as special folder - others should follow DETAIL.CDE mapping
+        folders.append("SensWork");
     }
     
     // Remove duplicates and sort
@@ -962,13 +960,7 @@ QStringList DataProcessor::prepareOutFiles(const QString &folderName)
             }
         }
         
-        // If not found in crop details, try as direct subfolder
-        if (actualPath.isEmpty()) {
-            QString dssatBase = getDSSATBase();
-            if (!dssatBase.isEmpty()) {
-                actualPath = QDir(dssatBase).absoluteFilePath(folderName);
-            }
-        }
+        // No fallback - directory must come from profile files only
     }
     
     if (actualPath.isEmpty()) {
@@ -1065,13 +1057,7 @@ QString DataProcessor::getActualFolderPath(const QString &folderName)
         }
     }
     
-    // If not found in crop details, try as direct subfolder
-    if (actualPath.isEmpty()) {
-        QString dssatBase = getDSSATBase();
-        if (!dssatBase.isEmpty()) {
-            actualPath = QDir(dssatBase).absoluteFilePath(folderName);
-        }
-    }
+    // No fallback - directory must come from profile files only
     
     return actualPath;
 }
@@ -1304,17 +1290,25 @@ QVector<CropDetails> DataProcessor::getCropDetails()
     
     QMap<QString, CropDetails> cropMap;
     
-    // Step 1: Parse DETAIL.CDE for crop codes and names
+    // Step 1: Parse DETAIL.CDE for crop codes and names, and applications
     QFile detailFile(detailPath);
     if (detailFile.open(QIODevice::ReadOnly | QIODevice::Text)) {
         QTextStream in(&detailFile);
         bool inCropSection = false;
+        bool inApplicationsSection = false;
         
         while (!in.atEnd()) {
             QString line = in.readLine();
             
             if (line.contains("*Crop and Weed Species")) {
                 inCropSection = true;
+                inApplicationsSection = false;
+                continue;
+            }
+            
+            if (line.contains("*Applications")) {
+                inApplicationsSection = true;
+                inCropSection = false;
                 continue;
             }
             
@@ -1322,11 +1316,16 @@ QVector<CropDetails> DataProcessor::getCropDetails()
                 continue;
             }
             
-            if (line.startsWith("*") && inCropSection) {
-                break;
+            if (line.startsWith("*") && (inCropSection || inApplicationsSection)) {
+                // Check if this is another section start
+                if (!line.contains("*Crop and Weed Species") && !line.contains("*Applications")) {
+                    inCropSection = false;
+                    inApplicationsSection = false;
+                }
+                continue;
             }
             
-            if (inCropSection && !line.trimmed().isEmpty()) {
+            if ((inCropSection || inApplicationsSection) && !line.trimmed().isEmpty()) {
                 if (line.length() >= 8) {
                     QString cropCode = line.left(8).trimmed();
                     QString cropName = line.mid(8, 64).trimmed();
