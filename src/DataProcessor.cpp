@@ -1357,23 +1357,28 @@ QVector<CropDetails> DataProcessor::getCropDetails()
             }
             
             
-            // Handle the DSSATPRO format: "ALD C: \DSSAT48\ALFALFA"
+            // Handle the DSSATPRO format: "ALD C: \DSSAT48\ALFALFA" or "ALD // /Applications/DSSAT48/ALFALFA"
+            QStringList parts;
             if (line.contains(" C: ")) {
-                QStringList parts = line.split(" C: ", Qt::SkipEmptyParts);
-                if (parts.size() >= 2) {
-                    QString folderCode = parts[0].trimmed();
-                    QString directory = parts[1].trimmed();
+                parts = line.split(" C: ", Qt::SkipEmptyParts);
+            } else if (line.contains(" // ")) {
+                parts = line.split(" // ", Qt::SkipEmptyParts);
+            }
+            
+            if (parts.size() >= 2) {
+                QString folderCode = parts[0].trimmed();
+                QString directory = parts[1].trimmed();
+                
+                if (folderCode.endsWith("D") && folderCode.length() >= 3) {
+                    QString code = folderCode.left(folderCode.length() - 1); // Remove 'D'
+                    qDebug() << "DSSATPRO: Found directory mapping:" << folderCode << "(" << code << ") ->" << directory;
                     
-                    
-                    if (folderCode.endsWith("D") && folderCode.length() >= 3) {
-                        QString code = folderCode.left(folderCode.length() - 1); // Remove 'D'
-                        
-                        
-                        // Update matching crop
-                        if (cropMap.contains(code)) {
-                            cropMap[code].directory = directory;
-                        } else {
-                        }
+                    // Update matching crop
+                    if (cropMap.contains(code)) {
+                        cropMap[code].directory = directory;
+                        qDebug() << "DSSATPRO: Updated directory for code" << code;
+                    } else {
+                        qDebug() << "DSSATPRO: No matching crop found for code" << code;
                     }
                 }
             }
