@@ -751,10 +751,16 @@ bool DataProcessor::readObservedData(const QString &simulatedFilePath, const QSt
 
     QStringList tFilePatterns;
     if (!cropCode.isEmpty() && cropCode != "XX") {
+        // Primary crop-specific pattern: {experiment}.{cropCode}T
         tFilePatterns.append(QString("%1.%2T").arg(baseName).arg(cropCode));
+        
+        // Also check for DSSAT version-specific extensions
+#ifdef Q_OS_WIN
+        tFilePatterns.append(QString("%1.V48").arg(baseName));
+#else
+        tFilePatterns.append(QString("%1.L48").arg(baseName));
+#endif
     }
-    tFilePatterns.append(QString("%1.TMT").arg(baseName));
-    tFilePatterns.append(QString("%1.T").arg(baseName));
 
     QString foundTFile;
     for (const QString& pattern : tFilePatterns) {
