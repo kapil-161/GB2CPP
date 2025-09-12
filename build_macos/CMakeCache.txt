@@ -169,6 +169,9 @@ CMAKE_OSX_DEPLOYMENT_TARGET:STRING=
 // inside the indicated SDK.
 CMAKE_OSX_SYSROOT:STRING=
 
+//No help, variable specified on the command line.
+CMAKE_PREFIX_PATH:UNINITIALIZED=/opt/homebrew/opt/qt@6
+
 //Value Computed by CMake
 CMAKE_PROJECT_DESCRIPTION:STATIC=
 
@@ -277,7 +280,7 @@ GB2_CPP_IS_TOP_LEVEL:STATIC=ON
 GB2_CPP_SOURCE_DIR:STATIC=/Applications/DSSAT48/Tools/GBTOOLS/GB2CPP
 
 //Path to a program.
-MACDEPLOYQT_EXECUTABLE:FILEPATH=/opt/homebrew/bin/macdeployqt
+MACDEPLOYQT_EXECUTABLE:FILEPATH=/opt/homebrew/opt/qt@6/bin/macdeployqt
 
 //Path to a library.
 OPENGL_FRAMEWORK:FILEPATH=/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/Frameworks/OpenGL.framework
@@ -302,61 +305,61 @@ QT_ADDITIONAL_HOST_PACKAGES_PREFIX_PATH:STRING=
 QT_ADDITIONAL_PACKAGES_PREFIX_PATH:STRING=
 
 //The directory containing a CMake configuration file for Qt6ChartsPrivate.
-Qt6ChartsPrivate_DIR:PATH=/opt/homebrew/lib/cmake/Qt6ChartsPrivate
+Qt6ChartsPrivate_DIR:PATH=/opt/homebrew/opt/qt@6/lib/cmake/Qt6ChartsPrivate
 
 //The directory containing a CMake configuration file for Qt6Charts.
-Qt6Charts_DIR:PATH=/opt/homebrew/lib/cmake/Qt6Charts
+Qt6Charts_DIR:PATH=/opt/homebrew/opt/qt@6/lib/cmake/Qt6Charts
 
 //The directory containing a CMake configuration file for Qt6CorePrivate.
-Qt6CorePrivate_DIR:PATH=/opt/homebrew/lib/cmake/Qt6CorePrivate
+Qt6CorePrivate_DIR:PATH=/opt/homebrew/opt/qt@6/lib/cmake/Qt6CorePrivate
 
 //The directory containing a CMake configuration file for Qt6CoreTools.
-Qt6CoreTools_DIR:PATH=/opt/homebrew/lib/cmake/Qt6CoreTools
+Qt6CoreTools_DIR:PATH=/opt/homebrew/opt/qt@6/lib/cmake/Qt6CoreTools
 
 //The directory containing a CMake configuration file for Qt6Core.
-Qt6Core_DIR:PATH=/opt/homebrew/lib/cmake/Qt6Core
+Qt6Core_DIR:PATH=/opt/homebrew/opt/qt@6/lib/cmake/Qt6Core
 
 //The directory containing a CMake configuration file for Qt6DBusPrivate.
-Qt6DBusPrivate_DIR:PATH=/opt/homebrew/lib/cmake/Qt6DBusPrivate
+Qt6DBusPrivate_DIR:PATH=/opt/homebrew/opt/qt@6/lib/cmake/Qt6DBusPrivate
 
 //The directory containing a CMake configuration file for Qt6DBusTools.
-Qt6DBusTools_DIR:PATH=/opt/homebrew/lib/cmake/Qt6DBusTools
+Qt6DBusTools_DIR:PATH=/opt/homebrew/opt/qt@6/lib/cmake/Qt6DBusTools
 
 //The directory containing a CMake configuration file for Qt6DBus.
-Qt6DBus_DIR:PATH=/opt/homebrew/lib/cmake/Qt6DBus
+Qt6DBus_DIR:PATH=/opt/homebrew/opt/qt@6/lib/cmake/Qt6DBus
 
 //The directory containing a CMake configuration file for Qt6GuiPrivate.
-Qt6GuiPrivate_DIR:PATH=/opt/homebrew/lib/cmake/Qt6GuiPrivate
+Qt6GuiPrivate_DIR:PATH=/opt/homebrew/opt/qt@6/lib/cmake/Qt6GuiPrivate
 
 //The directory containing a CMake configuration file for Qt6GuiTools.
-Qt6GuiTools_DIR:PATH=/opt/homebrew/lib/cmake/Qt6GuiTools
+Qt6GuiTools_DIR:PATH=/opt/homebrew/opt/qt@6/lib/cmake/Qt6GuiTools
 
 //The directory containing a CMake configuration file for Qt6Gui.
-Qt6Gui_DIR:PATH=/opt/homebrew/lib/cmake/Qt6Gui
+Qt6Gui_DIR:PATH=/opt/homebrew/opt/qt@6/lib/cmake/Qt6Gui
 
 //The directory containing a CMake configuration file for Qt6OpenGLPrivate.
-Qt6OpenGLPrivate_DIR:PATH=/opt/homebrew/lib/cmake/Qt6OpenGLPrivate
+Qt6OpenGLPrivate_DIR:PATH=/opt/homebrew/opt/qt@6/lib/cmake/Qt6OpenGLPrivate
 
 //The directory containing a CMake configuration file for Qt6OpenGLWidgetsPrivate.
-Qt6OpenGLWidgetsPrivate_DIR:PATH=/opt/homebrew/lib/cmake/Qt6OpenGLWidgetsPrivate
+Qt6OpenGLWidgetsPrivate_DIR:PATH=/opt/homebrew/opt/qt@6/lib/cmake/Qt6OpenGLWidgetsPrivate
 
 //The directory containing a CMake configuration file for Qt6OpenGLWidgets.
-Qt6OpenGLWidgets_DIR:PATH=/opt/homebrew/lib/cmake/Qt6OpenGLWidgets
+Qt6OpenGLWidgets_DIR:PATH=/opt/homebrew/opt/qt@6/lib/cmake/Qt6OpenGLWidgets
 
 //The directory containing a CMake configuration file for Qt6OpenGL.
-Qt6OpenGL_DIR:PATH=/opt/homebrew/lib/cmake/Qt6OpenGL
+Qt6OpenGL_DIR:PATH=/opt/homebrew/opt/qt@6/lib/cmake/Qt6OpenGL
 
 //The directory containing a CMake configuration file for Qt6WidgetsPrivate.
-Qt6WidgetsPrivate_DIR:PATH=/opt/homebrew/lib/cmake/Qt6WidgetsPrivate
+Qt6WidgetsPrivate_DIR:PATH=/opt/homebrew/opt/qt@6/lib/cmake/Qt6WidgetsPrivate
 
 //The directory containing a CMake configuration file for Qt6WidgetsTools.
-Qt6WidgetsTools_DIR:PATH=/opt/homebrew/lib/cmake/Qt6WidgetsTools
+Qt6WidgetsTools_DIR:PATH=/opt/homebrew/opt/qt@6/lib/cmake/Qt6WidgetsTools
 
 //The directory containing a CMake configuration file for Qt6Widgets.
-Qt6Widgets_DIR:PATH=/opt/homebrew/lib/cmake/Qt6Widgets
+Qt6Widgets_DIR:PATH=/opt/homebrew/opt/qt@6/lib/cmake/Qt6Widgets
 
-//The directory containing a CMake configuration file for Qt6.
-Qt6_DIR:PATH=/opt/homebrew/lib/cmake/Qt6
+//No help, variable specified on the command line.
+Qt6_DIR:UNINITIALIZED=/opt/homebrew/opt/qt@6/lib/cmake/Qt6
 
 //Path to a program.
 Vulkan_GLSLANG_VALIDATOR_EXECUTABLE:FILEPATH=Vulkan_GLSLANG_VALIDATOR_EXECUTABLE-NOTFOUND
