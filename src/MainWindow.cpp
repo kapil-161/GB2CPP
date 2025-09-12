@@ -1205,9 +1205,16 @@ void MainWindow::onFileSelectionChanged()
             QString cropCode = "XX";
             // Try to get crop code from the selected folder name by matching with crop details
             QVector<CropDetails> allCropDetails = m_dataProcessor->getCropDetails();
+            qDebug() << "MainWindow: Selected folder:" << m_selectedFolder;
+            qDebug() << "MainWindow: Found" << allCropDetails.size() << "crop details";
             for (const CropDetails& crop : allCropDetails) {
-                if (QFileInfo(crop.directory).fileName().toLower() == m_selectedFolder.toLower()) {
+                QString dirName = QFileInfo(crop.directory).fileName().toLower();
+                // Also check if the directory path contains the selected folder name
+                bool pathContainsFolder = crop.directory.toLower().contains("/" + m_selectedFolder.toLower());
+                qDebug() << "MainWindow: Checking crop:" << crop.cropCode << "name:" << crop.cropName << "dir:" << crop.directory << "dirName:" << dirName << "pathContains:" << pathContainsFolder;
+                if (dirName == m_selectedFolder.toLower() || pathContainsFolder) {
                     cropCode = crop.cropCode.toUpper();
+                    qDebug() << "MainWindow: MATCHED! Setting cropCode to:" << cropCode;
                     break;
                 }
             }
