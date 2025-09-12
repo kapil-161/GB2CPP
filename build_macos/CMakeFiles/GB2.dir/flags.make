@@ -6,7 +6,7 @@ CXX_DEFINES = -DQT_CHARTS_LIB -DQT_CORE_LIB -DQT_GUI_LIB -DQT_NO_DEBUG -DQT_OPEN
 
 CXX_INCLUDES = -I/Applications/DSSAT48/Tools/GBTOOLS/GB2CPP/build_macos/GB2_autogen/include -I/Applications/DSSAT48/Tools/GBTOOLS/GB2CPP/src -I/Applications/DSSAT48/Tools/GBTOOLS/GB2CPP/include -F/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/Frameworks -isystem /opt/homebrew/lib/QtCore.framework/Headers -iframework /opt/homebrew/lib -isystem /opt/homebrew/share/qt/mkspecs/macx-clang -isystem /opt/homebrew/include -isystem /opt/homebrew/lib/QtWidgets.framework/Headers -isystem /opt/homebrew/lib/QtGui.framework/Headers -isystem /opt/homebrew/lib/QtCharts.framework/Headers -isystem /opt/homebrew/lib/QtOpenGL.framework/Headers -isystem /opt/homebrew/lib/QtOpenGLWidgets.framework/Headers
 
-CXX_FLAGSarm64 = -O3 -DNDEBUG -std=gnu++17 -arch arm64
+CXX_FLAGSarm64 = -std=gnu++17 -arch arm64
 
-CXX_FLAGS = -O3 -DNDEBUG -std=gnu++17 -arch arm64
+CXX_FLAGS = -std=gnu++17 -arch arm64
 

@@ -297,6 +297,7 @@ CMakeFiles/GB2.dir/src/MetricsCalculator.cpp.o: \
   /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/sys/_types/_mbstate_t.h \
   /opt/homebrew/include/QtCore/qtversionchecks.h \
   /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/assert.h \
+  /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/_assert.h \
   /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/_static_assert.h \
   /opt/homebrew/include/QtCore/qtypes.h \
   /opt/homebrew/include/QtCore/qassert.h \

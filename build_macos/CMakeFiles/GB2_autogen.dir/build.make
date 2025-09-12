@@ -72,7 +72,7 @@ GB2_autogen/timestamp: /opt/homebrew/share/qt/libexec/moc
 GB2_autogen/timestamp: /opt/homebrew/share/qt/libexec/uic
 GB2_autogen/timestamp: CMakeFiles/GB2_autogen.dir/compiler_depend.ts
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --blue --bold --progress-dir=/Applications/DSSAT48/Tools/GBTOOLS/GB2CPP/build_macos/CMakeFiles --progress-num=$(CMAKE_PROGRESS_1) "Automatic MOC and UIC for target GB2"
-	/opt/homebrew/bin/cmake -E cmake_autogen /Applications/DSSAT48/Tools/GBTOOLS/GB2CPP/build_macos/CMakeFiles/GB2_autogen.dir/AutogenInfo.json Release
+	/opt/homebrew/bin/cmake -E cmake_autogen /Applications/DSSAT48/Tools/GBTOOLS/GB2CPP/build_macos/CMakeFiles/GB2_autogen.dir/AutogenInfo.json ""
 	/opt/homebrew/bin/cmake -E touch /Applications/DSSAT48/Tools/GBTOOLS/GB2CPP/build_macos/GB2_autogen/timestamp
 
 CMakeFiles/GB2_autogen.dir/codegen:

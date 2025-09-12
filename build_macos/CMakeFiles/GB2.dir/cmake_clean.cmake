@@ -35,6 +35,7 @@ file(REMOVE_RECURSE
   "GB2_autogen/mocs_compilation.cpp"
   "GB2_autogen/timestamp"
   "bin/GB2.app/Contents/MacOS/GB2"
+  "bin/GB2.app/Contents/Resources/final.icns"
   "bin/GB2.pdb"
 )
 
