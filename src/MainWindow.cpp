@@ -458,11 +458,37 @@ void MainWindow::onOpenFile()
 {
     qDebug() << "MainWindow::onOpenFile() - Starting file dialog...";
     
+    // Observed data must come from the same DSSATPRO-configured directory as simulated data
+    QString cropDirectory;
+    if (m_dataProcessor && m_fileComboBox && m_fileComboBox->currentText() != "No DSSAT folders found") {
+        QString currentFolder = m_fileComboBox->currentText();
+        cropDirectory = m_dataProcessor->getActualFolderPath(currentFolder);
+        qDebug() << "MainWindow::onOpenFile() - Using DSSATPRO crop directory:" << cropDirectory;
+    }
+    
+    // If no valid DSSATPRO crop directory, show error
+    if (cropDirectory.isEmpty()) {
+        m_statusWidget->showError("Please select a valid crop folder first. Observed data must come from DSSATPRO-configured crop directories.");
+        return;
+    }
+    
+    // Get crop code from DETAIL.CDE to filter observed data files (cropcode+T format)
+    QString cropCode;
+    QVector<CropDetails> cropDetails = m_dataProcessor->getCropDetails();
+    QString currentFolder = m_fileComboBox->currentText();
+    for (const CropDetails &crop : cropDetails) {
+        if (crop.cropName == currentFolder) {
+            cropCode = crop.cropCode;
+            break;
+        }
+    }
+    
+    QString observedPattern = cropCode.isEmpty() ? "T" : QString("%1T").arg(cropCode);
     QString fileName = QFileDialog::getOpenFileName(
         this,
-        "Open DSSAT Data File",
-        QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation),
-        "DSSAT Files (*.OUT *.CDE *.DAT);;Text Files (*.txt);;All Files (*)"
+        QString("Open Observed Data File (%1*) from %2").arg(observedPattern).arg(QFileInfo(cropDirectory).baseName()),
+        cropDirectory,
+        QString("Observed Data Files (*%1*);;DSSAT Files (*.OUT *.DAT);;All Files (*)").arg(observedPattern)
     );
     
     qDebug() << "MainWindow::onOpenFile() - Selected file:" << fileName;
@@ -668,8 +694,10 @@ void MainWindow::loadFile(const QString &filePath)
         
         if (readResult) {
             qDebug() << "MainWindow: File loaded successfully, rows:" << m_currentData.rowCount;
-            // File loaded successfully
-            // The onDataProcessed slot will be called
+            // File loaded successfully - manually call onDataProcessed since signal might not be emitted
+            onDataProcessed(QString("Successfully loaded observed data: %1 rows, %2 columns")
+                          .arg(m_currentData.rowCount)
+                          .arg(m_currentData.columns.size()));
         } else {
             qDebug() << "MainWindow: Failed to read file";
             m_statusWidget->showError("Failed to read file: " + filePath);
@@ -798,7 +826,7 @@ void MainWindow::updatePlot()
     qDebug() << "MainWindow::updatePlot() - Plot widget exists:" << (m_plotWidget != nullptr);
     
     if (m_currentData.rowCount == 0) {
-        qDebug() << "MainWindow::updatePlot() - No simulated data available. Aborting plot update.";
+        qDebug() << "MainWindow::updatePlot() - No data available (simulated or observed). Aborting plot update.";
         return;
     }
     
