@@ -22,15 +22,7 @@ A complete C++ port of the Python DSSAT Data Viewer application, built with Qt6 
 - **StatusWidget**: Status messages with flash notifications
 - **Config**: Centralized configuration and constants
 
-### Key Features Ported from Python
 
-- ✅ PyQt6 → Qt6 C++
-- ✅ Pandas data processing → Custom C++ classes with STL containers
-- ✅ PyQtGraph plotting → Qt Charts
-- ✅ File I/O and DSSAT format parsing
-- ✅ Status notifications with flash effects
-- ✅ Data table with filtering and export
-- ✅ Modern UI styling and responsive layout
 
 ## Requirements
 
@@ -39,7 +31,7 @@ A complete C++ port of the Python DSSAT Data Viewer application, built with Qt6 
 - **C++17** compatible compiler
 - **DSSAT48** installation (for data files)
 
-## Building
+
 
 ### Windows Quick Build
 
@@ -154,12 +146,7 @@ Styling is defined in `main.cpp` and can be customized by modifying the CSS-like
 
 ## Performance
 
-The C++ version offers significant performance improvements over the Python original:
 
-- **Faster Startup**: ~3x faster application launch
-- **Memory Efficiency**: Lower memory usage for large datasets
-- **Responsive UI**: Non-blocking operations with proper threading
-- **Native Performance**: Platform-optimized Qt6 rendering
 
 ## Troubleshooting
 
@@ -211,7 +198,7 @@ The application can be packaged as a single portable executable using **Enigma V
    - Enable compression for smaller file size
    - Process to create single `.exe`
 
-3. **Result**: ~63MB single executable that runs on any Windows system without Qt6 installation
+
 
 ### Deployment Structure Required
 
@@ -231,17 +218,3 @@ deployment/
 
 **Note**: The folder structure is critical - Qt platform plugins must be in subdirectories for proper initialization.
 
-## Changelog
-
-### Version 2.1.0 (Single Executable)
-- Added Enigma Virtual Box packaging support
-- Created portable single executable distribution
-- Resolved Qt platform plugin deployment issues
-- Enhanced deployment documentation
-
-### Version 2.0.0 (C++ Port)
-- Complete rewrite in C++ with Qt6
-- Enhanced performance and memory efficiency
-- Modern UI with Qt Charts integration
-- Improved data processing with STL containers
-- Cross-platform compatibility maintained# GB2CPP
