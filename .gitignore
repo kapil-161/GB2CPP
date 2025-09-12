@@ -1,0 +1,95 @@
+# Build directories
+build_macos/
+build_win/
+build_*/
+
+# CMake generated files
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile
+*.cmake
+
+# Compiled Object files
+*.o
+*.obj
+*.so
+*.dylib
+*.dll
+*.exe
+
+# Executables and app bundles
+*.app/
+*.exe
+
+# Qt generated files
+*_autogen/
+moc_*.cpp
+moc_*.h
+qrc_*.cpp
+ui_*.h
+*.pro.user
+*.pro.user.*
+*.qbs.user
+*.qbs.user.*
+*.moc
+moc_*.cpp
+moc_*.h
+qrc_*.cpp
+ui_*.h
+*.qmlc
+*.jsc
+
+# Qt deployment files
+*.dll
+*.so
+*.dylib
+platforms/
+styles/
+imageformats/
+iconengines/
+generic/
+networkinformation/
+tls/
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# System files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Log files
+*.log
+app_debug.log
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.backup
+
+# Manual deployment (build artifacts)
+manual_deployment/*.exe
+manual_deployment/*.dll
+manual_deployment/*.log
+manual_deployment/platforms/
+manual_deployment/styles/
+manual_deployment/imageformats/
+manual_deployment/iconengines/
+manual_deployment/generic/
+manual_deployment/networkinformation/
+manual_deployment/tls/
+
+# Keep the manual_deployment directory but ignore its contents
+manual_deployment/*
+!manual_deployment/GB2.app/
