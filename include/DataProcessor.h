@@ -61,6 +61,10 @@ public:
     QStringList prepareOutFiles(const QString &folderName);
     QString getActualFolderPath(const QString &folderName);
     bool isFilePlottable(const QString &filePath);
+    
+    // SensWork specific methods
+    QPair<QString, QString> extractSensWorkCodes(const QString &filePath);
+    bool readSensWorkObservedData(const QString &sensWorkFilePath, DataTable &observedData);
 
     void standardizeDataTypes(DataTable &table);
     void addDateColumns(DataTable &table);

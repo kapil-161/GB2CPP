@@ -721,7 +721,7 @@ void MainWindow::updateVariableComboBoxes()
     m_yVariableComboBox->clear();
 
     // Variables to exclude from Y variable list (these are typically X-axis or grouping variables)
-    QStringList yVariableExclusions = {"YEAR", "RUN", "EXPERIMENT", "DAS", "DAP", "DOY", "DATE", "TRT", "CROP"};
+    QStringList yVariableExclusions = {"YEAR", "RUN","CR","FILEX", "EXPERIMENT", "DAS", "DAP", "DOY", "DATE", "TRT", "CROP", "TNAME"};
 
     QStringList commonVariables;
     QStringList simOnlyVariables;
@@ -729,7 +729,26 @@ void MainWindow::updateVariableComboBoxes()
     // Identify common variables and simulated-only variables
     for (const QString &columnName : m_currentData.columnNames) {
         if (m_currentObsData.columnNames.contains(columnName)) {
-            commonVariables.append(columnName);
+            // Check if observed data column actually has valid (non-missing) data
+            const DataColumn *obsCol = m_currentObsData.getColumn(columnName);
+            bool hasValidObsData = false;
+            
+            if (obsCol) {
+                for (const QVariant &value : obsCol->data) {
+                    if (!DataProcessor::isMissingValue(value)) {
+                        hasValidObsData = true;
+                        break;
+                    }
+                }
+            }
+            
+            if (hasValidObsData) {
+                commonVariables.append(columnName);
+                qDebug() << "MainWindow: Variable" << columnName << "has both simulated and observed data";
+            } else {
+                simOnlyVariables.append(columnName);
+                qDebug() << "MainWindow: Variable" << columnName << "has column in observed data but no valid values";
+            }
         } else {
             simOnlyVariables.append(columnName);
         }
@@ -1203,19 +1222,33 @@ void MainWindow::onFileSelectionChanged()
 
             // Determine crop code
             QString cropCode = "XX";
-            // Try to get crop code from the selected folder name by matching with crop details
-            QVector<CropDetails> allCropDetails = m_dataProcessor->getCropDetails();
-            qDebug() << "MainWindow: Selected folder:" << m_selectedFolder;
-            qDebug() << "MainWindow: Found" << allCropDetails.size() << "crop details";
-            for (const CropDetails& crop : allCropDetails) {
-                QString dirName = QFileInfo(crop.directory).fileName().toLower();
-                // Also check if the directory path contains the selected folder name
-                bool pathContainsFolder = crop.directory.toLower().contains("/" + m_selectedFolder.toLower());
-                qDebug() << "MainWindow: Checking crop:" << crop.cropCode << "name:" << crop.cropName << "dir:" << crop.directory << "dirName:" << dirName << "pathContains:" << pathContainsFolder;
-                if (dirName == m_selectedFolder.toLower() || pathContainsFolder) {
-                    cropCode = crop.cropCode.toUpper();
-                    qDebug() << "MainWindow: MATCHED! Setting cropCode to:" << cropCode;
-                    break;
+            
+            // Special handling for SensWork - extract crop code from the file itself
+            if (m_selectedFolder.compare("SensWork", Qt::CaseInsensitive) == 0 && !firstValidFile.isEmpty()) {
+                qDebug() << "MainWindow: SensWork detected - extracting crop code from file";
+                QPair<QString, QString> sensWorkCodes = m_dataProcessor->extractSensWorkCodes(firstValidFile);
+                if (!sensWorkCodes.second.isEmpty()) {
+                    cropCode = sensWorkCodes.second.toUpper();
+                    qDebug() << "MainWindow: SensWork crop code extracted:" << cropCode;
+                } else {
+                    qDebug() << "MainWindow: Could not extract crop code from SensWork file, using default";
+                }
+            } else {
+                // Regular crop folder - try to get crop code from the selected folder name by matching with crop details
+                QVector<CropDetails> allCropDetails = m_dataProcessor->getCropDetails();
+                qDebug() << "MainWindow: Selected folder:" << m_selectedFolder;
+                qDebug() << "MainWindow: Found" << allCropDetails.size() << "crop details";
+                for (const CropDetails& crop : allCropDetails) {
+                    QString dirName = QFileInfo(crop.directory).fileName().toLower();
+                    // Check if the directory path contains the selected folder name (using both / and \ separators)
+                    bool pathContainsFolder = crop.directory.toLower().contains("/" + m_selectedFolder.toLower()) || 
+                                            crop.directory.toLower().contains("\\" + m_selectedFolder.toLower());
+                    qDebug() << "MainWindow: Checking crop:" << crop.cropCode << "name:" << crop.cropName << "dir:" << crop.directory << "dirName:" << dirName << "pathContains:" << pathContainsFolder;
+                    if (dirName == m_selectedFolder.toLower() || pathContainsFolder) {
+                        cropCode = crop.cropCode.toUpper();
+                        qDebug() << "MainWindow: MATCHED! Setting cropCode to:" << cropCode;
+                        break;
+                    }
                 }
             }
             qDebug() << "MainWindow: Determined Crop Code:" << cropCode;
@@ -1231,11 +1264,28 @@ void MainWindow::onFileSelectionChanged()
             }
 
             // Attempt to load and merge observed data for each unique experiment code
-            for (const QString& expCode : uniqueExperimentCodes) {
-                DataTable tempObsData;
-                // Use the first valid file path for observed data lookup
-                if (!firstValidFile.isEmpty() && m_dataProcessor->readObservedData(firstValidFile, expCode, cropCode, tempObsData)) {
-                    m_currentObsData.merge(tempObsData);
+            // Special handling for SensWork files
+            if (m_selectedFolder.compare("SensWork", Qt::CaseInsensitive) == 0) {
+                qDebug() << "MainWindow: Detected SensWork folder - using dynamic observed data lookup";
+                
+                // For SensWork, use the dynamic observed data lookup
+                if (!firstValidFile.isEmpty()) {
+                    DataTable sensWorkObsData;
+                    if (m_dataProcessor->readSensWorkObservedData(firstValidFile, sensWorkObsData)) {
+                        m_currentObsData.merge(sensWorkObsData);
+                        qDebug() << "MainWindow: Successfully loaded SensWork observed data:" << sensWorkObsData.rowCount << "rows";
+                    } else {
+                        qDebug() << "MainWindow: No observed data found for SensWork file";
+                    }
+                }
+            } else {
+                // Regular crop folder - use standard observed data lookup
+                for (const QString& expCode : uniqueExperimentCodes) {
+                    DataTable tempObsData;
+                    // Use the first valid file path for observed data lookup
+                    if (!firstValidFile.isEmpty() && m_dataProcessor->readObservedData(firstValidFile, expCode, cropCode, tempObsData)) {
+                        m_currentObsData.merge(tempObsData);
+                    }
                 }
             }
             

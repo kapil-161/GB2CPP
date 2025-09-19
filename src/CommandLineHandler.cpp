@@ -1,5 +1,6 @@
 #include "CommandLineHandler.h"
 #include "MainWindow.h"
+#include "DataProcessor.h"
 #include <QDebug>
 #include <QDir>
 #include <QTimer>
@@ -49,8 +50,8 @@ CommandLineArgs CommandLineHandler::parseCommandLineArgs(const QStringList &args
         result.dssatBase = params[0];
         result.cropDir = params[1];
         
-        // Extract crop name from crop directory
-        result.cropName = QDir(result.cropDir).dirName();
+        // Extract crop name from crop directory by finding the crop folder
+        result.cropName = extractCropNameFromPath(result.cropDir);
         
         // Get output files if provided
         if (params.size() > 2) {
@@ -180,4 +181,34 @@ void CommandLineHandler::loadInitialContent()
     } catch (const std::exception &e) {
         qCritical() << "Error loading initial content:" << e.what();
     }
+}
+
+QString CommandLineHandler::extractCropNameFromPath(const QString &cropDirPath)
+{
+    // Get crop details to find matching directory
+    QVector<CropDetails> cropDetails = DataProcessor::getCropDetails();
+    
+    // Try to find which crop directory this path belongs to
+    for (const CropDetails &crop : cropDetails) {
+        if (!crop.directory.isEmpty()) {
+            // Check if the provided path is within this crop directory
+            QDir cropDir(crop.directory);
+            QString canonicalCropDir = cropDir.canonicalPath();
+            QDir providedDir(cropDirPath);
+            QString canonicalProvidedDir = providedDir.canonicalPath();
+            
+            // Check if provided path starts with or equals the crop directory
+            if (canonicalProvidedDir.startsWith(canonicalCropDir, Qt::CaseInsensitive)) {
+                qDebug() << "CommandLineHandler: Matched crop directory:" << crop.directory 
+                         << "for path:" << cropDirPath << "-> crop name:" << crop.cropName;
+                return crop.cropName;
+            }
+        }
+    }
+    
+    // Fallback: use the last directory name if no match found
+    QString fallbackName = QDir(cropDirPath).dirName();
+    qWarning() << "CommandLineHandler: No matching crop directory found for:" << cropDirPath 
+               << "using fallback:" << fallbackName;
+    return fallbackName;
 }

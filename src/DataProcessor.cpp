@@ -920,21 +920,18 @@ QStringList DataProcessor::prepareFolders(bool includeExtraFolders)
 {
     QStringList folders;
     
-    
     // Get crop details from DETAIL.CDE and DSSATPRO
     QVector<CropDetails> cropDetails = getCropDetails();
     
-    
-    // Add crop folder names
+    // Add crop folder names - all folders now follow DETAIL.CDE mapping
     for (const CropDetails &crop : cropDetails) {
         if (!crop.cropName.isEmpty()) {
             folders.append(crop.cropName);
         }
     }
     
-    // Add extra non-crop folders if requested
+    // Add SensWork as special sensitivity analysis folder
     if (includeExtraFolders) {
-        // Only SensWork is treated as special folder - others should follow DETAIL.CDE mapping
         folders.append("SensWork");
     }
     
@@ -959,14 +956,19 @@ QStringList DataProcessor::prepareOutFiles(const QString &folderName)
         // Try to find the crop directory by name
         QVector<CropDetails> cropDetails = getCropDetails();
         
-        for (const CropDetails &crop : cropDetails) {
-            if (crop.cropName == folderName && !crop.directory.isEmpty()) {
-                actualPath = crop.directory;
-                break;
+        // Special handling for SensWork - sensitivity analysis folder
+        if (folderName.compare("SensWork", Qt::CaseInsensitive) == 0) {
+            actualPath = QDir(getDSSATBase()).absoluteFilePath("SensWork");
+            qDebug() << "prepareOutFiles: Using special SensWork path:" << actualPath;
+        } else {
+            // Regular crop folders - lookup in DETAIL.CDE mapping
+            for (const CropDetails &crop : cropDetails) {
+                if (crop.cropName == folderName && !crop.directory.isEmpty()) {
+                    actualPath = crop.directory;
+                    break;
+                }
             }
         }
-        
-        // No fallback - directory must come from profile files only
     }
     
     if (actualPath.isEmpty()) {
@@ -1052,6 +1054,11 @@ QString DataProcessor::getActualFolderPath(const QString &folderName)
     // Check if it's already an absolute path
     if (QDir::isAbsolutePath(folderName)) {
         return folderName;
+    }
+    
+    // Special handling for SensWork - sensitivity analysis folder
+    if (folderName.compare("SensWork", Qt::CaseInsensitive) == 0) {
+        return QDir(getDSSATBase()).absoluteFilePath("SensWork");
     }
     
     // Try to find the crop directory by name
@@ -1399,6 +1406,239 @@ QVector<CropDetails> DataProcessor::getCropDetails()
     }
     
     return cropDetails;
+}
+
+QPair<QString, QString> DataProcessor::extractSensWorkCodes(const QString &filePath)
+{
+    QString experimentCode;
+    QString cropCode;
+    
+    qDebug() << "DataProcessor::extractSensWorkCodes - Reading from:" << filePath;
+    
+    // Read the file to extract EXPERIMENT and CROP codes
+    DataTable tempData;
+    if (!readFile(filePath, tempData)) {
+        qWarning() << "DataProcessor::extractSensWorkCodes - Failed to read file:" << filePath;
+        return qMakePair(QString(), QString());
+    }
+    
+    // Extract EXPERIMENT code
+    if (tempData.columnNames.contains("EXPERIMENT")) {
+        const DataColumn* expCol = tempData.getColumn("EXPERIMENT");
+        if (expCol && !expCol->data.isEmpty()) {
+            for (const QVariant &value : expCol->data) {
+                QString exp = value.toString().trimmed();
+                if (!exp.isEmpty() && exp != "DEFAULT") {
+                    experimentCode = exp;
+                    break; // Use first valid experiment code
+                }
+            }
+        }
+    }
+    
+    // Extract CROP code - try multiple sources
+    // 1. Try CROP column
+    if (tempData.columnNames.contains("CROP")) {
+        const DataColumn* cropCol = tempData.getColumn("CROP");
+        if (cropCol && !cropCol->data.isEmpty()) {
+            for (const QVariant &value : cropCol->data) {
+                QString crop = value.toString().trimmed();
+                if (!crop.isEmpty()) {
+                    cropCode = crop;
+                    qDebug() << "DataProcessor::extractSensWorkCodes - Found crop code in CROP column:" << cropCode;
+                    break; // Use first valid crop code
+                }
+            }
+        }
+    }
+    
+    // 2. Try CR column if CROP not found
+    if (cropCode.isEmpty() && tempData.columnNames.contains("CR")) {
+        const DataColumn* crCol = tempData.getColumn("CR");
+        if (crCol && !crCol->data.isEmpty()) {
+            for (const QVariant &value : crCol->data) {
+                QString crop = value.toString().trimmed();
+                if (!crop.isEmpty()) {
+                    cropCode = crop;
+                    qDebug() << "DataProcessor::extractSensWorkCodes - Found crop code in CR column:" << cropCode;
+                    break; // Use first valid crop code
+                }
+            }
+        }
+    }
+    
+    // 3. Try to parse MODEL line from file header if no column found
+    if (cropCode.isEmpty()) {
+        qDebug() << "DataProcessor::extractSensWorkCodes - No CROP/CR column found, parsing MODEL line";
+        
+        QFile file(filePath);
+        if (file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+            QTextStream in(&file);
+            QString line;
+            int lineCount = 0;
+            
+            // Read first 50 lines to find MODEL line
+            while (!in.atEnd() && lineCount < 50) {
+                line = in.readLine().trimmed();
+                lineCount++;
+                
+                // Look for MODEL line: "MODEL          : CSCER048 - Wheat"
+                if (line.startsWith("MODEL") && line.contains(":")) {
+                    QString modelInfo = line.split(":").last().trimmed();
+                    qDebug() << "DataProcessor::extractSensWorkCodes - Found MODEL line:" << modelInfo;
+                    
+                    // Extract crop name from model info (e.g., "CSCER048 - Wheat")
+                    if (modelInfo.contains(" - ")) {
+                        QString cropName = modelInfo.split(" - ").last().trimmed();
+                        qDebug() << "DataProcessor::extractSensWorkCodes - Extracted crop name:" << cropName;
+                        
+                        // Map crop name to crop code using DETAIL.CDE
+                        QVector<CropDetails> cropDetails = getCropDetails();
+                        for (const CropDetails &crop : cropDetails) {
+                            if (crop.cropName.compare(cropName, Qt::CaseInsensitive) == 0) {
+                                cropCode = crop.cropCode.toUpper();
+                                qDebug() << "DataProcessor::extractSensWorkCodes - Mapped crop name to code:" << cropName << "->" << cropCode;
+                                break;
+                            }
+                        }
+                        
+                        // If no exact match, try partial matching
+                        if (cropCode.isEmpty()) {
+                            for (const CropDetails &crop : cropDetails) {
+                                if (crop.cropName.contains(cropName, Qt::CaseInsensitive) || 
+                                    cropName.contains(crop.cropName, Qt::CaseInsensitive)) {
+                                    cropCode = crop.cropCode.toUpper();
+                                    qDebug() << "DataProcessor::extractSensWorkCodes - Partial match crop name to code:" << cropName << "->" << cropCode;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                    break; // Found MODEL line, stop searching
+                }
+            }
+            file.close();
+        }
+        
+        // Fallback if still no crop code found
+        if (cropCode.isEmpty()) {
+            cropCode = "XX"; // Default unknown crop
+            qDebug() << "DataProcessor::extractSensWorkCodes - Could not determine crop code, using default: XX";
+        }
+    }
+    
+    qDebug() << "DataProcessor::extractSensWorkCodes - Extracted experiment:" << experimentCode << "crop:" << cropCode;
+    
+    return qMakePair(experimentCode, cropCode);
+}
+
+bool DataProcessor::readSensWorkObservedData(const QString &sensWorkFilePath, DataTable &observedData)
+{
+    qDebug() << "DataProcessor::readSensWorkObservedData - Processing SensWork file:" << sensWorkFilePath;
+    
+    // Extract experiment and crop codes from the SensWork file
+    QPair<QString, QString> codes = extractSensWorkCodes(sensWorkFilePath);
+    QString experimentCode = codes.first;
+    QString cropCode = codes.second;
+    
+    if (experimentCode.isEmpty() || cropCode.isEmpty()) {
+        qWarning() << "DataProcessor::readSensWorkObservedData - Could not extract experiment/crop codes";
+        return false;
+    }
+    
+    // Construct observed data file pattern: experiment_code.crop_code+T
+    QString observedFileName = QString("%1.%2T").arg(experimentCode).arg(cropCode);
+    qDebug() << "DataProcessor::readSensWorkObservedData - Looking for observed data file:" << observedFileName;
+    
+    // Search for observed data file in SensWork directory and crop directories
+    QStringList searchPaths;
+    
+    // 1. First check SensWork directory itself
+    QString sensWorkDir = QFileInfo(sensWorkFilePath).absolutePath();
+    searchPaths << sensWorkDir;
+    
+    // 2. Then check the original crop directory where the experiment likely came from
+    QVector<CropDetails> cropDetails = getCropDetails();
+    for (const CropDetails &crop : cropDetails) {
+        if (crop.cropCode.compare(cropCode, Qt::CaseInsensitive) == 0 && !crop.directory.isEmpty()) {
+            searchPaths << crop.directory;
+            qDebug() << "DataProcessor::readSensWorkObservedData - Added crop directory to search:" << crop.directory;
+        }
+    }
+    
+    // 3. As fallback, check standard DSSAT directories
+    QString dssatBase = getDSSATBase();
+    QStringList possibleCropDirs = {
+        QDir(dssatBase).absoluteFilePath("Maize"),
+        QDir(dssatBase).absoluteFilePath("MAIZE"), 
+        QDir(dssatBase).absoluteFilePath("Wheat"),
+        QDir(dssatBase).absoluteFilePath("WHEAT"),
+        QDir(dssatBase).absoluteFilePath("Soybean"),
+        QDir(dssatBase).absoluteFilePath("SOYBEAN")
+    };
+    searchPaths << possibleCropDirs;
+    
+    // Search for the observed data file
+    QString observedFilePath;
+    for (const QString &searchPath : searchPaths) {
+        QDir dir(searchPath);
+        if (!dir.exists()) continue;
+        
+        // Try exact filename
+        QString candidatePath = dir.absoluteFilePath(observedFileName);
+        if (QFile::exists(candidatePath)) {
+            observedFilePath = candidatePath;
+            qDebug() << "DataProcessor::readSensWorkObservedData - Found observed data at:" << observedFilePath;
+            break;
+        }
+        
+        // Try case-insensitive search
+        QStringList filters;
+        filters << QString("*%1*").arg(observedFileName.toUpper())
+                << QString("*%1*").arg(observedFileName.toLower());
+        
+        QStringList matches = dir.entryList(filters, QDir::Files);
+        if (!matches.isEmpty()) {
+            observedFilePath = dir.absoluteFilePath(matches.first());
+            qDebug() << "DataProcessor::readSensWorkObservedData - Found observed data (case-insensitive):" << observedFilePath;
+            break;
+        }
+    }
+    
+    if (observedFilePath.isEmpty()) {
+        qWarning() << "DataProcessor::readSensWorkObservedData - Could not find observed data file:" << observedFileName;
+        return false;
+    }
+    
+    // Read the observed data file
+    bool success = readTFile(observedFilePath, observedData);
+    if (success) {
+        qDebug() << "DataProcessor::readSensWorkObservedData - Successfully loaded observed data:" << observedData.rowCount << "rows";
+        
+        // Add CROP column to observed data if it doesn't exist
+        if (!observedData.columnNames.contains("CROP")) {
+            DataColumn cropCol("CROP");
+            for (int r = 0; r < observedData.rowCount; ++r) {
+                cropCol.data.append(cropCode);
+            }
+            observedData.addColumn(cropCol);
+            qDebug() << "DataProcessor::readSensWorkObservedData - Added CROP column to observed data";
+        }
+        
+        // Add EXPERIMENT column to observed data if it doesn't exist
+        if (!observedData.columnNames.contains("EXPERIMENT")) {
+            DataColumn expCol("EXPERIMENT");
+            for (int r = 0; r < observedData.rowCount; ++r) {
+                expCol.data.append(experimentCode);
+            }
+            observedData.addColumn(expCol);
+            qDebug() << "DataProcessor::readSensWorkObservedData - Added EXPERIMENT column to observed data";
+        }
+    } else {
+        qWarning() << "DataProcessor::readSensWorkObservedData - Failed to read observed data file:" << observedFilePath;
+    }
+    
+    return success;
 }
 
 QPair<QString, QString> DataProcessor::getVariableInfo(const QString &variableName)

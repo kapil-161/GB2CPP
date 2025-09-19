@@ -36,6 +36,7 @@ private:
     CommandLineArgs m_args;
     
     bool selectCropFolder(const QString &cropName);
+    static QString extractCropNameFromPath(const QString &cropDirPath);
 };
 
 #endif // COMMANDLINEHANDLER_H
