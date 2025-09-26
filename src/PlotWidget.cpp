@@ -2144,7 +2144,7 @@ void PlotWidget::exportPlotComposite(const QString &filePath, const QString &for
     QPainter chartPainter(&chartPixmap);
     m_chartView->render(&chartPainter);
     chartPainter.end();
-    
+
     QPixmap legendPixmap(m_legendWidget->size());
     legendPixmap.fill(Qt::white);
     QPainter legendPainter(&legendPixmap);
