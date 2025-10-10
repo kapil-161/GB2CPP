@@ -209,7 +209,9 @@ void MainWindow::setupControlPanel()
     
     m_fileListWidget = new QListWidget();
     m_fileListWidget->setSelectionMode(QListWidget::MultiSelection);
-    m_fileListWidget->setMinimumHeight(220);
+    m_fileListWidget->setMinimumHeight(120);
+    m_fileListWidget->setMaximumHeight(120);
+    m_fileListWidget->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
     fileContainerLayout->addWidget(m_fileListWidget);
     
     m_unselectFilesButton = new QPushButton("×");
@@ -224,8 +226,8 @@ void MainWindow::setupControlPanel()
     fileContainerLayout->addWidget(m_unselectFilesButton, 0, Qt::AlignTop);
     
     fileLayout->addWidget(fileContainer);
-    controlLayout->addWidget(fileGroup);
-    
+    controlLayout->addWidget(fileGroup, 0);  // Stretch factor 0 = no expansion
+
     // Time Series Variables Group
     QGroupBox *timeSeriesGroup = new QGroupBox("Time Series Variables");
     QVBoxLayout *tsLayout = new QVBoxLayout(timeSeriesGroup);
@@ -247,10 +249,9 @@ void MainWindow::setupControlPanel()
     QWidget *yVarContainer = new QWidget();
     QHBoxLayout *yVarContainerLayout = new QHBoxLayout(yVarContainer);
     yVarContainerLayout->setContentsMargins(0, 0, 0, 0);
-    
+
     QListWidget *yVarListWidget = new QListWidget();
     yVarListWidget->setSelectionMode(QListWidget::MultiSelection);
-    yVarListWidget->setMinimumHeight(220);
     yVarContainerLayout->addWidget(yVarListWidget);
     
     m_unselectYVarsButton = new QPushButton("×");
@@ -264,11 +265,16 @@ void MainWindow::setupControlPanel()
     m_unselectYVarsButton->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
     yVarContainerLayout->addWidget(m_unselectYVarsButton, 0, Qt::AlignTop);
     
-    tsLayout->addWidget(yVarContainer);
-    controlLayout->addWidget(timeSeriesGroup);
-    
+    tsLayout->addWidget(yVarContainer, 1);  // Stretch factor 1 = expands to fill space
+    controlLayout->addWidget(timeSeriesGroup, 1);  // Stretch factor 1 = expands to fill space
+
     // Store references for later use
     m_yVariableComboBox = yVarListWidget;
+
+    // Let Y variable list expand to fill remaining space
+    m_yVariableComboBox->setMinimumHeight(200);
+    m_yVariableComboBox->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+
     m_treatmentComboBox = new QComboBox();  // Keep for compatibility
     
     // Refresh Plot/Data Button
@@ -328,6 +334,8 @@ void MainWindow::setupControlPanel()
     qDebug() << "m_xVariableComboBox:" << (m_xVariableComboBox ? "OK" : "NULL");
     qDebug() << "m_yVariableComboBox:" << (m_yVariableComboBox ? "OK" : "NULL");
     qDebug() << "m_updatePlotButton:" << (m_updatePlotButton ? "OK" : "NULL");
+    qDebug() << "m_fileListWidget height - min:" << m_fileListWidget->minimumHeight() << "max:" << m_fileListWidget->maximumHeight();
+    qDebug() << "m_yVariableComboBox height - min:" << m_yVariableComboBox->minimumHeight() << "max:" << m_yVariableComboBox->maximumHeight();
     
     m_mainSplitter->addWidget(controlPanel);
 }
@@ -556,21 +564,52 @@ void MainWindow::onDataFileChanged()
 
 void MainWindow::onXVariableChanged()
 {
+    // Mark that variable selection has changed
+    m_variableSelectionChanged = true;
+    markDataNeedsRefresh();
+
+    // Show prompt message based on current tab
+    if (m_tabWidget && m_tabWidget->currentIndex() == 0) {
+        m_statusWidget->showInfo("X variable changed. Click 'Refresh Plot' to update the time series plot");
+    } else if (m_tabWidget && m_tabWidget->currentIndex() == 1) {
+        m_statusWidget->showInfo("X variable changed. Click 'Refresh Data' to update the data table");
+    }
     // Don't auto-plot, wait for manual refresh
 }
 
 void MainWindow::onYVariableChanged()
 {
+    // Mark that variable selection has changed
+    m_variableSelectionChanged = true;
+    markDataNeedsRefresh();
+
     // Check if no Y variables are selected and clear metrics if so
     if (m_yVariableComboBox && m_yVariableComboBox->selectedItems().isEmpty()) {
         clearMetrics();
         qDebug() << "MainWindow: Cleared metrics due to no Y variables selected";
+    }
+
+    // Show prompt message based on current tab
+    if (m_tabWidget && m_tabWidget->currentIndex() == 0) {
+        m_statusWidget->showInfo("Y variable selection changed. Click 'Refresh Plot' to update the time series plot");
+    } else if (m_tabWidget && m_tabWidget->currentIndex() == 1) {
+        m_statusWidget->showInfo("Y variable selection changed. Click 'Refresh Data' to update the data table");
     }
     // Don't auto-plot, wait for manual refresh
 }
 
 void MainWindow::onTreatmentChanged()
 {
+    // Mark that variable selection has changed
+    m_variableSelectionChanged = true;
+    markDataNeedsRefresh();
+
+    // Show prompt message based on current tab
+    if (m_tabWidget && m_tabWidget->currentIndex() == 0) {
+        m_statusWidget->showInfo("Treatment selection changed. Click 'Refresh Plot' to update the time series plot");
+    } else if (m_tabWidget && m_tabWidget->currentIndex() == 1) {
+        m_statusWidget->showInfo("Treatment selection changed. Click 'Refresh Data' to update the data table");
+    }
     // Don't auto-plot, wait for manual refresh
 }
 
@@ -600,6 +639,7 @@ void MainWindow::onUpdatePlot()
     
     // Mark data as refreshed
     m_dataNeedsRefresh = false;
+    m_variableSelectionChanged = false;
 }
 
 void MainWindow::onTabChanged(int index)
@@ -610,15 +650,36 @@ void MainWindow::onTabChanged(int index)
         if (m_updatePlotButton) {
             m_updatePlotButton->setText("Refresh Plot");
         }
+
+        // Show prompt message if files are selected but plot needs refresh
+        QList<QListWidgetItem*> selectedItems = m_fileListWidget ? m_fileListWidget->selectedItems() : QList<QListWidgetItem*>();
+        if (!selectedItems.isEmpty() && (m_currentData.rowCount == 0 || m_variableSelectionChanged || m_dataNeedsRefresh)) {
+            m_statusWidget->showInfo("Click 'Refresh Plot' to view the time series plot with current selections");
+        } else if (selectedItems.isEmpty()) {
+            m_statusWidget->showInfo("Click outfile and variables, then click 'Refresh Plot' to view time series");
+        }
+
     } else if (index == 1) {
         // Data View tab
         if (m_updatePlotButton) {
             m_updatePlotButton->setText("Refresh Data");
         }
+
         if (m_dataTableWidget && m_currentData.rowCount > 0 && m_dataNeedsRefresh) {
             qDebug() << "MainWindow::onTabChanged() - Data View tab selected, refreshing table data.";
             m_dataTableWidget->setData(m_currentData, m_currentObsData);
             m_dataNeedsRefresh = false; // Reset the flag after refreshing
+        }
+
+        // Show prompt message based on data state
+        QList<QListWidgetItem*> selectedItems = m_fileListWidget ? m_fileListWidget->selectedItems() : QList<QListWidgetItem*>();
+        if (selectedItems.isEmpty()) {
+            m_statusWidget->showInfo("Click outfile and click refresh data to view data");
+        } else if (m_currentData.rowCount == 0) {
+            m_statusWidget->showInfo("Click 'Refresh Data' to load and view the data table with current file selections");
+        } else {
+            // Data is loaded - show success message
+            m_statusWidget->showSuccess(QString("Displaying data from %1 selected file(s)").arg(selectedItems.size()));
         }
     }
 }
@@ -1106,19 +1167,26 @@ void MainWindow::onFileSelectionChanged()
     if (selectedItems.isEmpty()) {
         qDebug() << "MainWindow::onFileSelectionChanged() - No items selected, clearing data and variables";
         m_updatePlotButton->setEnabled(false);
-        
+
         // Clear data when no files are selected
         m_currentData.clear();
         m_currentObsData.clear();
-        
+
         // Clear and update variable combo boxes
         updateVariableComboBoxes();
-        
+
         // Clear the plot
         if (m_plotWidget) {
             m_plotWidget->clear();
         }
-        
+
+        // Show info message based on current tab
+        if (m_tabWidget && m_tabWidget->currentIndex() == 0) {
+            m_statusWidget->showInfo("Click outfile and variables, then click 'Refresh Plot' to view time series");
+        } else if (m_tabWidget && m_tabWidget->currentIndex() == 1) {
+            m_statusWidget->showInfo("Click outfile and click refresh data to view data");
+        }
+
         return;
     }
 
@@ -1303,6 +1371,13 @@ void MainWindow::onFileSelectionChanged()
             markDataNeedsRefresh();
             qDebug() << "MainWindow::onFileSelectionChanged() - Data loaded from" << selectedItems.size() << "files, marked for table refresh.";
             qDebug() << "MainWindow::onFileSelectionChanged() - Function completed successfully; table data not yet set.";
+
+            // Show prompt message based on current tab
+            if (m_tabWidget && m_tabWidget->currentIndex() == 0) {
+                m_statusWidget->showInfo(QString("Loaded %1 file(s). Select variables and click 'Refresh Plot' to view time series").arg(selectedItems.size()));
+            } else if (m_tabWidget && m_tabWidget->currentIndex() == 1) {
+                m_statusWidget->showInfo(QString("Loaded %1 file(s). Click 'Refresh Data' to view data table").arg(selectedItems.size()));
+            }
         }
     }
     qDebug() << "MainWindow::onFileSelectionChanged() - Function finished";

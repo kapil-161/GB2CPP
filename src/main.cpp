@@ -175,39 +175,8 @@ void setupApplicationStyle(QApplication &app)
     app.setStyleSheet(styleSheet);
 }
 
-void logMessageOutput(QtMsgType type, const QMessageLogContext &context, const QString &msg)
-{
-    static QFile logFile("app_debug.log");
-    if (!logFile.isOpen()) {
-        logFile.open(QIODevice::WriteOnly | QIODevice::Append);
-    }
-    QTextStream out(&logFile);
-    QString log_msg = QObject::tr("[%1] %2").arg(QDateTime::currentDateTime().toString("yyyy-MM-dd hh:mm:ss")).arg(msg);
-
-    switch (type) {
-        case QtDebugMsg:
-            out << "DEBUG: " << log_msg << Qt::endl;
-            break;
-        case QtInfoMsg:
-            out << "INFO: " << log_msg << Qt::endl;
-            break;
-        case QtWarningMsg:
-            out << "WARNING: " << log_msg << Qt::endl;
-            break;
-        case QtCriticalMsg:
-            out << "CRITICAL: " << log_msg << Qt::endl;
-            break;
-        case QtFatalMsg:
-            out << "FATAL: " << log_msg << Qt::endl;
-            abort();
-    }
-}
-
 int main(int argc, char *argv[])
 {
-    // Install the custom message handler
-    qInstallMessageHandler(logMessageOutput);
-
     // Create single instance application
     SingleInstanceApp app(argc, argv);
     

@@ -991,42 +991,13 @@ DataTable PlotWidget::applyScaling(const DataTable &data, const QStringList &yVa
         }
         
         qDebug() << "PlotWidget: WILL APPLY SCALING to" << var << "- factor:" << info.scaleFactor;
-        
-        // Write to debug file that we're about to scale this variable
-        QString debugPath = QStandardPaths::writableLocation(QStandardPaths::TempLocation) + QDir::separator() + "gb2_scaling_debug.txt";
-        QFile scaleDebug(debugPath);
-        if (scaleDebug.open(QIODevice::WriteOnly | QIODevice::Append)) {
-            QTextStream stream(&scaleDebug);
-            stream << "ABOUT TO SCALE " << var << " with factor " << info.scaleFactor << Qt::endl;
-            scaleDebug.close();
-        }
-        
+
         DataColumn *column = scaledData.getColumn(var);
         if (!column) {
             qDebug() << "PlotWidget: Column not found for variable:" << var;
             continue;
         }
-        
-        // Debug: Check original data vs scaled data column sizes
-        const DataColumn *originalColumn = data.getColumn(var);
-        QString debugPath3 = QStandardPaths::writableLocation(QStandardPaths::TempLocation) + QDir::separator() + "gb2_scaling_debug.txt";
-        QFile scaleDebug3(debugPath3);
-        if (scaleDebug3.open(QIODevice::WriteOnly | QIODevice::Append)) {
-            QTextStream stream(&scaleDebug3);
-            stream << "  Original column size: " << (originalColumn ? originalColumn->data.size() : -1) << Qt::endl;
-            stream << "  Scaled column size: " << column->data.size() << Qt::endl;
-            scaleDebug3.close();
-        }
 
-        // Debug: Check the scaling conditions IMMEDIATELY after getting column
-        QString debugPath2 = QStandardPaths::writableLocation(QStandardPaths::TempLocation) + QDir::separator() + "gb2_scaling_debug.txt";
-        QFile scaleDebug2(debugPath2);
-        if (scaleDebug2.open(QIODevice::WriteOnly | QIODevice::Append)) {
-            QTextStream stream(&scaleDebug2);
-            stream << "  IMMEDIATE check - Column size: " << column->data.size() << Qt::endl;
-            scaleDebug2.close();
-        }
-        
         QString originalVarName = var + "_original";
         if (!scaledData.getColumn(originalVarName)) {
             DataColumn originalColumn(originalVarName);
@@ -1045,43 +1016,7 @@ DataTable PlotWidget::applyScaling(const DataTable &data, const QStringList &yVa
         int scaledCount = 0;
         double sampleOriginal = 0, sampleScaled = 0;
         bool hasSample = false;
-        
-        // Debug: Check the scaling conditions AFTER backup creation
-        QString debugPath4 = QStandardPaths::writableLocation(QStandardPaths::TempLocation) + QDir::separator() + "gb2_scaling_debug.txt";
-        QFile scaleDebug4(debugPath4);
-        if (scaleDebug4.open(QIODevice::WriteOnly | QIODevice::Append)) {
-            QTextStream stream(&scaleDebug4);
-            stream << "  Column size: " << column->data.size() << Qt::endl;
-            int validCount = 0, nonMissingCount = 0, convertibleCount = 0, nonZeroCount = 0;
-            for (int i = 0; i < qMin(10, column->data.size()); ++i) {
-                const QVariant &val = column->data[i];
-                stream << "  [" << i << "]: " << val.toString() << " (type=" << val.typeName() << ")";
-                if (!DataProcessor::isMissingValue(val)) {
-                    nonMissingCount++;
-                    stream << " non-missing";
-                    bool ok;
-                    double numVal = val.toDouble(&ok);
-                    if (ok) {
-                        convertibleCount++;
-                        stream << " -> " << numVal;
-                        if (qAbs(numVal) > 1e-10) {
-                            nonZeroCount++;
-                            stream << " (non-zero)";
-                        } else {
-                            stream << " (zero)";
-                        }
-                    } else {
-                        stream << " (conversion failed)";
-                    }
-                } else {
-                    stream << " (missing)";
-                }
-                stream << Qt::endl;
-            }
-            stream << "  Summary: " << nonMissingCount << " non-missing, " << convertibleCount << " convertible, " << nonZeroCount << " non-zero" << Qt::endl;
-            scaleDebug4.close();
-        }
-        
+
         // Fix: Use index-based loop instead of reference-based to ensure modification
         for (int i = 0; i < column->data.size(); ++i) {
             QVariant &val = column->data[i];
@@ -1094,20 +1029,9 @@ DataTable PlotWidget::applyScaling(const DataTable &data, const QStringList &yVa
                         hasSample = true;
                     }
                     double scaledVal = numVal * info.scaleFactor + info.offset;
-                    
-                    // Debug: Track the first few transformations
-                    if (scaledCount < 3) {
-                        QString debugPath = QStandardPaths::writableLocation(QStandardPaths::TempLocation) + QDir::separator() + "gb2_scaling_debug.txt";
-                        QFile scaleDebug(debugPath);
-                        if (scaleDebug.open(QIODevice::WriteOnly | QIODevice::Append)) {
-                            QTextStream stream(&scaleDebug);
-                            stream << "  Transforming [" << i << "]: " << numVal << " -> " << scaledVal << Qt::endl;
-                            scaleDebug.close();
-                        }
-                    }
-                    
+
                     // Scaling factor already stored earlier for label display
-                    
+
                     val = QVariant(scaledVal); // Explicit QVariant construction
                     scaledCount++;
                     if (scaledCount == 1) {
@@ -1119,15 +1043,6 @@ DataTable PlotWidget::applyScaling(const DataTable &data, const QStringList &yVa
         qDebug() << "PlotWidget: Scaled" << scaledCount << "values for variable" << var;
         if (hasSample) {
             qDebug() << "PlotWidget: Sample transformation:" << var << ":" << sampleOriginal << "->" << sampleScaled;
-            
-            // Write transformation to debug file
-            QString transformDebugPath = QStandardPaths::writableLocation(QStandardPaths::TempLocation) + QDir::separator() + "gb2_scaling_debug.txt";
-            QFile transformDebug(transformDebugPath);
-            if (transformDebug.open(QIODevice::WriteOnly | QIODevice::Append)) {
-                QTextStream stream(&transformDebug);
-                stream << "SCALING TRANSFORMATION: " << var << ": " << sampleOriginal << " -> " << sampleScaled << " (factor=" << info.scaleFactor << ")" << Qt::endl;
-                transformDebug.close();
-            }
         }
     }
     
@@ -2441,53 +2356,10 @@ void PlotWidget::updatePlotWithScaling()
     qDebug() << "PlotWidget::updatePlotWithScaling() - About to calculate scaling factors";
     m_scaleFactors = calculateScalingFactors(m_simData, m_obsData, m_currentYVars);
     qDebug() << "PlotWidget::updatePlotWithScaling() - Scaling factors calculated";
-    
-    // Write scaling debug to file
-    QString debugFilePath = QStandardPaths::writableLocation(QStandardPaths::TempLocation) + QDir::separator() + "gb2_scaling_debug.txt";
-    QFile debugFile(debugFilePath);
-    if (debugFile.open(QIODevice::WriteOnly | QIODevice::Append)) {
-        QTextStream stream(&debugFile);
-        stream << "=== SCALING DEBUG ===" << Qt::endl;
-        stream << "Y Variables: " << m_currentYVars.join(", ") << Qt::endl;
-        if (m_scaleFactors.contains("default")) {
-            for (const QString &var : m_currentYVars) {
-                if (m_scaleFactors["default"].contains(var)) {
-                    const ScalingInfo &info = m_scaleFactors["default"][var];
-                    stream << "  " << var << ": scale factor = " << info.scaleFactor << Qt::endl;
-                }
-            }
-        }
-        stream << Qt::endl;
-        debugFile.close();
-    }
-    
+
     // Create temporary copies for scaling
     DataTable scaledSimData = m_simData;
     DataTable scaledObsData = m_obsData;
-    
-    // Write before values to debug file
-    QString debugFile2Path = QStandardPaths::writableLocation(QStandardPaths::TempLocation) + QDir::separator() + "gb2_scaling_debug.txt";
-    QFile debugFile2(debugFile2Path);
-    if (debugFile2.open(QIODevice::WriteOnly | QIODevice::Append)) {
-        QTextStream stream(&debugFile2);
-        stream << "BEFORE scaling:" << Qt::endl;
-        for (const QString &var : m_currentYVars) {
-            const DataColumn *col = scaledSimData.getColumn(var);
-            if (col && !col->data.isEmpty()) {
-                // Find first non-zero value
-                QString firstNonZero = "all zero";
-                for (int i = 0; i < qMin(10, col->data.size()); ++i) {
-                    double val = col->data[i].toDouble();
-                    if (qAbs(val) > 0.0001) {
-                        firstNonZero = col->data[i].toString();
-                        break;
-                    }
-                }
-                stream << "  " << var << " first non-zero: " << firstNonZero << Qt::endl;
-            }
-        }
-        debugFile2.close();
-    }
 
     // Apply scaling
     qDebug() << "PlotWidget::updatePlotWithScaling() - BEFORE scaling, sample values:";
@@ -2499,35 +2371,24 @@ void PlotWidget::updatePlotWithScaling()
     }
     
     scaledSimData = applyScaling(scaledSimData, m_currentYVars);
-    
+
     qDebug() << "PlotWidget::updatePlotWithScaling() - AFTER scaling, sample values:";
-    
-    // Write after values to debug file
-    QString debugFile3Path = QStandardPaths::writableLocation(QStandardPaths::TempLocation) + QDir::separator() + "gb2_scaling_debug.txt";
-    QFile debugFile3(debugFile3Path);
-    if (debugFile3.open(QIODevice::WriteOnly | QIODevice::Append)) {
-        QTextStream stream(&debugFile3);
-        stream << "AFTER scaling:" << Qt::endl;
-        for (const QString &var : m_currentYVars) {
-            const DataColumn *col = scaledSimData.getColumn(var);
-            if (col && !col->data.isEmpty()) {
-                // Find first non-zero value
-                QString firstNonZero = "all zero";
-                for (int i = 0; i < qMin(10, col->data.size()); ++i) {
-                    double val = col->data[i].toDouble();
-                    if (qAbs(val) > 0.0001) {
-                        firstNonZero = col->data[i].toString();
-                        break;
-                    }
+    for (const QString &var : m_currentYVars) {
+        const DataColumn *col = scaledSimData.getColumn(var);
+        if (col && !col->data.isEmpty()) {
+            // Find first non-zero value
+            QString firstNonZero = "all zero";
+            for (int i = 0; i < qMin(10, col->data.size()); ++i) {
+                double val = col->data[i].toDouble();
+                if (qAbs(val) > 0.0001) {
+                    firstNonZero = col->data[i].toString();
+                    break;
                 }
-                stream << "  " << var << " first non-zero: " << firstNonZero << Qt::endl;
-                qDebug() << "  " << var << " first non-zero AFTER scaling:" << firstNonZero;
             }
+            qDebug() << "  " << var << " first non-zero AFTER scaling:" << firstNonZero;
         }
-        stream << Qt::endl;
-        debugFile3.close();
     }
-    
+
     if (scaledObsData.rowCount > 0) {
         scaledObsData = applyScaling(scaledObsData, m_currentYVars);
     }
