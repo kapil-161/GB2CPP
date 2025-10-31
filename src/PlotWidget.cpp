@@ -1930,10 +1930,12 @@ void PlotWidget::exportPlot(const QString &filePath, const QString &format)
     this->update();
     QApplication::processEvents();
     
-    // Make sure legend is visible
+    // Respect legend visibility setting
     if (m_legendScrollArea) {
-        m_legendScrollArea->show();
-        m_legendScrollArea->update();
+        m_legendScrollArea->setVisible(m_showLegend);
+        if (m_showLegend) {
+            m_legendScrollArea->update();
+        }
     }
     
     // Use current widget size for quick export (includes chart + legend)
@@ -2060,19 +2062,22 @@ void PlotWidget::exportPlotComposite(const QString &filePath, const QString &for
     m_chartView->render(&chartPainter);
     chartPainter.end();
 
-    QPixmap legendPixmap(m_legendWidget->size());
-    legendPixmap.fill(Qt::white);
-    QPainter legendPainter(&legendPixmap);
-    m_legendWidget->render(&legendPainter);
-    legendPainter.end();
+    QPixmap legendPixmap;
+    if (m_showLegend) {
+        legendPixmap = QPixmap(m_legendWidget->size());
+        legendPixmap.fill(Qt::white);
+        QPainter legendPainter(&legendPixmap);
+        m_legendWidget->render(&legendPainter);
+        legendPainter.end();
+    }
     
     // Auto-crop both pixmaps to remove blank borders
     QPixmap croppedChart = cropToContent(chartPixmap);
-    QPixmap croppedLegend = cropToContent(legendPixmap);
+    QPixmap croppedLegend = m_showLegend ? cropToContent(legendPixmap) : QPixmap();
     
     // Calculate total dimensions
-    int totalWidth = croppedChart.width() + croppedLegend.width();
-    int maxHeight = qMax(croppedChart.height(), croppedLegend.height());
+    int totalWidth = m_showLegend ? (croppedChart.width() + croppedLegend.width()) : croppedChart.width();
+    int maxHeight = m_showLegend ? qMax(croppedChart.height(), croppedLegend.height()) : croppedChart.height();
     
     // Create final composite image
     QPixmap finalPixmap(totalWidth, maxHeight);
@@ -2086,7 +2091,9 @@ void PlotWidget::exportPlotComposite(const QString &filePath, const QString &for
     painter.drawPixmap(0, 0, croppedChart);
     
     // Draw legend on the right
-    painter.drawPixmap(croppedChart.width(), 0, croppedLegend);
+    if (m_showLegend && !croppedLegend.isNull()) {
+        painter.drawPixmap(croppedChart.width(), 0, croppedLegend);
+    }
     
     painter.end();
     

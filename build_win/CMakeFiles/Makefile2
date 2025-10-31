@@ -79,8 +79,8 @@ clean: CMakeFiles/GB2_autogen.dir/clean
 # Target rules for target CMakeFiles/GB2.dir
 
 # All Build rule for target.
-CMakeFiles/GB2.dir/all: CMakeFiles/GB2_autogen_timestamp_deps.dir/all
 CMakeFiles/GB2.dir/all: CMakeFiles/GB2_autogen.dir/all
+CMakeFiles/GB2.dir/all: CMakeFiles/GB2_autogen_timestamp_deps.dir/all
 	$(MAKE) $(MAKESILENT) -f CMakeFiles\GB2.dir\build.make CMakeFiles/GB2.dir/depend
 	$(MAKE) $(MAKESILENT) -f CMakeFiles\GB2.dir\build.make CMakeFiles/GB2.dir/build
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=C:\DSSAT48\Tools\GB2CPP\build_win\CMakeFiles --progress-num=1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18 "Built target GB2"

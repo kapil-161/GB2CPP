@@ -39,9 +39,16 @@ SingleInstanceApp::~SingleInstanceApp()
 
 bool SingleInstanceApp::lockInstance()
 {
-    // Create lock file in current directory, similar to Python example
-    QString lockFileName = ".lock.instance.GB2";
-    m_lockFilePath = QDir::currentPath() + "/" + lockFileName;
+    // Create lock file in global temp directory to ensure single instance across all directories
+    QString lockFileName = "GB2.instance.lock";
+    
+    // Use system temp directory for global lock file
+    QString tempDir = QStandardPaths::writableLocation(QStandardPaths::TempLocation);
+    if (tempDir.isEmpty()) {
+        // Fallback to current directory if temp location is not available
+        tempDir = QDir::currentPath();
+    }
+    m_lockFilePath = tempDir + "/" + lockFileName;
     
     
     try {
