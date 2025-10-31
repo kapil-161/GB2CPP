@@ -184,7 +184,8 @@ QVariantMap MetricsCalculator::calculateMetrics(const QVector<double>& simValues
         double rmse_value = rmse(obs, sim);
         double nrmse = (mean_obs != 0.0) ? (rmse_value / mean_obs) * 100.0 : 0.0;
         double d_stat = dStat(obs, sim);
-        double r_squared = rSquared(obs, sim);
+        // R² not calculated for time series data - leave as "-"
+        // double r_squared = rSquared(obs, sim);
         
         // Build result map
         result["TRT"] = treatmentNumber;
@@ -192,7 +193,7 @@ QVariantMap MetricsCalculator::calculateMetrics(const QVector<double>& simValues
         result["RMSE"] = rmse_value;
         result["NRMSE"] = nrmse;
         result["Willmott's d-stat"] = d_stat;
-        result["R²"] = r_squared;
+        result["R²"] = "-";  // Not calculated for time series data
         
     } catch (const std::exception& e) {
         qWarning() << "Error calculating metrics:" << e.what();

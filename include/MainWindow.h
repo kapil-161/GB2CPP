@@ -27,8 +27,7 @@
 #include "StatusWidget.h"
 #include "DataProcessor.h"
 #include "Config.h"
-
-
+#include "MetricsDialog.h"
 #include "DataTableWidget.h"
 
 class PlotWidget;
@@ -64,6 +63,7 @@ private slots:
     void onOpenFile();
     void onSaveData();
     void onExportPlot();
+    void onCopyPlot();
     void onAbout();
     void onDataFileChanged();
     void onXVariableChanged();

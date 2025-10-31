@@ -35,6 +35,117 @@
 #include <algorithm>
 #include <cmath>
 
+// ErrorBarChartView implementation
+ErrorBarChartView::ErrorBarChartView(QChart *chart, QWidget *parent)
+    : QChartView(chart, parent)
+{
+}
+
+void ErrorBarChartView::setErrorBarData(const QMap<QAbstractSeries*, QVector<ErrorBarData>> &errorBars)
+{
+    m_errorBars = errorBars;
+    update();  // Trigger repaint
+}
+
+void ErrorBarChartView::paintEvent(QPaintEvent *event)
+{
+    // First, draw the chart normally
+    QChartView::paintEvent(event);
+    
+    // Then draw error bars on top
+    if (m_errorBars.isEmpty() || !chart()) {
+        return;
+    }
+    
+    QPainter painter(this->viewport());
+    painter.setRenderHint(QPainter::Antialiasing, true);
+    
+    // Get the chart's plot area
+    QRectF plotArea = chart()->plotArea();
+    
+    // Get axes for coordinate conversion
+    QList<QAbstractAxis*> axes = chart()->axes();
+    QAbstractAxis *xAxis = nullptr;
+    QAbstractAxis *yAxis = nullptr;
+    
+    for (QAbstractAxis *axis : axes) {
+        if (axis->alignment() == Qt::AlignBottom || axis->alignment() == Qt::AlignTop) {
+            xAxis = axis;
+        } else if (axis->alignment() == Qt::AlignLeft || axis->alignment() == Qt::AlignRight) {
+            yAxis = axis;
+        }
+    }
+    
+    if (!xAxis || !yAxis) {
+        return;
+    }
+    
+    // Draw error bars for each series
+    for (auto it = m_errorBars.begin(); it != m_errorBars.end(); ++it) {
+        QAbstractSeries *series = it.key();
+        const QVector<ErrorBarData> &errorBars = it.value();
+        
+        if (errorBars.isEmpty()) continue;
+        
+        // Get series color
+        QColor color = Qt::black;
+        if (auto lineSeries = qobject_cast<QLineSeries*>(series)) {
+            color = lineSeries->pen().color();
+        } else if (auto scatterSeries = qobject_cast<QScatterSeries*>(series)) {
+            // Prefer pen color; fall back to brush color
+            QColor penColor = scatterSeries->pen().color();
+            color = penColor.isValid() ? penColor : scatterSeries->brush().color();
+        }
+        QPen errorPen(color, 1.5);
+        painter.setPen(errorPen);
+        
+        // Get axis ranges for coordinate conversion
+        double xMin, xMax, yMin, yMax;
+        
+        if (QValueAxis *valueXAxis = qobject_cast<QValueAxis*>(xAxis)) {
+            xMin = valueXAxis->min();
+            xMax = valueXAxis->max();
+        } else if (QDateTimeAxis *dateXAxis = qobject_cast<QDateTimeAxis*>(xAxis)) {
+            xMin = dateXAxis->min().toMSecsSinceEpoch();
+            xMax = dateXAxis->max().toMSecsSinceEpoch();
+        } else {
+            continue;
+        }
+        
+        if (QValueAxis *valueYAxis = qobject_cast<QValueAxis*>(yAxis)) {
+            yMin = valueYAxis->min();
+            yMax = valueYAxis->max();
+        } else {
+            continue;
+        }
+        
+        // Draw each error bar
+        for (const ErrorBarData &errorBar : errorBars) {
+            // Convert data coordinates to plot area coordinates
+            double xRatio = (errorBar.meanX - xMin) / (xMax - xMin);
+            double yRatio = (errorBar.meanY - yMin) / (yMax - yMin);
+            
+            double x = plotArea.left() + xRatio * plotArea.width();
+            double y = plotArea.top() + (1.0 - yRatio) * plotArea.height();  // Invert Y
+            
+            // Calculate error bar height in pixels
+            double errorHeight = (errorBar.errorValue / (yMax - yMin)) * plotArea.height();
+            
+            // Draw vertical error bar
+            double topY = y - errorHeight;
+            double bottomY = y + errorHeight;
+            
+            // Draw main vertical line
+            painter.drawLine(QPointF(x, topY), QPointF(x, bottomY));
+            
+            // Draw horizontal caps (top and bottom)
+            double capWidth = 5.0;  // Width of error bar caps in pixels
+            painter.drawLine(QPointF(x - capWidth, topY), QPointF(x + capWidth, topY));
+            painter.drawLine(QPointF(x - capWidth, bottomY), QPointF(x + capWidth, bottomY));
+        }
+    }
+}
+
 PlotWidget::PlotWidget(QWidget *parent)
     : QWidget(parent)
     , m_mainLayout(nullptr)
@@ -255,7 +366,7 @@ void PlotWidget::setupChart()
     }
     
     m_chart = new QChart();
-    m_chartView = new QChartView(m_chart);
+    m_chartView = new ErrorBarChartView(m_chart);
     m_chartView->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
     
     // Enable zoom and pan functionality
@@ -1049,6 +1160,68 @@ DataTable PlotWidget::applyScaling(const DataTable &data, const QStringList &yVa
     return scaledData;
 }
 
+QVector<ErrorBarData> PlotWidget::aggregateReplicates(const QVector<QPointF> &points, const QString &xVar, double xTolerance)
+{
+    QVector<ErrorBarData> errorBars;
+    if (points.isEmpty()) return errorBars;
+    
+    // Determine appropriate tolerance based on X variable type
+    double effectiveTolerance = xTolerance;
+    if (xVar == "DATE") {
+        // For DATE, group by same day (24 hours = 86400000 milliseconds)
+        effectiveTolerance = 86400000.0;  // 1 day in milliseconds
+    }
+    
+    // Group points by X value (with tolerance)
+    QMap<double, QVector<double>> groups;  // Map of rounded X -> list of Y values
+    
+    for (const QPointF &point : points) {
+        // Round X to nearest tolerance to group replicates
+        double roundedX = qRound(point.x() / effectiveTolerance) * effectiveTolerance;
+        groups[roundedX].append(point.y());
+    }
+    
+    // Calculate statistics for each group
+    for (auto it = groups.begin(); it != groups.end(); ++it) {
+        const QVector<double> &yValues = it.value();
+        if (yValues.isEmpty()) continue;
+        
+        double meanX = it.key();
+        
+        // Calculate mean Y
+        double sumY = 0.0;
+        for (double y : yValues) {
+            sumY += y;
+        }
+        double meanY = sumY / yValues.size();
+        
+        // Calculate standard deviation
+        double sumSquaredDiff = 0.0;
+        for (double y : yValues) {
+            double diff = y - meanY;
+            sumSquaredDiff += diff * diff;
+        }
+        double variance = yValues.size() > 1 ? sumSquaredDiff / (yValues.size() - 1) : 0.0;
+        double sd = qSqrt(variance);
+        
+        ErrorBarData errorBar;
+        errorBar.meanX = meanX;
+        errorBar.meanY = meanY;
+        errorBar.errorValue = sd;  // Will be converted to SE later if needed
+        errorBar.n = yValues.size();
+        
+        errorBars.append(errorBar);
+    }
+    
+    // Sort by X value
+    std::sort(errorBars.begin(), errorBars.end(), 
+              [](const ErrorBarData &a, const ErrorBarData &b) {
+                  return a.meanX < b.meanX;
+              });
+    
+    return errorBars;
+}
+
 void PlotWidget::plotDatasets(const DataTable &simData, const DataTable &obsData,
                              const QString &xVar, const QStringList &yVars, 
                              const QStringList &treatments, const QString &selectedExperiment)
@@ -1068,7 +1241,13 @@ void PlotWidget::plotDatasets(const DataTable &simData, const DataTable &obsData
     
     if (!m_chart) return;
     
+    // Clear all series (already done in clearChart(), but ensure it's cleared)
     m_chart->removeAllSeries();
+    
+    // Clear error bars when replotting
+    if (m_chartView) {
+        m_chartView->setErrorBarData(QMap<QAbstractSeries*, QVector<ErrorBarData>>());
+    }
     
     // Clear treatment color map to ensure consistent color assignment
     m_treatmentColorMap.clear();
@@ -1386,9 +1565,32 @@ void PlotWidget::plotDatasets(const DataTable &simData, const DataTable &obsData
                 // Get treatment display name using the actual experiment and crop from data
                 plotData.treatmentName = getTreatmentDisplayName(treatment, experiment, crop);
                 plotData.variable = yVar;
-                plotData.points = it.value();
                 QString treatmentId = crop + "__" + experiment + "__" + treatment;
                 
+                // Aggregate replicates if error bars are enabled (ONLY for observed data, not simulated)
+                if (m_plotSettings.showErrorBars && it.value().size() > 0) {
+                    QVector<ErrorBarData> errorBars = aggregateReplicates(it.value(), xVar);
+                    
+                    // Convert SD to SE if needed
+                    if (m_plotSettings.errorBarType == "SE") {
+                        for (ErrorBarData &errorBar : errorBars) {
+                            if (errorBar.n > 1) {
+                                errorBar.errorValue = errorBar.errorValue / qSqrt(errorBar.n);  // SE = SD / sqrt(n)
+                            }
+                        }
+                    }
+                    
+                    // Create points from aggregated data (mean points)
+                    QVector<QPointF> meanPoints;
+                    for (const ErrorBarData &errorBar : errorBars) {
+                        meanPoints.append(errorBar.meanPoint());
+                    }
+                    plotData.points = meanPoints;
+                    plotData.errorBars = errorBars;
+                } else {
+                    plotData.points = it.value();
+                    plotData.errorBars.clear();  // No error bars if disabled or no replicates
+                }
                 
                 plotData.color = getColorForTreatment(treatmentId, colorIndex); // Use consistent treatment identifier
                 plotData.lineStyleIndex = colorIndex % 4;
@@ -1405,6 +1607,20 @@ void PlotWidget::plotDatasets(const DataTable &simData, const DataTable &obsData
     
     // Add series to chart
     addSeriesToPlot(plotDataList);
+    
+    // Update error bar data in chart view (ONLY for observed data series, never for simulated data)
+    if (m_plotSettings.showErrorBars && m_chartView) {
+        QMap<QAbstractSeries*, QVector<ErrorBarData>> errorBarMap;
+        for (const QSharedPointer<PlotData> &plotData : m_plotDataList) {
+            // Only add error bars for observed data, never for simulated data
+            if (plotData && plotData->isObserved && plotData->series && !plotData->errorBars.isEmpty()) {
+                errorBarMap[plotData->series] = plotData->errorBars;
+            }
+        }
+        m_chartView->setErrorBarData(errorBarMap);
+    } else if (m_chartView) {
+        m_chartView->setErrorBarData(QMap<QAbstractSeries*, QVector<ErrorBarData>>());
+    }
     
     // Update legend
     updateLegend(plotDataList);
@@ -1831,10 +2047,19 @@ void PlotWidget::calculateMetrics()
             
             if (!result.isEmpty()) {
                 result["Variable"] = variable;
+                // Get variable display name from CDE file
+                QPair<QString, QString> varInfo = DataProcessor::getVariableInfo(variable);
+                QString varDisplayName = varInfo.first.isEmpty() ? variable : varInfo.first;
+                result["VariableName"] = varDisplayName;
+                
                 result["Treatment"] = trt;
                 result["TreatmentName"] = getTreatmentDisplayName(trt, experimentName, cropName);
                 result["Experiment"] = experimentName;
                 result["Crop"] = cropName;
+                // Get crop display name from crop code
+                QString cropDisplayName = getCropNameFromCode(cropName);
+                result["CropName"] = cropDisplayName;
+                
                 metrics.append(result);
             }
         }
@@ -1909,6 +2134,11 @@ void PlotWidget::clearChart()
     m_scalingLabel->clear();
     m_plotDataList.clear(); // Clear unique_ptrs
     
+    // Clear error bars when chart is cleared
+    if (m_chartView) {
+        m_chartView->setErrorBarData(QMap<QAbstractSeries*, QVector<ErrorBarData>>());
+    }
+    
     // Clear axis labels when chart is cleared
     setAxisTitles("", "");
 }
@@ -1944,6 +2174,34 @@ void PlotWidget::exportPlot(const QString &filePath, const QString &format)
     qDebug() << "Quick export: Widget size" << this->size() << "pixmap size" << pixmap.size();
     
     pixmap.save(filePath, format.toUtf8().constData());
+}
+
+void PlotWidget::copyPlotToClipboard()
+{
+    if (!this) return;
+    
+    // Ensure everything is visible and updated
+    this->show();
+    this->update();
+    QApplication::processEvents();
+    
+    // Respect legend visibility setting
+    if (m_legendScrollArea) {
+        m_legendScrollArea->setVisible(m_showLegend);
+        if (m_showLegend) {
+            m_legendScrollArea->update();
+        }
+    }
+    
+    // Grab the plot as a pixmap
+    QPixmap pixmap = this->grab();
+    
+    // Copy to clipboard
+    QClipboard *clipboard = QApplication::clipboard();
+    if (clipboard) {
+        clipboard->setPixmap(pixmap);
+        qDebug() << "Plot copied to clipboard. Size:" << pixmap.size();
+    }
 }
 
 void PlotWidget::exportPlot(const QString &filePath, const QString &format, int width, int height, int dpi)
@@ -2407,6 +2665,11 @@ void PlotWidget::updatePlotWithScaling()
     // Clear the chart first to ensure fresh plotting
     if (m_chart) {
         m_chart->removeAllSeries();
+    }
+    
+    // Clear error bars when updating plot
+    if (m_chartView) {
+        m_chartView->setErrorBarData(QMap<QAbstractSeries*, QVector<ErrorBarData>>());
     }
     
     plotDatasets(scaledSimData, scaledObsData, m_currentXVar, m_currentYVars, m_currentTreatments, m_selectedExperiment);
@@ -3532,6 +3795,18 @@ void PlotWidget::applyPlotSettings(const PlotSettings &settings)
     // Update internal settings
     m_showGrid = settings.showGrid;
     m_showLegend = settings.showLegend;
+    
+    // Update plot settings (including error bar settings)
+    m_plotSettings = settings;
+    
+    // If error bar settings changed, replot to apply aggregation
+    bool errorBarChanged = (m_plotSettings.showErrorBars != settings.showErrorBars) ||
+                          (m_plotSettings.errorBarType != settings.errorBarType);
+    
+    if (errorBarChanged && m_simData.rowCount > 0 && !m_currentYVars.isEmpty()) {
+        qDebug() << "PlotWidget: Error bar settings changed, replotting...";
+        updatePlotWithScaling();
+    }
     
     qDebug() << "PlotWidget: Plot settings applied successfully";
 }

@@ -6,6 +6,9 @@
 #include <QMessageBox>
 #include <QFileDialog>
 #include <QStandardPaths>
+#include <QPushButton>
+#include <QDesktopServices>
+#include <QUrl>
 
 PlotSettingsDialog::PlotSettingsDialog(const PlotSettings &currentSettings, PlotWidget *plotWidget, QWidget *parent)
     : QDialog(parent), m_settings(currentSettings), m_plotWidget(plotWidget)
@@ -27,6 +30,8 @@ PlotSettings PlotSettingsDialog::getSettings() const
     settings.showMinorGrid = m_showMinorGridCheckBox->isChecked();
     settings.minorTickCount = m_minorTickCountSpinBox->value();
     settings.showLegend = m_showLegendCheckBox->isChecked();
+    settings.showErrorBars = m_showErrorBarsCheckBox->isChecked();
+    settings.errorBarType = m_errorBarTypeComboBox->currentData().toString();
     settings.lineWidth = m_lineWidthSpinBox->value();
     settings.markerSize = m_markerSizeSpinBox->value();
     settings.showAxisLabels = m_showAxisLabelsCheckBox->isChecked();
@@ -126,6 +131,25 @@ void PlotSettingsDialog::setupUI()
     m_showLegendCheckBox = new QCheckBox("Show Legend");
     m_showLegendCheckBox->setChecked(m_settings.showLegend);
     legendLayout->addWidget(m_showLegendCheckBox);
+    
+    // Error bar settings
+    m_showErrorBarsCheckBox = new QCheckBox("Show Error Bars (Mean ± SD/SE)");
+    m_showErrorBarsCheckBox->setChecked(m_settings.showErrorBars);
+    m_showErrorBarsCheckBox->setToolTip("Aggregate replicates and show mean with error bars");
+    legendLayout->addWidget(m_showErrorBarsCheckBox);
+    
+    QHBoxLayout *errorBarTypeLayout = new QHBoxLayout();
+    errorBarTypeLayout->addWidget(new QLabel("Error Bar Type:"));
+    m_errorBarTypeComboBox = new QComboBox();
+    m_errorBarTypeComboBox->addItem("Standard Deviation (SD)", "SD");
+    m_errorBarTypeComboBox->addItem("Standard Error (SE)", "SE");
+    int errorBarIndex = m_errorBarTypeComboBox->findData(m_settings.errorBarType);
+    if (errorBarIndex >= 0) {
+        m_errorBarTypeComboBox->setCurrentIndex(errorBarIndex);
+    }
+    errorBarTypeLayout->addWidget(m_errorBarTypeComboBox);
+    errorBarTypeLayout->addStretch();
+    legendLayout->addLayout(errorBarTypeLayout);
     
     appearanceLayout->addWidget(legendGroup);
     
@@ -279,6 +303,11 @@ void PlotSettingsDialog::onResetDefaults()
     m_showMinorGridCheckBox->setChecked(defaults.showMinorGrid);
     m_minorTickCountSpinBox->setValue(defaults.minorTickCount);
     m_showLegendCheckBox->setChecked(defaults.showLegend);
+    m_showErrorBarsCheckBox->setChecked(defaults.showErrorBars);
+    int defaultErrorBarIndex = m_errorBarTypeComboBox->findData(defaults.errorBarType);
+    if (defaultErrorBarIndex >= 0) {
+        m_errorBarTypeComboBox->setCurrentIndex(defaultErrorBarIndex);
+    }
     m_lineWidthSpinBox->setValue(defaults.lineWidth);
     m_markerSizeSpinBox->setValue(defaults.markerSize);
     m_showAxisLabelsCheckBox->setChecked(defaults.showAxisLabels);
@@ -302,6 +331,8 @@ void PlotSettingsDialog::onPreviewSettings()
     m_settings.showMinorGrid = m_showMinorGridCheckBox->isChecked();
     m_settings.minorTickCount = m_minorTickCountSpinBox->value();
     m_settings.showLegend = m_showLegendCheckBox->isChecked();
+    m_settings.showErrorBars = m_showErrorBarsCheckBox->isChecked();
+    m_settings.errorBarType = m_errorBarTypeComboBox->currentData().toString();
     m_settings.lineWidth = m_lineWidthSpinBox->value();
     m_settings.markerSize = m_markerSizeSpinBox->value();
     m_settings.showAxisLabels = m_showAxisLabelsCheckBox->isChecked();
@@ -368,10 +399,25 @@ void PlotSettingsDialog::onExportPlot()
     // Try the composite export method first
     m_plotWidget->exportPlotComposite(fileName, format, width, height, dpi);
     
-    QMessageBox::information(this, "Export Complete", 
-        QString("Plot exported successfully to:\n%1\n\nDimensions: %2 x %3 pixels\nDPI: %4")
-        .arg(fileName)
-        .arg(width)
-        .arg(height)
-        .arg(dpi));
+    // Create message box with OK and View buttons
+    QMessageBox msgBox(this);
+    msgBox.setWindowTitle("Export Complete");
+    msgBox.setText(QString("Plot exported successfully to:\n%1\n\nDimensions: %2 x %3 pixels\nDPI: %4")
+                   .arg(fileName)
+                   .arg(width)
+                   .arg(height)
+                   .arg(dpi));
+    msgBox.setIcon(QMessageBox::Information);
+    
+    // Add View button
+    QPushButton *viewButton = msgBox.addButton("View", QMessageBox::ActionRole);
+    QPushButton *okButton = msgBox.addButton(QMessageBox::Ok);
+    
+    // Execute the message box
+    msgBox.exec();
+    
+    // If View button was clicked, open the file
+    if (msgBox.clickedButton() == viewButton) {
+        QDesktopServices::openUrl(QUrl::fromLocalFile(fileName));
+    }
 }

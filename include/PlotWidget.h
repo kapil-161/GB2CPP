@@ -32,6 +32,14 @@
 #include <QtCharts/QAbstractSeries>
 #include "DataProcessor.h"
 
+struct ErrorBarData {
+    double meanX;
+    double meanY;
+    double errorValue;  // SD or SE
+    int n;              // Number of replicates
+    QPointF meanPoint() const { return QPointF(meanX, meanY); }
+};
+
 struct PlotData {
     QString crop;
     QString experiment;
@@ -47,6 +55,22 @@ struct PlotData {
     QPen pen;
     QBrush brush;
     QString symbol;
+    // Error bar data (for aggregated replicates)
+    QVector<ErrorBarData> errorBars;  // Empty if not aggregated or no replicates
+};
+
+class ErrorBarChartView : public QChartView
+{
+    Q_OBJECT
+public:
+    explicit ErrorBarChartView(QChart *chart, QWidget *parent = nullptr);
+    void setErrorBarData(const QMap<QAbstractSeries*, QVector<ErrorBarData>> &errorBars);
+    
+protected:
+    void paintEvent(QPaintEvent *event) override;
+    
+private:
+    QMap<QAbstractSeries*, QVector<ErrorBarData>> m_errorBars;
 };
 
 struct LegendTreatmentData {
@@ -129,6 +153,7 @@ public:
     void exportPlot(const QString &filePath, const QString &format = "PNG");
     void exportPlot(const QString &filePath, const QString &format, int width, int height, int dpi);
     void exportPlotComposite(const QString &filePath, const QString &format, int width, int height, int dpi);
+    void copyPlotToClipboard();  // Copy plot to clipboard
     QPixmap cropToContent(const QPixmap &source);
     void renderLegendContent(QPainter *painter, const QRect &rect);
     
@@ -171,6 +196,7 @@ private:
     void plotDatasets(const DataTable &simData, const DataTable &obsData,
                      const QString &xVar, const QStringList &yVars, 
                      const QStringList &treatments, const QString &selectedExperiment);
+    QVector<ErrorBarData> aggregateReplicates(const QVector<QPointF> &points, const QString &xVar, double xTolerance = 0.01);
     void setupUI();
     void setupChart();
     void addSeriesToPlot(const QVector<PlotData> &plotDataList);
@@ -232,7 +258,7 @@ private:
     QWidget *m_leftContainer;
     QVBoxLayout *m_leftLayout;
     QChart *m_chart;
-    QChartView *m_chartView;
+    ErrorBarChartView *m_chartView;
     
     // X-axis control buttons
     QWidget *m_bottomContainer;

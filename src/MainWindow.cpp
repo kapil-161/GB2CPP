@@ -108,6 +108,10 @@ void MainWindow::setupMenuBar()
     exportAction->setShortcut(QKeySequence("Ctrl+E"));
     connect(exportAction, &QAction::triggered, this, &MainWindow::onExportPlot);
     
+    QAction *copyPlotAction = fileMenu->addAction("&Copy Plot");
+    copyPlotAction->setShortcut(QKeySequence("Ctrl+Shift+C"));  // Use Ctrl+Shift+C to avoid conflict with standard copy
+    connect(copyPlotAction, &QAction::triggered, this, &MainWindow::onCopyPlot);
+    
     fileMenu->addSeparator();
     
     QAction *exitAction = fileMenu->addAction("E&xit");
@@ -543,6 +547,14 @@ void MainWindow::onExportPlot()
         // Export the plot widget
         m_plotWidget->exportPlot(fileName);
         m_statusWidget->showSuccess("Plot exported successfully");
+    }
+}
+
+void MainWindow::onCopyPlot()
+{
+    if (m_plotWidget) {
+        m_plotWidget->copyPlotToClipboard();
+        m_statusWidget->showSuccess("Plot copied to clipboard");
     }
 }
 
@@ -1600,52 +1612,10 @@ void MainWindow::onShowMetrics()
         return;
     }
     
-    // Create and show metrics dialog
-    QDialog *metricsDialog = new QDialog(this);
-    metricsDialog->setWindowTitle("Model Performance Metrics");
-    metricsDialog->setModal(true);
-    metricsDialog->resize(600, 400);
-    
-    QVBoxLayout *layout = new QVBoxLayout(metricsDialog);
-    
-    // Add explanation label
-    QLabel *infoLabel = new QLabel("This table shows performance metrics for simulated versus observed data:");
-    layout->addWidget(infoLabel);
-    
-    // Create table to display metrics
-    QTableWidget *metricsTable = new QTableWidget();
-    metricsTable->setColumnCount(9);
-    QStringList headers = {"Treatment", "Treatment Name", "Experiment", "Crop", "Variable", "n", "RMSE", "NRMSE (%)", "d-stat"};
-    metricsTable->setHorizontalHeaderLabels(headers);
-    metricsTable->setRowCount(m_currentMetrics.size());
-    
-    // Populate table with metrics data
-    for (int row = 0; row < m_currentMetrics.size(); ++row) {
-        const QVariantMap &metric = m_currentMetrics[row].toMap();
-        
-        metricsTable->setItem(row, 0, new QTableWidgetItem(metric.value("Treatment", "").toString()));
-        metricsTable->setItem(row, 1, new QTableWidgetItem(metric.value("TreatmentName", "").toString()));
-        metricsTable->setItem(row, 2, new QTableWidgetItem(metric.value("Experiment", "").toString()));
-        metricsTable->setItem(row, 3, new QTableWidgetItem(metric.value("Crop", "").toString()));
-        metricsTable->setItem(row, 4, new QTableWidgetItem(metric.value("Variable", "").toString()));
-        metricsTable->setItem(row, 5, new QTableWidgetItem(QString::number(metric.value("n", 0).toInt())));
-        metricsTable->setItem(row, 6, new QTableWidgetItem(QString::number(metric.value("RMSE", 0.0).toDouble(), 'f', 3)));
-        metricsTable->setItem(row, 7, new QTableWidgetItem(QString::number(metric.value("NRMSE", 0.0).toDouble(), 'f', 1)));
-        metricsTable->setItem(row, 8, new QTableWidgetItem(QString::number(metric.value("Willmott's d-stat", 0.0).toDouble(), 'f', 3)));
-    }
-    
-    metricsTable->resizeColumnsToContents();
-    metricsTable->setAlternatingRowColors(true);
-    metricsTable->setSelectionBehavior(QAbstractItemView::SelectRows);
-    
-    layout->addWidget(metricsTable);
-    
-    // Add close button
-    QDialogButtonBox *buttonBox = new QDialogButtonBox(QDialogButtonBox::Close);
-    connect(buttonBox, &QDialogButtonBox::rejected, metricsDialog, &QDialog::reject);
-    layout->addWidget(buttonBox);
-    
-    metricsDialog->show();
+    // Use the proper MetricsDialog which includes the export button
+    MetricsDialog *metricsDialog = new MetricsDialog(m_currentMetrics, this);
+    metricsDialog->exec();  // Use exec() for modal dialog
+    metricsDialog->deleteLater();
 }
 
 void MainWindow::updateTimeSeriesMetrics(const QVector<QMap<QString, QVariant>> &metrics)

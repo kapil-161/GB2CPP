@@ -28,6 +28,10 @@ struct PlotSettings {
     // Legend settings
     bool showLegend = true;
     
+    // Error bar settings
+    bool showErrorBars = false;
+    QString errorBarType = "SD";  // "SD" or "SE"
+    
     // Line settings
     int lineWidth = 2;
     
@@ -84,6 +88,10 @@ private:
     
     // Legend controls
     QCheckBox *m_showLegendCheckBox;
+    
+    // Error bar controls
+    QCheckBox *m_showErrorBarsCheckBox;
+    QComboBox *m_errorBarTypeComboBox;
     
     // Line controls
     QSpinBox *m_lineWidthSpinBox;
