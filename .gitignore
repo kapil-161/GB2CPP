@@ -93,3 +93,7 @@ manual_deployment/tls/
 # Keep the manual_deployment directory but ignore its contents
 manual_deployment/*
 !manual_deployment/GB2.app/
+
+# Test files with API keys
+test_api.py
+test_gemini.py
