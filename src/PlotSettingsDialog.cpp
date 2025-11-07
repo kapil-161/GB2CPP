@@ -44,7 +44,14 @@ PlotSettings PlotSettingsDialog::getSettings() const
     settings.exportWidth = m_exportWidthSpinBox->value();
     settings.exportHeight = m_exportHeightSpinBox->value();
     settings.exportDpi = m_exportDpiSpinBox->value();
-    
+    settings.fontFamily = m_fontFamilyComboBox->currentText();
+    settings.titleFontSize = m_titleFontSizeSpinBox->value();
+    settings.axisLabelFontSize = m_axisLabelFontSizeSpinBox->value();
+    settings.axisTickFontSize = m_axisTickFontSizeSpinBox->value();
+    settings.legendFontSize = m_legendFontSizeSpinBox->value();
+    settings.boldTitle = m_boldTitleCheckBox->isChecked();
+    settings.boldAxisLabels = m_boldAxisLabelsCheckBox->isChecked();
+
     return settings;
 }
 
@@ -240,7 +247,67 @@ void PlotSettingsDialog::setupUI()
     exportLayout->addStretch();
     
     tabWidget->addTab(exportTab, "Export");
-    
+
+    // Font Tab
+    QWidget *fontTab = new QWidget();
+    QVBoxLayout *fontLayout = new QVBoxLayout(fontTab);
+
+    QGroupBox *fontGroup = new QGroupBox("Font Settings");
+    QGridLayout *fontGridLayout = new QGridLayout(fontGroup);
+
+    // Font family
+    fontGridLayout->addWidget(new QLabel("Font Family:"), 0, 0);
+    m_fontFamilyComboBox = new QComboBox();
+    m_fontFamilyComboBox->addItems({"Arial", "Times New Roman", "Courier New", "Helvetica", "Verdana", "Georgia", "Calibri", "Tahoma"});
+    int fontFamilyIndex = m_fontFamilyComboBox->findText(m_settings.fontFamily);
+    if (fontFamilyIndex >= 0) {
+        m_fontFamilyComboBox->setCurrentIndex(fontFamilyIndex);
+    }
+    fontGridLayout->addWidget(m_fontFamilyComboBox, 0, 1);
+
+    // Title font size
+    fontGridLayout->addWidget(new QLabel("Title Font Size:"), 1, 0);
+    m_titleFontSizeSpinBox = new QSpinBox();
+    m_titleFontSizeSpinBox->setRange(8, 36);
+    m_titleFontSizeSpinBox->setValue(m_settings.titleFontSize);
+    fontGridLayout->addWidget(m_titleFontSizeSpinBox, 1, 1);
+
+    // Bold title checkbox
+    m_boldTitleCheckBox = new QCheckBox("Bold Title");
+    m_boldTitleCheckBox->setChecked(m_settings.boldTitle);
+    fontGridLayout->addWidget(m_boldTitleCheckBox, 1, 2);
+
+    // Axis label font size
+    fontGridLayout->addWidget(new QLabel("Axis Label Font Size:"), 2, 0);
+    m_axisLabelFontSizeSpinBox = new QSpinBox();
+    m_axisLabelFontSizeSpinBox->setRange(6, 24);
+    m_axisLabelFontSizeSpinBox->setValue(m_settings.axisLabelFontSize);
+    fontGridLayout->addWidget(m_axisLabelFontSizeSpinBox, 2, 1);
+
+    // Bold axis labels checkbox
+    m_boldAxisLabelsCheckBox = new QCheckBox("Bold Axis Labels");
+    m_boldAxisLabelsCheckBox->setChecked(m_settings.boldAxisLabels);
+    fontGridLayout->addWidget(m_boldAxisLabelsCheckBox, 2, 2);
+
+    // Axis tick font size
+    fontGridLayout->addWidget(new QLabel("Axis Tick Font Size:"), 3, 0);
+    m_axisTickFontSizeSpinBox = new QSpinBox();
+    m_axisTickFontSizeSpinBox->setRange(6, 20);
+    m_axisTickFontSizeSpinBox->setValue(m_settings.axisTickFontSize);
+    fontGridLayout->addWidget(m_axisTickFontSizeSpinBox, 3, 1);
+
+    // Legend font size
+    fontGridLayout->addWidget(new QLabel("Legend Font Size:"), 4, 0);
+    m_legendFontSizeSpinBox = new QSpinBox();
+    m_legendFontSizeSpinBox->setRange(6, 20);
+    m_legendFontSizeSpinBox->setValue(m_settings.legendFontSize);
+    fontGridLayout->addWidget(m_legendFontSizeSpinBox, 4, 1);
+
+    fontLayout->addWidget(fontGroup);
+    fontLayout->addStretch();
+
+    tabWidget->addTab(fontTab, "Fonts");
+
     mainLayout->addWidget(tabWidget);
     
     // Control buttons
@@ -322,6 +389,16 @@ void PlotSettingsDialog::onResetDefaults()
     m_exportWidthSpinBox->setValue(defaults.exportWidth);
     m_exportHeightSpinBox->setValue(defaults.exportHeight);
     m_exportDpiSpinBox->setValue(defaults.exportDpi);
+    int defaultFontIndex = m_fontFamilyComboBox->findText(defaults.fontFamily);
+    if (defaultFontIndex >= 0) {
+        m_fontFamilyComboBox->setCurrentIndex(defaultFontIndex);
+    }
+    m_titleFontSizeSpinBox->setValue(defaults.titleFontSize);
+    m_axisLabelFontSizeSpinBox->setValue(defaults.axisLabelFontSize);
+    m_axisTickFontSizeSpinBox->setValue(defaults.axisTickFontSize);
+    m_legendFontSizeSpinBox->setValue(defaults.legendFontSize);
+    m_boldTitleCheckBox->setChecked(defaults.boldTitle);
+    m_boldAxisLabelsCheckBox->setChecked(defaults.boldAxisLabels);
 }
 
 void PlotSettingsDialog::onPreviewSettings()

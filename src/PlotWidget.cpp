@@ -1304,8 +1304,18 @@ void PlotWidget::plotDatasets(const DataTable &simData, const DataTable &obsData
                 }
             }
             
-            // Create unique key for crop-experiment-treatment combination
-            QString expTrtKey = QString("%1__%2__%3").arg(crop).arg(experiment).arg(trt);
+            // Create unique key for crop-experiment-treatment(+run) combination
+            QString runStr;
+            const DataColumn* runColumn = simData.getColumn("RUN");
+            if (runColumn && row < runColumn->data.size()) {
+                QString rv = runColumn->data[row].toString();
+                if (!rv.isEmpty()) {
+                    runStr = QString("RUN%1").arg(rv);
+                }
+            }
+            QString expTrtKey = runStr.isEmpty()
+                ? QString("%1__%2__%3").arg(crop).arg(experiment).arg(trt)
+                : QString("%1__%2__%3__%4").arg(crop).arg(experiment).arg(trt).arg(runStr);
             
             QVariant xVal = xColumn->data[row];
             QVariant yVal = yColumn->data[row];
@@ -1390,6 +1400,16 @@ void PlotWidget::plotDatasets(const DataTable &simData, const DataTable &obsData
         
         qDebug() << "PlotWidget: Selected treatments filter:" << treatments;
         
+        // Pre-compute how many runs exist per crop+experiment+treatment to decide if RUN needs to be shown
+        QMap<QString, int> baseKeyToRunCount;
+        for (auto it = experimentTreatmentData.begin(); it != experimentTreatmentData.end(); ++it) {
+            QStringList keyParts = it.key().split("__");
+            if (keyParts.size() >= 3) {
+                QString baseKey = QString("%1__%2__%3").arg(keyParts[0]).arg(keyParts[1]).arg(keyParts[2]);
+                baseKeyToRunCount[baseKey] = baseKeyToRunCount.value(baseKey, 0) + 1;
+            }
+        }
+
         // Create plot data for each experiment-treatment combination
         for (auto it = experimentTreatmentData.begin(); it != experimentTreatmentData.end(); ++it) {
             // Parse the crop-experiment-treatment-tname key
@@ -1399,7 +1419,16 @@ void PlotWidget::plotDatasets(const DataTable &simData, const DataTable &obsData
             QString crop = keyParts[0];
             QString experiment = keyParts[1];
             QString treatment = keyParts[2];
-            QString treatmentName = (keyParts.size() >= 4) ? keyParts[3] : QString();
+            // Optional RUN part may be present in keyParts[3+]
+            QString runPart;
+            if (keyParts.size() >= 4) {
+                for (int i = 3; i < keyParts.size(); ++i) {
+                    if (keyParts[i].startsWith("RUN")) {
+                        runPart = keyParts[i];
+                        break;
+                    }
+                }
+            }
             
             PlotData plotData;
             plotData.crop = crop;
@@ -1408,12 +1437,21 @@ void PlotWidget::plotDatasets(const DataTable &simData, const DataTable &obsData
             // Always use getTreatmentDisplayName for consistency with observed data
             // This will add experiment name when multiple experiments exist and crop name when multiple crops exist
             plotData.treatmentName = getTreatmentDisplayName(treatment, experiment, crop);
+            // Only append RUN if there are multiple runs under the same crop+experiment+treatment
+            QString baseKey = QString("%1__%2__%3").arg(crop).arg(experiment).arg(treatment);
+            if (!runPart.isEmpty() && baseKeyToRunCount.value(baseKey, 0) > 1) {
+                plotData.treatmentName += QString(" (%1)").arg(runPart);
+            }
             plotData.variable = yVar;
             plotData.points = it.value();
-            QString treatmentId = crop + "__" + experiment + "__" + treatment;
+            QString treatmentId = runPart.isEmpty()
+                ? crop + "__" + experiment + "__" + treatment
+                : crop + "__" + experiment + "__" + treatment + "__" + runPart;
             plotData.color = getColorForTreatment(treatmentId, colorIndex); // Use consistent treatment identifier
-            plotData.lineStyleIndex = colorIndex % 4;
-            plotData.symbolIndex = getMarkerIndexForVariable(yVar); // CDE-based marker assignment
+            // Line style based on variable index, not treatment index
+            plotData.lineStyleIndex = yVars.indexOf(yVar) % 4;
+            // Marker based on variable index to ensure each variable gets a different marker
+            plotData.symbolIndex = yVars.indexOf(yVar);
             colorIndex++;
             plotData.isObserved = false;
             
@@ -1593,8 +1631,10 @@ void PlotWidget::plotDatasets(const DataTable &simData, const DataTable &obsData
                 }
                 
                 plotData.color = getColorForTreatment(treatmentId, colorIndex); // Use consistent treatment identifier
-                plotData.lineStyleIndex = colorIndex % 4;
-                plotData.symbolIndex = getMarkerIndexForVariable(yVar); // CDE-based marker assignment
+                // Line style based on variable index, not treatment index
+                plotData.lineStyleIndex = yVars.indexOf(yVar) % 4;
+                // Marker based on variable index to ensure each variable gets a different marker
+                plotData.symbolIndex = yVars.indexOf(yVar);
                 colorIndex++;
                 plotData.isObserved = true;
                 
@@ -1757,8 +1797,12 @@ void PlotWidget::addSeriesToPlot(const QVector<PlotData> &plotDataList)
             scatterSeries->setColor(sharedPlotData->color);
             scatterSeries->setMarkerSize(sharedPlotData->isObserved ? 8.0 : 6.0);
             
-            // Apply symbol based on symbolIndex
-            QString originalSymbol = m_markerSymbols[sharedPlotData->symbolIndex % m_markerSymbols.size()];
+            // Apply symbol based on symbolIndex - use only unique visual shapes
+            // Map to 6 unique shapes: circle, rectangle, diamond, triangle, star, pentagon
+            // Use variable index directly to ensure each variable gets a different visual marker
+            QStringList uniqueShapes = {"o", "s", "d", "t", "star", "p"}; // 6 unique visual shapes
+            int shapeIndex = sharedPlotData->symbolIndex % uniqueShapes.size();
+            QString originalSymbol = uniqueShapes[shapeIndex];
             QString actualSymbol = getActualRenderedSymbol(originalSymbol);
             scatterSeries->setMarkerShape(getMarkerShape(originalSymbol));
 
@@ -1953,6 +1997,7 @@ void PlotWidget::calculateMetrics()
         const DataColumn *obsExpColumn = m_obsData.getColumn("EXPERIMENT");
         const DataColumn *simCropColumn = m_simData.getColumn("CROP");
         const DataColumn *obsCropColumn = m_obsData.getColumn("CROP");
+        const DataColumn *simRunColumn = m_simData.getColumn("RUN");
         
         if (!simDateColumn || !obsDateColumn) {
             qDebug() << "PlotWidget: Missing DATE column for metrics calculation";
@@ -1964,8 +2009,9 @@ void PlotWidget::calculateMetrics()
             return QString("%1_%2_%3_%4").arg(trt, exp, crop, date);
         };
         
-        // Collect simulated data with match keys
-        QMap<QString, double> simDataByKey;
+        // Collect simulated data with match keys, split by RUN if present
+        // Map: baseKey (trt_exp_crop_date) -> (runId -> sim value)
+        QMap<QString, QMap<QString, double>> simDataByBaseKeyToRuns;
         for (int row = 0; row < m_simData.rowCount; ++row) {
             if (row >= simYColumn->data.size() || row >= simTrtColumn->data.size() || row >= simDateColumn->data.size()) continue;
             
@@ -1973,20 +2019,31 @@ void PlotWidget::calculateMetrics()
             QString date = simDateColumn->data[row].toString();
             QString exp = simExpColumn && row < simExpColumn->data.size() ? simExpColumn->data[row].toString() : "";
             QString crop = simCropColumn && row < simCropColumn->data.size() ? simCropColumn->data[row].toString() : "";
+            QString runId;
+            if (simRunColumn && row < simRunColumn->data.size()) {
+                QString rv = simRunColumn->data[row].toString();
+                if (!rv.isEmpty()) {
+                    runId = QString("RUN%1").arg(rv);
+                }
+            }
             QVariant yVal = simYColumn->data[row];
             
             if (!DataProcessor::isMissingValue(yVal)) {
-                QString key = createMatchKey(trt, exp, crop, date);
-                simDataByKey[key] = yVal.toDouble();
+                QString baseKey = createMatchKey(trt, exp, crop, date);
+                auto &runMap = simDataByBaseKeyToRuns[baseKey];
+                runMap[runId] = yVal.toDouble(); // empty runId means no RUN column
             }
         }
         
-        // Collect observed data with match keys and create matched pairs grouped by treatment+variable+experiment+crop
+        // Collect observed data with match keys and create matched pairs grouped by treatment+variable+experiment+crop(+run)
         QMap<QString, QVector<double>> simByTreatmentVarExpCrop;
         QMap<QString, QVector<double>> obsByTreatmentVarExpCrop;
-        QMap<QString, QString> treatmentVarExpCropToExp; // Map to store experiment name for each group
-        QMap<QString, QString> treatmentVarExpCropToCrop; // Map to store crop name for each group
-        QMap<QString, QString> treatmentVarExpCropToTrt; // Map to store treatment for each group
+        QMap<QString, QString> treatmentVarExpCropToExp; // experiment per group
+        QMap<QString, QString> treatmentVarExpCropToCrop; // crop per group
+        QMap<QString, QString> treatmentVarExpCropToTrt; // treatment per group
+        QMap<QString, QString> treatmentVarExpCropToRun; // runId per group (may be empty)
+        // Track run counts per base (no-run) group for labeling decisions
+        QMap<QString, QSet<QString>> baseGroupToRuns;
         
         int matchedPairs = 0;
         for (int row = 0; row < m_obsData.rowCount; ++row) {
@@ -2002,22 +2059,39 @@ void PlotWidget::calculateMetrics()
                 QString matchKey = createMatchKey(trt, exp, crop, date);
                 
                 // Only add if we have matching simulated data for the same key
-                if (simDataByKey.contains(matchKey)) {
-                    // Create group key: treatment_variable_experiment_crop (without date)
-                    QString groupKey = QString("%1_%2_%3_%4").arg(trt, yVar, exp, crop);
-                    
-                    simByTreatmentVarExpCrop[groupKey].append(simDataByKey[matchKey]);
-                    obsByTreatmentVarExpCrop[groupKey].append(obsVal.toDouble());
-                    treatmentVarExpCropToExp[groupKey] = exp;
-                    treatmentVarExpCropToCrop[groupKey] = crop;
-                    treatmentVarExpCropToTrt[groupKey] = trt;
-                    matchedPairs++;
+                if (simDataByBaseKeyToRuns.contains(matchKey)) {
+                    const auto &runMap = simDataByBaseKeyToRuns[matchKey];
+                    QString baseGroupKey = QString("%1_%2_%3_%4").arg(trt, yVar, exp, crop);
+                    if (runMap.isEmpty()) {
+                        // No run separation
+                        QString groupKey = baseGroupKey;
+                        simByTreatmentVarExpCrop[groupKey].append(0.0); // placeholder; will be overwritten next line
+                        simByTreatmentVarExpCrop[groupKey].back() = 0.0; // ensure vector exists
+                        obsByTreatmentVarExpCrop[groupKey].append(obsVal.toDouble());
+                        treatmentVarExpCropToExp[groupKey] = exp;
+                        treatmentVarExpCropToCrop[groupKey] = crop;
+                        treatmentVarExpCropToTrt[groupKey] = trt;
+                        matchedPairs++;
+                    } else {
+                        for (auto itRun = runMap.constBegin(); itRun != runMap.constEnd(); ++itRun) {
+                            QString runId = itRun.key();
+                            double simVal = itRun.value();
+                            QString groupKey = runId.isEmpty() ? baseGroupKey : QString("%1_%2").arg(baseGroupKey, runId);
+                            simByTreatmentVarExpCrop[groupKey].append(simVal);
+                            obsByTreatmentVarExpCrop[groupKey].append(obsVal.toDouble());
+                            treatmentVarExpCropToExp[groupKey] = exp;
+                            treatmentVarExpCropToCrop[groupKey] = crop;
+                            treatmentVarExpCropToTrt[groupKey] = trt;
+                            treatmentVarExpCropToRun[groupKey] = runId;
+                            baseGroupToRuns[baseGroupKey].insert(runId);
+                            matchedPairs++;
+                        }
+                    }
                 }
             }
         }
         
-        // Calculate metrics for each treatment+variable+experiment+crop combination
-        
+        // Calculate metrics for each treatment+variable+experiment+crop(+run) combination
         for (auto it = simByTreatmentVarExpCrop.begin(); it != simByTreatmentVarExpCrop.end(); ++it) {
             QString groupKey = it.key();
             QStringList keyParts = groupKey.split("_");
@@ -2028,6 +2102,7 @@ void PlotWidget::calculateMetrics()
             QString variable = keyParts[1]; // Should be yVar
             QString experimentName = treatmentVarExpCropToExp[groupKey];
             QString cropName = treatmentVarExpCropToCrop[groupKey];
+            QString runId = treatmentVarExpCropToRun.value(groupKey);
             
             // Check if this treatment should be processed
             if (!m_currentTreatments.contains("All") && !m_currentTreatments.contains(trt)) {
@@ -2053,12 +2128,21 @@ void PlotWidget::calculateMetrics()
                 result["VariableName"] = varDisplayName;
                 
                 result["Treatment"] = trt;
-                result["TreatmentName"] = getTreatmentDisplayName(trt, experimentName, cropName);
+                // Build TreatmentName and append run only if multiple runs exist for this base group
+                QString treatmentName = getTreatmentDisplayName(trt, experimentName, cropName);
+                QString baseGroupKey = QString("%1_%2_%3_%4").arg(trt, variable, experimentName, cropName);
+                if (!runId.isEmpty() && baseGroupToRuns.value(baseGroupKey).size() > 1) {
+                    treatmentName += QString(" (%1)").arg(runId);
+                }
+                result["TreatmentName"] = treatmentName;
                 result["Experiment"] = experimentName;
                 result["Crop"] = cropName;
                 // Get crop display name from crop code
                 QString cropDisplayName = getCropNameFromCode(cropName);
                 result["CropName"] = cropDisplayName;
+                if (!runId.isEmpty()) {
+                    result["Run"] = runId;
+                }
                 
                 metrics.append(result);
             }
@@ -3736,22 +3820,36 @@ void PlotWidget::applyPlotSettings(const PlotSettings &settings)
     if (m_chart) {
         m_chart->setBackgroundBrush(QBrush(settings.backgroundColor));
         m_chart->setPlotAreaBackgroundBrush(QBrush(settings.plotAreaColor));
+
+        // Apply title font
+        QFont titleFont(settings.fontFamily, settings.titleFontSize);
+        titleFont.setBold(settings.boldTitle);
+        m_chart->setTitleFont(titleFont);
     }
     
     // Apply axis settings to all axes
     auto axes = m_chart->axes();
     for (auto axis : axes) {
+        // Apply axis tick label font
+        QFont tickFont(settings.fontFamily, settings.axisTickFontSize);
+        axis->setLabelsFont(tickFont);
+
+        // Apply axis title font
+        QFont labelFont(settings.fontFamily, settings.axisLabelFontSize);
+        labelFont.setBold(settings.boldAxisLabels);
+        axis->setTitleFont(labelFont);
+
         if (auto valueAxis = qobject_cast<QValueAxis*>(axis)) {
             valueAxis->setMinorTickCount(settings.minorTickCount);
             valueAxis->setMinorGridLineVisible(settings.showMinorGrid);
             valueAxis->setLabelsVisible(settings.showAxisLabels);
-            
+
             // Apply X-axis tick customization only to X-axis
             if (axis == m_chart->axes(Qt::Horizontal).first()) {
                 if (settings.xAxisTickCount > 0) {
                     valueAxis->setTickCount(settings.xAxisTickCount);
                 }
-                
+
                 // If custom spacing is set (> 0), calculate and set tick interval
                 if (settings.xAxisTickSpacing > 0.0) {
                     valueAxis->setTickInterval(settings.xAxisTickSpacing);
@@ -3760,13 +3858,13 @@ void PlotWidget::applyPlotSettings(const PlotSettings &settings)
         }
         else if (auto dateTimeAxis = qobject_cast<QDateTimeAxis*>(axis)) {
             dateTimeAxis->setLabelsVisible(settings.showAxisLabels);
-            
+
             // Apply X-axis tick customization only to X-axis (for DATE variables)
             if (axis == m_chart->axes(Qt::Horizontal).first()) {
                 if (settings.xAxisTickCount > 0) {
                     dateTimeAxis->setTickCount(settings.xAxisTickCount);
                 }
-                
+
                 // Note: QDateTimeAxis doesn't support setTickInterval
                 // Tick spacing is controlled through setTickCount only
             }
@@ -3792,10 +3890,22 @@ void PlotWidget::applyPlotSettings(const PlotSettings &settings)
         }
     }
     
+    // Apply legend font (to custom legend widget, not chart legend)
+    if (m_legendWidget) {
+        QFont legendFont(settings.fontFamily, settings.legendFontSize);
+        m_legendWidget->setFont(legendFont);
+
+        // Apply font to all existing labels in the legend
+        QList<QLabel*> labels = m_legendWidget->findChildren<QLabel*>();
+        for (QLabel* label : labels) {
+            label->setFont(legendFont);
+        }
+    }
+
     // Update internal settings
     m_showGrid = settings.showGrid;
     m_showLegend = settings.showLegend;
-    
+
     // Update plot settings (including error bar settings)
     m_plotSettings = settings;
     

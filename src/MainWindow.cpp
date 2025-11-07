@@ -1,6 +1,7 @@
 #include "MainWindow.h"
 #include "DataTableWidget.h"
 #include "PlotWidget.h"
+#include "../AI/AIAnalysisDialog.h"
 #include <QApplication>
 #include <QMessageBox>
 #include <QCloseEvent>
@@ -11,6 +12,7 @@
 #include <QHeaderView>
 #include <QTableWidget>
 #include <QTableWidgetItem>
+#include <QRegularExpression>
 #include <QDebug>
 
 MainWindow::MainWindow(QWidget *parent)
@@ -113,11 +115,18 @@ void MainWindow::setupMenuBar()
     connect(copyPlotAction, &QAction::triggered, this, &MainWindow::onCopyPlot);
     
     fileMenu->addSeparator();
-    
+
     QAction *exitAction = fileMenu->addAction("E&xit");
     exitAction->setShortcut(QKeySequence::Quit);
     connect(exitAction, &QAction::triggered, this, &QWidget::close);
-    
+
+    // Analysis Menu
+    QMenu *analysisMenu = menuBar->addMenu("&Analysis");
+
+    QAction *aiAnalysisAction = analysisMenu->addAction("&AI Analysis...");
+    aiAnalysisAction->setShortcut(QKeySequence("Ctrl+I"));
+    connect(aiAnalysisAction, &QAction::triggered, this, &MainWindow::onAIAnalysis);
+
     // Help Menu
     QMenu *helpMenu = menuBar->addMenu("&Help");
     
@@ -556,6 +565,108 @@ void MainWindow::onCopyPlot()
         m_plotWidget->copyPlotToClipboard();
         m_statusWidget->showSuccess("Plot copied to clipboard");
     }
+}
+
+void MainWindow::onAIAnalysis()
+{
+    AIAnalysisDialog *dialog = new AIAnalysisDialog(this);
+
+    // Filter data based on current selections
+    DataTable filteredSimData;
+    DataTable filteredObsData;
+
+    if (!m_currentData.columns.isEmpty()) {
+        // Get current selections
+        QString xVar = m_xVariableComboBox->currentText();
+        QStringList yVars;
+        for (int i = 0; i < m_yVariableComboBox->count(); ++i) {
+            QListWidgetItem *item = m_yVariableComboBox->item(i);
+            if (item && item->isSelected()) {
+                yVars.append(item->text());
+            }
+        }
+
+        // Extract actual column codes from display names (e.g., "* Biomass kg/ha (CWAD)" -> "CWAD")
+        auto extractColumnCode = [](const QString &displayName) -> QString {
+            // Look for column code in parentheses at the end
+            QRegularExpression re("\\(([A-Z0-9]+)\\)$");
+            QRegularExpressionMatch match = re.match(displayName);
+            if (match.hasMatch()) {
+                return match.captured(1);
+            }
+            // If no parentheses, remove leading "* " if present
+            QString cleaned = displayName;
+            if (cleaned.startsWith("* ")) {
+                cleaned = cleaned.mid(2);
+            }
+            return cleaned;
+        };
+
+        // Create filtered data with only selected variables
+        QStringList selectedVars;
+        if (!xVar.isEmpty()) {
+            QString xCode = extractColumnCode(xVar);
+            selectedVars.append(xCode);
+        }
+
+        for (const QString &yVar : yVars) {
+            QString yCode = extractColumnCode(yVar);
+            selectedVars.append(yCode);
+        }
+
+        // Add required metadata columns for plotting and AI analysis
+        QStringList metadataColumns = {
+            "TRT", "TNAME"  // Required
+        };
+        
+        // Add optional metadata columns if they exist in data
+        QStringList optionalMetadata = {"CROP", "EXPERIMENT", "RUN"};
+        for (const QString &optCol : optionalMetadata) {
+            if (m_currentData.columnNames.contains(optCol) && !metadataColumns.contains(optCol)) {
+                metadataColumns.append(optCol);
+            }
+        }
+
+        for (const QString &metaCol : metadataColumns) {
+            if (!selectedVars.contains(metaCol)) {
+                selectedVars.append(metaCol);
+            }
+        }
+
+        // Filter simulated data
+        for (const QString &varName : selectedVars) {
+            const DataColumn *col = m_currentData.getColumn(varName);
+            if (col) {
+                filteredSimData.addColumn(*col);
+            }
+        }
+        filteredSimData.rowCount = m_currentData.rowCount;
+        filteredSimData.tableName = m_currentData.tableName;
+
+        // Filter observed data (same variables)
+        if (!m_currentObsData.columns.isEmpty()) {
+            for (const QString &varName : selectedVars) {
+                const DataColumn *col = m_currentObsData.getColumn(varName);
+                if (col) {
+                    filteredObsData.addColumn(*col);
+                }
+            }
+            filteredObsData.rowCount = m_currentObsData.rowCount;
+            filteredObsData.tableName = m_currentObsData.tableName;
+        }
+
+        // Set context info
+        QString contextInfo = QString("Crop: %1, X-axis: %2, Y-variables: %3")
+            .arg(m_selectedFolder, xVar, yVars.join(", "));
+
+        dialog->setData(filteredSimData.columns.isEmpty() ? m_currentData : filteredSimData,
+                       filteredObsData.columns.isEmpty() ? m_currentObsData : filteredObsData,
+                       m_currentMetrics,
+                       contextInfo);
+    }
+
+    dialog->exec();
+    dialog->deleteLater();
 }
 
 void MainWindow::onAbout()
@@ -1748,4 +1859,54 @@ void MainWindow::updateTimeSeriesPlot()
     } else {
         qWarning() << "MainWindow: Plot widget not initialized";
     }
+}
+
+QString MainWindow::getCurrentOverviewPath() const
+{
+    QString actualPath = m_dataProcessor->getActualFolderPath(m_selectedFolder);
+
+    if (actualPath.isEmpty()) {
+        qDebug() << "MainWindow::getCurrentOverviewPath - No folder selected";
+        return QString();
+    }
+
+    QDir dir(actualPath);
+
+    // Try common case variations of Overview.OUT
+    QStringList overviewVariants = {"Overview.OUT", "overview.out", "OVERVIEW.OUT", "Overview.out"};
+    for (const QString &variant : overviewVariants) {
+        QString path = dir.absoluteFilePath(variant);
+        if (QFile::exists(path)) {
+            qDebug() << "MainWindow::getCurrentOverviewPath - Found:" << path;
+            return path;
+        }
+    }
+
+    qDebug() << "MainWindow::getCurrentOverviewPath - Overview.OUT not found in:" << actualPath;
+    return QString();
+}
+
+QString MainWindow::getCurrentSummaryPath() const
+{
+    QString actualPath = m_dataProcessor->getActualFolderPath(m_selectedFolder);
+
+    if (actualPath.isEmpty()) {
+        qDebug() << "MainWindow::getCurrentSummaryPath - No folder selected";
+        return QString();
+    }
+
+    QDir dir(actualPath);
+
+    // Try common case variations of Summary.OUT
+    QStringList summaryVariants = {"Summary.OUT", "summary.out", "SUMMARY.OUT", "Summary.out"};
+    for (const QString &variant : summaryVariants) {
+        QString path = dir.absoluteFilePath(variant);
+        if (QFile::exists(path)) {
+            qDebug() << "MainWindow::getCurrentSummaryPath - Found:" << path;
+            return path;
+        }
+    }
+
+    qDebug() << "MainWindow::getCurrentSummaryPath - Summary.OUT not found in:" << actualPath;
+    return QString();
 }

@@ -985,10 +985,28 @@ QStringList DataProcessor::prepareOutFiles(const QString &folderName)
     
     qDebug() << "prepareOutFiles: Directory exists, looking for files...";
     
-    // Get all .OUT files (and other O-files like .OSU, .OVT, etc.)
+    // Get all .OUT files (and other O-files like .OSU, .OVT, .OPT, .OPG, etc.)
     QStringList filters;
-    filters << "*.OUT" << "*.out" << "*.OSU" << "*.osu" 
-            << "*.OVT" << "*.ovt" << "*.OPT" << "*.opt";
+    filters << "*.OUT" << "*.out"
+            << "*.OSU" << "*.osu"
+            << "*.OVT" << "*.ovt"
+            << "*.OPT" << "*.opt"
+            << "*.OPG" << "*.opg"
+            << "*.OEB" << "*.oeb"
+            << "*.OEV" << "*.oev"
+            << "*.OG2" << "*.og2"
+            << "*.OGF" << "*.ogf"
+            << "*.OLN" << "*.oln"
+            << "*.OME" << "*.ome"
+            << "*.OMO" << "*.omo"
+            << "*.ONO" << "*.ono"
+            << "*.OOV" << "*.oov"
+            << "*.OPC" << "*.opc"
+            << "*.OPN" << "*.opn"
+            << "*.OSN" << "*.osn"
+            << "*.OSW" << "*.osw"
+            << "*.OTS" << "*.ots"
+            << "*.OWE" << "*.owe";
     QStringList allFiles = dir.entryList(filters, QDir::Files, QDir::Name);
     
     qDebug() << "prepareOutFiles: Found" << allFiles.size() << "total files:" << allFiles;
@@ -996,7 +1014,7 @@ QStringList DataProcessor::prepareOutFiles(const QString &folderName)
     // Filter out non-plottable files with more selective approach
     // Note: Removed "evaluate" as Evaluate.OUT files contain important simulated vs observed comparisons
     QStringList definitelyNonPlottablePatterns = {
-        "summary", "overview"
+        "summary", "overview", "mgmtevent"
     };
     
     for (const QString &file : allFiles) {

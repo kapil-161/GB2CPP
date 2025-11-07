@@ -55,6 +55,15 @@ struct PlotSettings {
     int exportWidth = 800;
     int exportHeight = 600;
     int exportDpi = 300;
+
+    // Font settings
+    QString fontFamily = "Arial";
+    int titleFontSize = 14;
+    int axisLabelFontSize = 10;
+    int axisTickFontSize = 9;
+    int legendFontSize = 9;
+    bool boldTitle = true;
+    bool boldAxisLabels = false;
 };
 
 class PlotSettingsDialog : public QDialog
@@ -116,7 +125,16 @@ private:
     QSpinBox *m_exportWidthSpinBox;
     QSpinBox *m_exportHeightSpinBox;
     QSpinBox *m_exportDpiSpinBox;
-    
+
+    // Font controls
+    QComboBox *m_fontFamilyComboBox;
+    QSpinBox *m_titleFontSizeSpinBox;
+    QSpinBox *m_axisLabelFontSizeSpinBox;
+    QSpinBox *m_axisTickFontSizeSpinBox;
+    QSpinBox *m_legendFontSizeSpinBox;
+    QCheckBox *m_boldTitleCheckBox;
+    QCheckBox *m_boldAxisLabelsCheckBox;
+
     // Buttons
     QPushButton *m_resetButton;
     QPushButton *m_previewButton;
