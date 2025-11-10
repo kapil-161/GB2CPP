@@ -55,10 +55,6 @@ public:
     QListWidget* getYVariableSelector() const { return m_yVariableComboBox; }
     QTabWidget* getTabWidget() const { return m_tabWidget; }
 
-    // Public accessors for AI Analysis
-    QString getCurrentOverviewPath() const;
-    QString getCurrentSummaryPath() const;
-
 protected:
     void closeEvent(QCloseEvent *event) override;
     void resizeEvent(QResizeEvent *event) override;
@@ -68,7 +64,6 @@ private slots:
     void onSaveData();
     void onExportPlot();
     void onCopyPlot();
-    void onAIAnalysis();
     void onAbout();
     void onDataFileChanged();
     void onXVariableChanged();

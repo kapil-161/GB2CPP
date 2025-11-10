@@ -168,7 +168,7 @@ echo.
 echo Step 6: Removing unnecessary files and folders...
 REM Remove unwanted plugin folders (KEEP platforms folder - it's essential!)
 if exist manual_deployment\generic rmdir /s /q manual_deployment\generic
-if exist manual_deployment\iconengines rmdir /s /q manual_deployment\iconengines  
+if exist manual_deployment\iconengines rmdir /s /q manual_deployment\iconengines
 if exist manual_deployment\imageformats rmdir /s /q manual_deployment\imageformats
 if exist manual_deployment\networkinformation rmdir /s /q manual_deployment\networkinformation
 if exist manual_deployment\styles rmdir /s /q manual_deployment\styles
@@ -181,7 +181,7 @@ if exist manual_deployment\D3Dcompiler_47.dll del manual_deployment\D3Dcompiler_
 if exist manual_deployment\opengl32sw.dll del manual_deployment\opengl32sw.dll
 
 echo Removed unnecessary files to minimize deployment size
-echo KEPT: platforms folder (Qt platform plugin), libgcc_s_seh-1.dll, libwinpthread-1.dll
+echo KEPT: platforms folder, libgcc/libwinpthread
 
 echo.
 echo Step 7: Testing deployment...

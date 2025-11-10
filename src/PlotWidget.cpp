@@ -1444,10 +1444,10 @@ void PlotWidget::plotDatasets(const DataTable &simData, const DataTable &obsData
             }
             plotData.variable = yVar;
             plotData.points = it.value();
-            QString treatmentId = runPart.isEmpty()
-                ? crop + "__" + experiment + "__" + treatment
-                : crop + "__" + experiment + "__" + treatment + "__" + runPart;
-            plotData.color = getColorForTreatment(treatmentId, colorIndex); // Use consistent treatment identifier
+            // Use base treatmentId (without RUN) for color assignment so observed and simulated data match
+            // RUN information is used for display name but not for color matching
+            QString treatmentId = crop + "__" + experiment + "__" + treatment;
+            plotData.color = getColorForTreatment(treatmentId, colorIndex); // Use base treatment identifier for consistent colors
             // Line style based on variable index, not treatment index
             plotData.lineStyleIndex = yVars.indexOf(yVar) % 4;
             // Marker based on variable index to ensure each variable gets a different marker
@@ -1603,6 +1603,7 @@ void PlotWidget::plotDatasets(const DataTable &simData, const DataTable &obsData
                 // Get treatment display name using the actual experiment and crop from data
                 plotData.treatmentName = getTreatmentDisplayName(treatment, experiment, crop);
                 plotData.variable = yVar;
+                // Use base treatmentId (without RUN) to match simulated data colors
                 QString treatmentId = crop + "__" + experiment + "__" + treatment;
                 
                 // Aggregate replicates if error bars are enabled (ONLY for observed data, not simulated)
@@ -1630,7 +1631,7 @@ void PlotWidget::plotDatasets(const DataTable &simData, const DataTable &obsData
                     plotData.errorBars.clear();  // No error bars if disabled or no replicates
                 }
                 
-                plotData.color = getColorForTreatment(treatmentId, colorIndex); // Use consistent treatment identifier
+                plotData.color = getColorForTreatment(treatmentId, colorIndex); // Use same treatmentId as simulated data for consistent colors
                 // Line style based on variable index, not treatment index
                 plotData.lineStyleIndex = yVars.indexOf(yVar) % 4;
                 // Marker based on variable index to ensure each variable gets a different marker
