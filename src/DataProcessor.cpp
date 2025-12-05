@@ -1014,7 +1014,7 @@ QStringList DataProcessor::prepareOutFiles(const QString &folderName)
     // Filter out non-plottable files with more selective approach
     // Note: Removed "evaluate" as Evaluate.OUT files contain important simulated vs observed comparisons
     QStringList definitelyNonPlottablePatterns = {
-        "summary", "overview", "mgmtevent", "mgmtops"
+        "summary", "overview", "mgmtevent", "mgmtops", "measured"
     };
     
     for (const QString &file : allFiles) {

@@ -74,6 +74,7 @@ private slots:
     void onUpdatePlot();
     void onTabChanged(int index);
     void onPlotWidgetXVariableChanged(const QString &xVariable);
+    void onDataViewFileTypeChanged();
     void onDataProcessed(const QString &message);
     void onDataError(const QString &error);
     void onProgressUpdate(int percentage);
@@ -157,6 +158,7 @@ private:
     // Data Panel - matching Python's tab structure
     DataTableWidget *m_dataTableWidget;
     QLabel *m_dataInfoLabel;
+    QComboBox *m_dataViewFileTypeComboBox;  // Selector for which file type to show in Data View tab
     
     // Plot Panel (now integrated into tabs like Python)
     PlotWidget *m_plotWidget;               // Main plotting widget for time series (like Python PyQtGraph)
@@ -169,8 +171,9 @@ private:
     
     // Data Management
     std::unique_ptr<DataProcessor> m_dataProcessor;
-    DataTable m_currentData;
-    DataTable m_currentObsData;
+    DataTable m_currentData;  // For time series (regular .OUT files)
+    DataTable m_currentObsData;  // For time series observed data
+    DataTable m_evaluateData;  // For scatter plots (EVALUATE.OUT files)
     QString m_currentFilePath;
     QStringList m_availableFiles;
     QString m_selectedFolder;

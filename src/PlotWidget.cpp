@@ -4098,6 +4098,8 @@ void PlotWidget::plotScatter(
         
         try {
             clear();
+            // Re-set scatter mode after clear() (which resets it to false)
+            m_isScatterMode = true;
             
             if (evaluateData.rowCount == 0) {
                 qWarning() << "PlotWidget: No data available for scatter plot";

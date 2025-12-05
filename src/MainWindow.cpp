@@ -280,8 +280,10 @@ void MainWindow::setupControlPanel()
     // Store references for later use
     m_yVariableComboBox = yVarListWidget;
 
-    // Let Y variable list expand to fill remaining space
-    m_yVariableComboBox->setMinimumHeight(200);
+    // Let Y variable list expand to fill remaining space, but with reasonable min/max constraints
+    // This ensures buttons remain visible when window is resized
+    m_yVariableComboBox->setMinimumHeight(150);  // Reduced from 200 to allow more flexibility
+    m_yVariableComboBox->setMaximumHeight(400);  // Add maximum to prevent it from pushing buttons out
     m_yVariableComboBox->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
 
     m_treatmentComboBox = new QComboBox();  // Keep for compatibility
@@ -336,7 +338,8 @@ void MainWindow::setupControlPanel()
     
     // Don't add plot group to layout - keep it hidden
     
-    controlLayout->addStretch();
+    // Don't add stretch here - it pushes buttons out of view when window is small
+    // The scroll area will handle scrolling if needed
     
     qDebug() << "Widget creation status:";
     qDebug() << "m_fileComboBox:" << (m_fileComboBox ? "OK" : "NULL");
@@ -370,6 +373,19 @@ void MainWindow::setupDataPanel()
     // Data View Tab
     QWidget *dataWidget = new QWidget();
     QVBoxLayout *dataLayout = new QVBoxLayout(dataWidget);
+    
+    // File type selector for Data View tab
+    QHBoxLayout *dataSelectorLayout = new QHBoxLayout();
+    QLabel *dataTypeLabel = new QLabel("Show data from:");
+    m_dataViewFileTypeComboBox = new QComboBox();
+    m_dataViewFileTypeComboBox->addItem("Regular .OUT Files", "regular");
+    m_dataViewFileTypeComboBox->addItem("EVALUATE.OUT Files", "evaluate");
+    m_dataViewFileTypeComboBox->setCurrentIndex(0); // Default to regular .OUT
+    m_dataViewFileTypeComboBox->setEnabled(false); // Disabled until data is loaded
+    dataSelectorLayout->addWidget(dataTypeLabel);
+    dataSelectorLayout->addWidget(m_dataViewFileTypeComboBox);
+    dataSelectorLayout->addStretch();
+    dataLayout->addLayout(dataSelectorLayout);
     
     m_dataInfoLabel = new QLabel("No data loaded");
     m_dataInfoLabel->setStyleSheet("font-weight: bold; padding: 5px;");
@@ -474,6 +490,12 @@ void MainWindow::connectSignals()
     
     if (m_metricsButton) {
         connect(m_metricsButton, &QPushButton::clicked, this, &MainWindow::onShowMetrics);
+    }
+    
+    // Connect data view file type selector
+    if (m_dataViewFileTypeComboBox) {
+        connect(m_dataViewFileTypeComboBox, QOverload<int>::of(&QComboBox::currentIndexChanged),
+                this, &MainWindow::onDataViewFileTypeChanged);
     }
     
     if (m_refreshFilesButton) {
@@ -616,10 +638,6 @@ void MainWindow::onXVariableChanged()
         return;
     }
 
-    // Check if we should auto-switch to scatter plot tab for EVALUATE.OUT files
-    // But don't auto-plot - just switch tabs if needed
-    checkAndAutoSwitchToScatterPlot(false); // Pass false to prevent auto-plotting
-
     // Show prompt message based on current tab
     if (m_tabWidget && m_tabWidget->currentIndex() == 0) {
         m_statusWidget->showInfo("X variable changed. Click 'Refresh Plot' to update the time series plot");
@@ -650,10 +668,6 @@ void MainWindow::onYVariableChanged()
         qDebug() << "MainWindow: Cleared plots and metrics due to no Y variables selected";
         return;
     }
-
-    // Check if we should auto-switch to scatter plot tab for EVALUATE.OUT files
-    // But don't auto-plot - just switch tabs if needed
-    checkAndAutoSwitchToScatterPlot(false); // Pass false to prevent auto-plotting
 
     // Show prompt message based on current tab
     if (m_tabWidget && m_tabWidget->currentIndex() == 0) {
@@ -693,24 +707,13 @@ void MainWindow::onUpdatePlot()
     
     // Check which tab we're on and perform appropriate action
     if (m_tabWidget && m_tabWidget->currentIndex() == 0) {
-        // Time Series tab - check if we should auto-switch to scatter plot for EVALUATE.OUT
-        checkAndAutoSwitchToScatterPlot();
-        
-        // If we're still on time series tab after auto-switch check, proceed with time series plot
-        if (m_tabWidget && m_tabWidget->currentIndex() == 0) {
-            qDebug() << "MainWindow::onUpdatePlot() - Refreshing plot for Time Series tab";
-            updatePlot();
-        } else {
-            // Tab was switched to scatter plot, updateScatterPlot() was already called by checkAndAutoSwitchToScatterPlot()
-            qDebug() << "MainWindow::onUpdatePlot() - Auto-switched to scatter plot tab";
-        }
+        // Time Series tab - refresh time series plot
+        qDebug() << "MainWindow::onUpdatePlot() - Refreshing plot for Time Series tab";
+        updatePlot();
     } else if (m_tabWidget && m_tabWidget->currentIndex() == 1) {
-        // Data View tab - refresh data table only
-        if (m_dataTableWidget && m_currentData.rowCount > 0) {
-            qDebug() << "MainWindow::onUpdatePlot() - Refreshing data table for Data View tab";
-            m_dataTableWidget->setData(m_currentData, m_currentObsData);
-            m_dataNeedsRefresh = false;
-        }
+        // Data View tab - refresh data table based on selected file type
+        onDataViewFileTypeChanged();
+        m_dataNeedsRefresh = false;
     } else if (m_tabWidget && m_tabWidget->currentIndex() == 2) {
         // Scatter Plot tab - refresh scatter plot
         qDebug() << "MainWindow::onUpdatePlot() - Refreshing scatter plot";
@@ -739,6 +742,9 @@ void MainWindow::onTabChanged(int index)
         if (m_scatterPlotWidget) {
             m_scatterPlotWidget->setXAxisButtonsVisible(false);
         }
+        
+        // Update variables to show time series variables (regular .OUT files)
+        updateVariableComboBoxes();
 
         // Show prompt message if files are selected but plot needs refresh
         QList<QListWidgetItem*> selectedItems = m_fileListWidget ? m_fileListWidget->selectedItems() : QList<QListWidgetItem*>();
@@ -754,10 +760,35 @@ void MainWindow::onTabChanged(int index)
             m_updatePlotButton->setText("Refresh Data");
         }
 
-        if (m_dataTableWidget && m_currentData.rowCount > 0 && m_dataNeedsRefresh) {
-            qDebug() << "MainWindow::onTabChanged() - Data View tab selected, refreshing table data.";
-            m_dataTableWidget->setData(m_currentData, m_currentObsData);
+        // Update file type selector based on available data
+        if (m_dataViewFileTypeComboBox) {
+            bool hasRegular = (m_currentData.rowCount > 0);
+            bool hasEvaluate = (m_evaluateData.rowCount > 0);
+            
+            if (hasRegular && hasEvaluate) {
+                // Both available - enable selector
+                m_dataViewFileTypeComboBox->setEnabled(true);
+            } else if (hasEvaluate) {
+                // Only EVALUATE.OUT - disable selector and set to evaluate
+                m_dataViewFileTypeComboBox->setEnabled(false);
+                m_dataViewFileTypeComboBox->setCurrentIndex(1); // EVALUATE.OUT
+            } else if (hasRegular) {
+                // Only regular .OUT - disable selector and set to regular
+                m_dataViewFileTypeComboBox->setEnabled(false);
+                m_dataViewFileTypeComboBox->setCurrentIndex(0); // Regular .OUT
+            } else {
+                // No data - disable selector
+                m_dataViewFileTypeComboBox->setEnabled(false);
+            }
+        }
+
+        // Refresh data table based on selected file type
+        if (m_dataTableWidget && m_dataNeedsRefresh) {
+            onDataViewFileTypeChanged();
             m_dataNeedsRefresh = false; // Reset the flag after refreshing
+        } else if (m_dataTableWidget) {
+            // Data already loaded, just refresh if needed
+            onDataViewFileTypeChanged();
         }
     } else if (index == 2) {
         // Scatter Plot tab
@@ -774,9 +805,12 @@ void MainWindow::onTabChanged(int index)
             m_plotWidget->setXAxisButtonsVisible(true);
         }
         
+        // Update variables to show scatter plot variables (EVALUATE.OUT files)
+        updateVariableComboBoxes();
+        
         // Show prompt message if files are selected but plot needs refresh
         QList<QListWidgetItem*> selectedItems = m_fileListWidget ? m_fileListWidget->selectedItems() : QList<QListWidgetItem*>();
-        if (!selectedItems.isEmpty() && (m_currentData.rowCount == 0 || m_variableSelectionChanged || m_dataNeedsRefresh)) {
+        if (!selectedItems.isEmpty() && (m_evaluateData.rowCount == 0 || m_variableSelectionChanged || m_dataNeedsRefresh)) {
             m_statusWidget->showInfo("Click 'Refresh Plot' to view the scatter plot with current selections");
         } else if (selectedItems.isEmpty()) {
             m_statusWidget->showInfo("Select EVALUATE.OUT file and variables, then click 'Refresh Plot' to view scatter plot");
@@ -891,30 +925,135 @@ void MainWindow::updateVariableComboBoxes()
     m_xVariableComboBox->clear();
     m_yVariableComboBox->clear();
     
-    if (m_currentData.rowCount == 0) {
-        return;
-    }
-    
-    // Check if current file is EVALUATE.OUT
+    // Determine which data to use based on current tab
+    int currentTab = m_tabWidget ? m_tabWidget->currentIndex() : 0;
+    bool isScatterTab = (currentTab == 2);
     bool isEvaluateFile = false;
+    bool hasRegularFile = false;
+    
+    // Check which file types are available
     if (m_fileListWidget) {
         QList<QListWidgetItem*> selectedItems = m_fileListWidget->selectedItems();
-        if (!selectedItems.isEmpty()) {
-            QString firstSelectedFile = selectedItems.first()->text();
-            QString upperFileName = firstSelectedFile.toUpper();
-            isEvaluateFile = upperFileName.contains("EVALUATE") || upperFileName == "EVALUATE.OUT";
+        for (QListWidgetItem* item : selectedItems) {
+            QString fileName = item->text().toUpper();
+            if (fileName.contains("EVALUATE") || fileName == "EVALUATE.OUT") {
+                isEvaluateFile = true;
+            } else {
+                hasRegularFile = true;
+            }
         }
     }
     
-    // For EVALUATE.OUT files, use special variable population
+    // Tab-dependent variable selection:
+    // - Scatter tab (index 2) → show EVALUATE.OUT variables
+    // - Time series tab (index 0) → show regular .OUT variables
+    if (isScatterTab) {
+        // Scatter plot tab - use EVALUATE.OUT data
+        isEvaluateFile = (m_evaluateData.rowCount > 0);
+        if (!isEvaluateFile) {
+            qDebug() << "MainWindow::updateVariableComboBoxes() - Scatter tab but no EVALUATE data";
+            m_xVariableComboBox->clear();
+            if (m_yVariableComboBox) {
+                m_yVariableComboBox->clear();
+            }
+            return;
+        }
+    } else {
+        // Time series tab - use regular .OUT data
+        isEvaluateFile = false;
+        if (m_currentData.rowCount == 0) {
+            qDebug() << "MainWindow::updateVariableComboBoxes() - Time series tab but no regular data";
+            m_xVariableComboBox->clear();
+            if (m_yVariableComboBox) {
+                m_yVariableComboBox->clear();
+            }
+            return;
+        }
+    }
+    
+    // For EVALUATE.OUT files (scatter plot tab), use special variable population
     if (isEvaluateFile) {
         // Set Y variable list to single selection mode for scatter plots (only one Y variable can be plotted)
         if (m_yVariableComboBox) {
             m_yVariableComboBox->setSelectionMode(QListWidget::SingleSelection);
         }
         
-        // Get all variables from EVALUATE.OUT
-        QVector<QPair<QString, QString>> allVars = DataProcessor::getAllEvaluateVariables(m_currentData);
+        // Get all variables from EVALUATE.OUT data
+        QVector<QPair<QString, QString>> allVars = DataProcessor::getAllEvaluateVariables(m_evaluateData);
+        
+        // Build a set of base variable names that have both "s" and "m" versions with valid data
+        QSet<QString> variablesWithBothVersions;
+        
+        // First, collect all base variable names from the actual column names
+        QMap<QString, QString> baseToSimCol;  // base name (lowercase) -> actual sim column name
+        QMap<QString, QString> baseToMeasCol; // base name (lowercase) -> actual meas column name
+        
+        qDebug() << "MainWindow::updateVariableComboBoxes() - Checking EVALUATE.OUT columns for asterisk logic";
+        qDebug() << "  Total columns:" << m_evaluateData.columnNames.size();
+        
+        for (const QString &colName : m_evaluateData.columnNames) {
+            QString upperCol = colName.toUpper();
+            if (upperCol.endsWith("S") && upperCol.length() > 1) {
+                QString baseName = upperCol.left(upperCol.length() - 1).toLower();
+                baseToSimCol[baseName] = colName; // Store actual column name (preserving case)
+                qDebug() << "  Found sim column:" << colName << "-> base:" << baseName;
+            } else if (upperCol.endsWith("M") && upperCol.length() > 1) {
+                QString baseName = upperCol.left(upperCol.length() - 1).toLower();
+                baseToMeasCol[baseName] = colName; // Store actual column name (preserving case)
+                qDebug() << "  Found meas column:" << colName << "-> base:" << baseName;
+            }
+        }
+        
+        qDebug() << "  Found" << baseToSimCol.size() << "sim columns and" << baseToMeasCol.size() << "meas columns";
+        
+        // Check which base names have both versions with valid data
+        for (auto it = baseToSimCol.begin(); it != baseToSimCol.end(); ++it) {
+            QString baseKey = it.key();
+            if (baseToMeasCol.contains(baseKey)) {
+                // Both versions exist, check for valid data
+                QString simColName = it.value();
+                QString measColName = baseToMeasCol[baseKey];
+                
+                const DataColumn *simCol = m_evaluateData.getColumn(simColName);
+                const DataColumn *measCol = m_evaluateData.getColumn(measColName);
+                
+                bool hasValidSimData = false;
+                bool hasValidMeasData = false;
+                
+                if (simCol) {
+                    for (const QVariant &value : simCol->data) {
+                        if (!DataProcessor::isMissingValue(value)) {
+                            hasValidSimData = true;
+                            break;
+                        }
+                    }
+                } else {
+                    qDebug() << "  WARNING: Sim column" << simColName << "not found in data";
+                }
+                
+                if (measCol) {
+                    for (const QVariant &value : measCol->data) {
+                        if (!DataProcessor::isMissingValue(value)) {
+                            hasValidMeasData = true;
+                            break;
+                        }
+                    }
+                } else {
+                    qDebug() << "  WARNING: Meas column" << measColName << "not found in data";
+                }
+                
+                // Only add asterisk if both versions have valid data
+                if (hasValidSimData && hasValidMeasData) {
+                    variablesWithBothVersions.insert(baseKey);
+                    qDebug() << "  ✓ Variable" << baseKey << "has both simulated (" << simColName 
+                             << ") and measured (" << measColName << ") data with valid values - adding asterisk";
+                } else {
+                    qDebug() << "  ✗ Variable" << baseKey << "missing valid data - sim:" << hasValidSimData << "meas:" << hasValidMeasData;
+                }
+            }
+        }
+        
+        qDebug() << "  Total variables with both versions:" << variablesWithBothVersions.size();
         
         // For scatter plots: X-axis = variables ending with "m" (measured), Y-axis = variables ending with "s" (simulated)
         for (const QPair<QString, QString> &varPair : allVars) {
@@ -941,6 +1080,12 @@ void MainWindow::updateVariableComboBoxes()
                     // Fallback to original display name if no info found
                     fullDisplayName = displayName;
                 }
+            }
+            
+            // Check if this variable has both "s" and "m" versions - add asterisk if so
+            bool hasBothVersions = variablesWithBothVersions.contains(baseVarName.toLower());
+            if (hasBothVersions) {
+                fullDisplayName = "* " + fullDisplayName;
             }
             
             // Check if variable ends with "m" (measured) - add to X variable combo box
@@ -1089,9 +1234,10 @@ void MainWindow::updateScatterPlot()
 {
     qDebug() << "MainWindow::updateScatterPlot() - ENTRY POINT";
     
-    if (m_currentData.rowCount == 0) {
-        qDebug() << "MainWindow::updateScatterPlot() - No data available. Aborting scatter plot update.";
-        m_statusWidget->showWarning("No data available for scatter plot");
+    // Use EVALUATE.OUT data for scatter plots
+    if (m_evaluateData.rowCount == 0) {
+        qDebug() << "MainWindow::updateScatterPlot() - No EVALUATE.OUT data available. Aborting scatter plot update.";
+        m_statusWidget->showWarning("No EVALUATE.OUT data available for scatter plot. Please select EVALUATE.OUT files.");
         return;
     }
     
@@ -1177,9 +1323,9 @@ void MainWindow::updateScatterPlot()
         QString treatment = m_treatmentComboBox ? m_treatmentComboBox->currentText() : "All";
         QStringList treatments = treatment == "All" ? QStringList() : QStringList() << treatment;
         
-        // Plot the first selected Y variable
+        // Plot the first selected Y variable using EVALUATE.OUT data
         m_scatterPlotWidget->plotScatter(
-            m_currentData,
+            m_evaluateData,
             xVar,
             yVar,
             treatments,
@@ -1335,6 +1481,7 @@ void MainWindow::resetInterface()
 {
     m_currentData.clear();
     m_currentObsData.clear();
+    m_evaluateData.clear();
     m_currentFilePath.clear();
     
     if (m_xVariableComboBox) {
@@ -1530,6 +1677,7 @@ void MainWindow::onFileSelectionChanged()
         // Clear data when no files are selected
         m_currentData.clear();
         m_currentObsData.clear();
+        m_evaluateData.clear();
 
         // Clear and update variable combo boxes
         updateVariableComboBoxes();
@@ -1565,23 +1713,18 @@ void MainWindow::onFileSelectionChanged()
     if (!selectedItems.isEmpty()) {
         qDebug() << "MainWindow::onFileSelectionChanged() - Processing" << selectedItems.size() << "selected files...";
         
-        // Clear previous data
-        m_currentData.clear();
-        m_currentObsData.clear();
+        // Clear previous data - separate storage for different file types
+        m_currentData.clear();  // For time series (regular .OUT files)
+        m_currentObsData.clear();  // For time series observed data
+        m_evaluateData.clear();  // For scatter plots (EVALUATE.OUT files)
         
-        // Load and merge data from all selected files
+        // Load and merge data from all selected files, separating by type
         QSet<QString> uniqueExperimentCodes;
         QMap<QString, QMap<QString, QString>> extractedTreatmentNames;
         QString firstValidFile;
-        
-        // Check if selected file is EVALUATE.OUT
-        bool isEvaluateFile = false;
-        if (!selectedItems.isEmpty()) {
-            QString firstSelectedFile = selectedItems.first()->text();
-            QString upperFileName = firstSelectedFile.toUpper();
-            isEvaluateFile = upperFileName.contains("EVALUATE") || upperFileName == "EVALUATE.OUT";
-            qDebug() << "MainWindow::onFileSelectionChanged() - Is EVALUATE file:" << isEvaluateFile;
-        }
+        QString firstValidRegularFile;  // For observed data lookup
+        bool hasEvaluateFile = false;
+        bool hasRegularFile = false;
         
         for (QListWidgetItem* selectedItem : selectedItems) {
             QString selectedFile = selectedItem->text();
@@ -1603,7 +1746,20 @@ void MainWindow::onFileSelectionChanged()
                 }
                 qDebug() << "MainWindow: Selected simulated file path:" << filePath;
                 
-                // Load data from current file
+                // Check if THIS specific file is EVALUATE.OUT (not just the first one)
+                QString upperFileName = selectedFile.toUpper();
+                bool isEvaluateFile = upperFileName.contains("EVALUATE") || upperFileName == "EVALUATE.OUT";
+                if (isEvaluateFile) {
+                    hasEvaluateFile = true;
+                } else {
+                    hasRegularFile = true;
+                    if (firstValidRegularFile.isEmpty()) {
+                        firstValidRegularFile = filePath;
+                    }
+                }
+                qDebug() << "MainWindow::onFileSelectionChanged() - File" << selectedFile << "is EVALUATE:" << isEvaluateFile;
+                
+                // Load data from current file using appropriate reader
                 DataTable fileData;
                 bool readSuccess = false;
                 if (isEvaluateFile) {
@@ -1621,17 +1777,25 @@ void MainWindow::onFileSelectionChanged()
                         firstValidFile = filePath;
                     }
                     
-                    // Merge this file's data with m_currentData
-                    if (m_currentData.rowCount == 0) {
-                        // First file - copy entirely
-                        m_currentData = fileData;
+                    // Store data in appropriate location based on file type
+                    if (isEvaluateFile) {
+                        // Store EVALUATE.OUT data separately for scatter plots
+                        if (m_evaluateData.rowCount == 0) {
+                            m_evaluateData = fileData;
+                        } else {
+                            m_evaluateData.merge(fileData);
+                        }
                     } else {
-                        // Subsequent files - merge data
-                        m_currentData.merge(fileData);
+                        // Store regular .OUT data for time series plots
+                        if (m_currentData.rowCount == 0) {
+                            m_currentData = fileData;
+                        } else {
+                            m_currentData.merge(fileData);
+                        }
                     }
                     
-                    // Extract experiment codes and treatment names from this file
-                    if (fileData.columnNames.contains("EXPERIMENT") && fileData.columnNames.contains("TRT") && fileData.columnNames.contains("TNAME")) {
+                    // Extract experiment codes and treatment names from this file (only for regular files)
+                    if (!isEvaluateFile && fileData.columnNames.contains("EXPERIMENT") && fileData.columnNames.contains("TRT") && fileData.columnNames.contains("TNAME")) {
                         const DataColumn* expCol = fileData.getColumn("EXPERIMENT");
                         const DataColumn* trtCol = fileData.getColumn("TRT");
                         const DataColumn* tnameCol = fileData.getColumn("TNAME");
@@ -1657,6 +1821,7 @@ void MainWindow::onFileSelectionChanged()
             }
         }
         
+        // Process regular .OUT files (for time series plots)
         if (m_currentData.rowCount > 0) {
             qDebug() << "MainWindow::onFileSelectionChanged() - Merged data from" << selectedItems.size() << "files, total rows:" << m_currentData.rowCount;
             qDebug() << "MainWindow: Extracted unique Experiment Codes from all files:" << QList<QString>(uniqueExperimentCodes.values());
@@ -1715,15 +1880,15 @@ void MainWindow::onFileSelectionChanged()
                 qDebug() << "MainWindow: Added CROP column with code:" << cropCode << "to simulated data";
             }
 
-            // Attempt to load and merge observed data for each unique experiment code
+            // Attempt to load and merge observed data for each unique experiment code (only for regular files)
             // Special handling for SensWork files
             if (m_selectedFolder.compare("SensWork", Qt::CaseInsensitive) == 0) {
                 qDebug() << "MainWindow: Detected SensWork folder - using dynamic observed data lookup";
                 
                 // For SensWork, use the dynamic observed data lookup
-                if (!firstValidFile.isEmpty()) {
+                if (!firstValidRegularFile.isEmpty()) {
                     DataTable sensWorkObsData;
-                    if (m_dataProcessor->readSensWorkObservedData(firstValidFile, sensWorkObsData)) {
+                    if (m_dataProcessor->readSensWorkObservedData(firstValidRegularFile, sensWorkObsData)) {
                         m_currentObsData.merge(sensWorkObsData);
                         qDebug() << "MainWindow: Successfully loaded SensWork observed data:" << sensWorkObsData.rowCount << "rows";
                     } else {
@@ -1734,8 +1899,8 @@ void MainWindow::onFileSelectionChanged()
                 // Regular crop folder - use standard observed data lookup
                 for (const QString& expCode : uniqueExperimentCodes) {
                     DataTable tempObsData;
-                    // Use the first valid file path for observed data lookup
-                    if (!firstValidFile.isEmpty() && m_dataProcessor->readObservedData(firstValidFile, expCode, cropCode, tempObsData)) {
+                    // Use the first valid regular file path for observed data lookup
+                    if (!firstValidRegularFile.isEmpty() && m_dataProcessor->readObservedData(firstValidRegularFile, expCode, cropCode, tempObsData)) {
                         m_currentObsData.merge(tempObsData);
                     }
                 }
@@ -1746,31 +1911,90 @@ void MainWindow::onFileSelectionChanged()
                 qDebug() << "MainWindow: Adding DAS/DAP columns to observed data";
                 m_dataProcessor->addDasDapColumns(m_currentObsData, m_currentData);
             }
-
-            // Update variable combo boxes after observed data is loaded to show asterisk indicators
-            updateVariableComboBoxes();
+        }
+        
+        // Process EVALUATE.OUT files (for scatter plots)
+        if (m_evaluateData.rowCount > 0) {
+            qDebug() << "MainWindow::onFileSelectionChanged() - Loaded EVALUATE.OUT data, total rows:" << m_evaluateData.rowCount;
+        }
+        
+        // Update variable combo boxes based on current tab
+        updateVariableComboBoxes();
+        if (hasRegularFile) {
             updateTreatmentComboBox();
+        }
 
-            // Mark data as needing refresh for the data table, but don't set it yet
-            markDataNeedsRefresh();
-            qDebug() << "MainWindow::onFileSelectionChanged() - Data loaded from" << selectedItems.size() << "files, marked for table refresh.";
-            qDebug() << "MainWindow::onFileSelectionChanged() - Function completed successfully; table data not yet set.";
-
-            // Check if we should auto-switch to scatter plot tab for EVALUATE.OUT files
-            checkAndAutoSwitchToScatterPlot();
-            
-            // Show prompt message based on current tab
-            if (m_tabWidget && m_tabWidget->currentIndex() == 0) {
-                m_statusWidget->showInfo(QString("Loaded %1 file(s). Select variables and click 'Refresh Plot' to view time series").arg(selectedItems.size()));
-            } else if (m_tabWidget && m_tabWidget->currentIndex() == 1) {
-                m_statusWidget->showInfo(QString("Loaded %1 file(s). Click 'Refresh Data' to view data table").arg(selectedItems.size()));
-            } else if (m_tabWidget && m_tabWidget->currentIndex() == 2) {
-                // Scatter Plot tab
-                if (isEvaluateFile) {
-                    m_statusWidget->showInfo(QString("Loaded EVALUATE.OUT file. Select X and Y variables and click 'Refresh Plot' to view scatter plot").arg(selectedItems.size()));
+        // Mark data as needing refresh for the data table, but don't set it yet
+        markDataNeedsRefresh();
+        qDebug() << "MainWindow::onFileSelectionChanged() - Data loaded from" << selectedItems.size() << "files";
+        qDebug() << "  Regular .OUT files:" << (hasRegularFile ? "Yes" : "No") << "rows:" << m_currentData.rowCount;
+        qDebug() << "  EVALUATE.OUT files:" << (hasEvaluateFile ? "Yes" : "No") << "rows:" << m_evaluateData.rowCount;
+        qDebug() << "MainWindow::onFileSelectionChanged() - Function completed successfully; table data not yet set.";
+        
+        // If we're on Data View tab, update file type selector and refresh data
+        if (m_tabWidget && m_tabWidget->currentIndex() == 1) {
+            // Update file type selector based on available data
+            if (m_dataViewFileTypeComboBox) {
+                bool hasRegular = (m_currentData.rowCount > 0);
+                bool hasEvaluate = (m_evaluateData.rowCount > 0);
+                
+                if (hasRegular && hasEvaluate) {
+                    // Both available - enable selector
+                    m_dataViewFileTypeComboBox->setEnabled(true);
+                } else if (hasEvaluate) {
+                    // Only EVALUATE.OUT - disable selector and set to evaluate
+                    m_dataViewFileTypeComboBox->setEnabled(false);
+                    m_dataViewFileTypeComboBox->setCurrentIndex(1); // EVALUATE.OUT
+                } else if (hasRegular) {
+                    // Only regular .OUT - disable selector and set to regular
+                    m_dataViewFileTypeComboBox->setEnabled(false);
+                    m_dataViewFileTypeComboBox->setCurrentIndex(0); // Regular .OUT
                 } else {
-                    m_statusWidget->showInfo(QString("Loaded %1 file(s). Select X and Y variables and click 'Refresh Plot' to view scatter plot").arg(selectedItems.size()));
+                    // No data - disable selector
+                    m_dataViewFileTypeComboBox->setEnabled(false);
                 }
+            }
+            
+            // Refresh data table based on selected file type
+            if (m_dataTableWidget) {
+                onDataViewFileTypeChanged();
+            }
+        }
+
+        // Check if we're in command line mode (file selection UI is hidden)
+        bool isCommandLineMode = (m_cropGroup && !m_cropGroup->isVisible()) || 
+                                 (m_fileGroup && !m_fileGroup->isVisible());
+        
+        // Auto-switch to scatter plot tab in command line mode if only EVALUATE.OUT files are selected
+        if (isCommandLineMode && hasEvaluateFile && !hasRegularFile) {
+            if (m_tabWidget) {
+                m_tabWidget->setCurrentIndex(2); // Switch to scatter plot tab
+                qDebug() << "MainWindow::onFileSelectionChanged() - Command line mode: Auto-switched to scatter plot tab for EVALUATE.OUT files";
+                // Update variables for scatter plot tab after switching
+                updateVariableComboBoxes();
+            }
+        }
+        
+        // Show prompt message based on current tab
+        if (m_tabWidget && m_tabWidget->currentIndex() == 0) {
+            if (hasRegularFile) {
+                m_statusWidget->showInfo(QString("Loaded %1 regular .OUT file(s) for time series plots. Select variables and click 'Refresh Plot'.").arg(selectedItems.size()));
+            } else if (hasEvaluateFile) {
+                if (isCommandLineMode) {
+                    // In command line mode, we already switched tabs, so this message won't show
+                    m_statusWidget->showInfo("EVALUATE.OUT files selected. Switched to Scatter Plot tab.");
+                } else {
+                    m_statusWidget->showInfo("EVALUATE.OUT files selected. Switch to Scatter Plot tab to view scatter plots.");
+                }
+            }
+        } else if (m_tabWidget && m_tabWidget->currentIndex() == 1) {
+            m_statusWidget->showInfo(QString("Loaded %1 file(s). Click 'Refresh Data' to view data table").arg(selectedItems.size()));
+        } else if (m_tabWidget && m_tabWidget->currentIndex() == 2) {
+            // Scatter Plot tab
+            if (hasEvaluateFile) {
+                m_statusWidget->showInfo(QString("Loaded %1 EVALUATE.OUT file(s). Select X and Y variables and click 'Refresh Plot' to view scatter plot").arg(selectedItems.size()));
+            } else {
+                m_statusWidget->showInfo("No EVALUATE.OUT files selected. Please select EVALUATE.OUT files for scatter plots.");
             }
         }
     }
@@ -2161,14 +2385,16 @@ void MainWindow::hideFileSelectionUI(bool hide)
         qDebug() << "MainWindow: Hidden crop and file selection UI for command line mode";
         // Make Y variable list expand to fill available space
         if (m_yVariableComboBox) {
-            m_yVariableComboBox->setMinimumHeight(400);
+            m_yVariableComboBox->setMinimumHeight(300);  // Reduced from 400
+            m_yVariableComboBox->setMaximumHeight(600);  // Add maximum to prevent buttons from being hidden
             m_yVariableComboBox->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
         }
     } else {
         qDebug() << "MainWindow: Showing crop and file selection UI";
         // Restore original Y variable list size
         if (m_yVariableComboBox) {
-            m_yVariableComboBox->setMinimumHeight(200);
+            m_yVariableComboBox->setMinimumHeight(150);
+            m_yVariableComboBox->setMaximumHeight(400);  // Restore maximum height
             m_yVariableComboBox->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
         }
     }
@@ -2183,5 +2409,34 @@ void MainWindow::updateTimeSeriesPlot()
         qDebug() << "MainWindow: Updated time series plot";
     } else {
         qWarning() << "MainWindow: Plot widget not initialized";
+    }
+}
+
+void MainWindow::onDataViewFileTypeChanged()
+{
+    if (!m_dataTableWidget || !m_dataViewFileTypeComboBox) {
+        return;
+    }
+    
+    QString selectedType = m_dataViewFileTypeComboBox->currentData().toString();
+    qDebug() << "MainWindow::onDataViewFileTypeChanged() - Selected file type:" << selectedType;
+    
+    if (selectedType == "evaluate") {
+        // Show EVALUATE.OUT data
+        if (m_evaluateData.rowCount > 0) {
+            DataTable emptyObsData;
+            m_dataTableWidget->setData(m_evaluateData, emptyObsData);
+            qDebug() << "MainWindow::onDataViewFileTypeChanged() - Showing EVALUATE.OUT data";
+        } else {
+            qDebug() << "MainWindow::onDataViewFileTypeChanged() - No EVALUATE.OUT data available";
+        }
+    } else {
+        // Show regular .OUT data (default)
+        if (m_currentData.rowCount > 0) {
+            m_dataTableWidget->setData(m_currentData, m_currentObsData);
+            qDebug() << "MainWindow::onDataViewFileTypeChanged() - Showing regular .OUT data";
+        } else {
+            qDebug() << "MainWindow::onDataViewFileTypeChanged() - No regular .OUT data available";
+        }
     }
 }
