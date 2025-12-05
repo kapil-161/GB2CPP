@@ -1,6 +1,6 @@
 #include "MetricsDialog.h"
 
-MetricsDialog::MetricsDialog(const QVariantList& metricsData, QWidget* parent)
+MetricsDialog::MetricsDialog(const QVariantList& metricsData, bool isScatterPlot, QWidget* parent)
     : QDialog(parent)
     , m_layout(nullptr)
     , m_metricsWidget(nullptr)
@@ -12,7 +12,7 @@ MetricsDialog::MetricsDialog(const QVariantList& metricsData, QWidget* parent)
     setupUI();
     
     if (!metricsData.isEmpty()) {
-        m_metricsWidget->setMetrics(metricsData);
+        m_metricsWidget->setMetrics(metricsData, isScatterPlot);
     }
 }
 
@@ -30,9 +30,9 @@ void MetricsDialog::setupUI()
     m_layout->addWidget(m_buttonBox);
 }
 
-void MetricsDialog::setMetrics(const QVariantList& metricsData)
+void MetricsDialog::setMetrics(const QVariantList& metricsData, bool isScatterPlot)
 {
     if (m_metricsWidget) {
-        m_metricsWidget->setMetrics(metricsData);
+        m_metricsWidget->setMetrics(metricsData, isScatterPlot);
     }
 }

@@ -1033,6 +1033,13 @@ QStringList DataProcessor::prepareOutFiles(const QString &folderName)
         
         // Only apply strict filename filtering to .OUT files
         if (extension == "OUT") {
+            // Always allow EVALUATE.OUT files (they're for scatter plots, not time series)
+            if (baseName.contains("evaluate")) {
+                outFiles.append(file);
+                qDebug() << "prepareOutFiles: Allowing EVALUATE.OUT file:" << file;
+                continue;
+            }
+            
             // Check for definitely non-plottable filename patterns
             for (const QString &pattern : definitelyNonPlottablePatterns) {
                 if (baseName.contains(pattern)) {
@@ -2397,4 +2404,161 @@ QMap<QString, QString> DataProcessor::getOutfileDescriptions()
     
     qDebug() << "DataProcessor::getOutfileDescriptions() - Loaded" << outfileDescriptions.size() << "descriptions from" << outfilePath;
     return outfileDescriptions;
+}
+
+bool DataProcessor::readEvaluateFile(const QString &filePath, DataTable &table)
+{
+    // EVALUATE.OUT files are standard .OUT files, so use readOutFile
+    return readOutFile(filePath, table);
+}
+
+QVector<QMap<QString, QString>> DataProcessor::getEvaluateVariablePairs(const DataTable &evaluateData)
+{
+    QVector<QMap<QString, QString>> pairs;
+    
+    // Metadata columns to exclude (EXCODE, TRT, CR, RN are metadata in EVALUATE.OUT)
+    QStringList metadataColumns = {"RUN", "TRNO", "EXPNO", "EXPERIMENT", "TREATMENT", "TRTNO", "TRT", "EXP", 
+                                   "EXCODE", "CR", "RN"};
+    
+    // Find all simulated variables (ending with 'S')
+    QStringList simVariables;
+    QStringList measVariables;
+    
+    for (const QString &colName : evaluateData.columnNames) {
+        QString upperCol = colName.toUpper();
+        
+        // Skip metadata columns
+        if (metadataColumns.contains(upperCol)) {
+            continue;
+        }
+        
+        // Check if it's a simulated variable (ends with 'S')
+        if (upperCol.endsWith("S") && upperCol.length() > 1) {
+            simVariables.append(colName);
+        }
+        // Check if it's a measured variable (ends with 'M')
+        else if (upperCol.endsWith("M") && upperCol.length() > 1) {
+            measVariables.append(colName);
+        }
+    }
+    
+    // Match simulated and measured variables
+    for (const QString &simVar : simVariables) {
+        QString baseName = simVar.left(simVar.length() - 1);  // Remove 'S' or 's'
+        QString measVar = baseName + "M";  // Add 'M'
+        
+        // Check if corresponding measured variable exists
+        bool found = false;
+        for (const QString &mVar : measVariables) {
+            if (mVar.compare(measVar, Qt::CaseInsensitive) == 0) {
+                found = true;
+                measVar = mVar;  // Use actual case from data
+                break;
+            }
+        }
+        
+        if (!found) {
+            continue;  // Skip if no matching measured variable
+        }
+        
+        // Validate the pair: both must have data
+        const DataColumn *simCol = evaluateData.getColumn(simVar);
+        const DataColumn *measCol = evaluateData.getColumn(measVar);
+        
+        if (!simCol || !measCol) {
+            continue;
+        }
+        
+        // Check if both columns have valid data (not all missing)
+        bool simHasData = false;
+        bool measHasData = false;
+        int validPairs = 0;
+        bool allIdentical = true;
+        double firstValue = 0.0;
+        bool firstValueSet = false;
+        
+        for (int i = 0; i < evaluateData.rowCount; ++i) {
+            QVariant simVal = simCol->data.value(i);
+            QVariant measVal = measCol->data.value(i);
+            
+            if (!isMissingValue(simVal)) {
+                simHasData = true;
+            }
+            if (!isMissingValue(measVal)) {
+                measHasData = true;
+            }
+            
+            // Check for valid overlapping pairs
+            if (!isMissingValue(simVal) && !isMissingValue(measVal)) {
+                validPairs++;
+                double simDbl = toDouble(simVal);
+                double measDbl = toDouble(measVal);
+                
+                if (!firstValueSet) {
+                    firstValue = simDbl;
+                    firstValueSet = true;
+                } else if (qAbs(simDbl - firstValue) > 1e-6) {
+                    allIdentical = false;
+                }
+            }
+        }
+        
+        // Only add pair if both have data, have overlapping points, and aren't all identical
+        if (simHasData && measHasData && validPairs > 0 && !allIdentical) {
+            // Get display name from variable info
+            QPair<QString, QString> varInfo = getVariableInfo(baseName);
+            QString displayName = varInfo.first.isEmpty() ? baseName : varInfo.first;
+            
+            QMap<QString, QString> pair;
+            pair["display_name"] = displayName;
+            pair["sim_variable"] = simVar;
+            pair["meas_variable"] = measVar;
+            pairs.append(pair);
+        }
+    }
+    
+    return pairs;
+}
+
+QVector<QPair<QString, QString>> DataProcessor::getAllEvaluateVariables(const DataTable &evaluateData)
+{
+    QVector<QPair<QString, QString>> variables;
+    
+    // Metadata columns to exclude (EXCODE, TRT, CR, RN are metadata in EVALUATE.OUT)
+    QStringList metadataColumns = {"RUN", "TRNO", "EXPNO", "EXPERIMENT", "TREATMENT", "TRTNO", "TRT", "EXP", 
+                                   "EXCODE", "CR", "RN"};
+    
+    for (const QString &colName : evaluateData.columnNames) {
+        QString upperCol = colName.toUpper();
+        
+        // Skip metadata columns
+        if (metadataColumns.contains(upperCol)) {
+            continue;
+        }
+        
+        // Check if column has at least some data
+        const DataColumn *col = evaluateData.getColumn(colName);
+        if (!col) {
+            continue;
+        }
+        
+        bool hasData = false;
+        for (int i = 0; i < evaluateData.rowCount; ++i) {
+            QVariant val = col->data.value(i);
+            if (!isMissingValue(val)) {
+                hasData = true;
+                break;
+            }
+        }
+        
+        if (hasData) {
+            // Get human-readable label
+            QPair<QString, QString> varInfo = getVariableInfo(colName);
+            QString displayName = varInfo.first.isEmpty() ? colName : varInfo.first;
+            
+            variables.append(qMakePair(displayName, colName));
+        }
+    }
+    
+    return variables;
 }

@@ -203,8 +203,16 @@ int main(int argc, char *argv[])
         setupApplicationIcon(app);
         setupApplicationStyle(app);
         
-        // Create and show main window
+        // Create main window
         MainWindow window;
+        
+        // Check for command line args before showing window
+        // This allows us to hide UI elements before they're visible
+        // Simple check: if we have at least 2 args (program name + params), hide UI
+        if (app.arguments().size() >= 2) {
+            // Hide file selection UI before window is shown to prevent any visible change
+            window.hideFileSelectionUI(true);
+        }
         
         // Center window on screen
         centerWindow(&window);
@@ -212,7 +220,7 @@ int main(int argc, char *argv[])
         // Show window
         window.show();
         
-        // Setup command line integration
+        // Setup command line integration (will apply args after UI is ready)
         CommandLineHandler cmdHandler;
         cmdHandler.setupCommandLineIntegration(&window, app.arguments());
         

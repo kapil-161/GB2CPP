@@ -23,7 +23,7 @@ class MetricsTableModel : public QAbstractTableModel
     Q_OBJECT
 
 public:
-    explicit MetricsTableModel(const QVariantList& data, QObject* parent = nullptr);
+    explicit MetricsTableModel(const QVariantList& data, bool isScatterPlot = false, QObject* parent = nullptr);
 
     // QAbstractTableModel interface
     int rowCount(const QModelIndex& parent = QModelIndex()) const override;
@@ -47,7 +47,7 @@ class MetricsTableWidget : public QWidget
 public:
     explicit MetricsTableWidget(QWidget* parent = nullptr);
 
-    void setMetrics(const QVariantList& metricsData);
+    void setMetrics(const QVariantList& metricsData, bool isScatterPlot = false);
     void clear();
 
 private slots:

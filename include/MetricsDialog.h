@@ -12,9 +12,9 @@ class MetricsDialog : public QDialog
     Q_OBJECT
 
 public:
-    explicit MetricsDialog(const QVariantList& metricsData = QVariantList(), QWidget* parent = nullptr);
+    explicit MetricsDialog(const QVariantList& metricsData = QVariantList(), bool isScatterPlot = false, QWidget* parent = nullptr);
     
-    void setMetrics(const QVariantList& metricsData);
+    void setMetrics(const QVariantList& metricsData, bool isScatterPlot = false);
 
 private:
     void setupUI();

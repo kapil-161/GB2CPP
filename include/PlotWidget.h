@@ -138,6 +138,15 @@ public:
         const QMap<QString, QMap<QString, QString>> &treatmentNames = QMap<QString, QMap<QString, QString>>()
     );
     
+    // Scatter plot function for model evaluation (simulated vs measured)
+    void plotScatter(
+        const DataTable &evaluateData,
+        const QString &xVar,
+        const QString &yVar,
+        const QStringList &selectedTreatments = QStringList(),
+        const QMap<QString, QMap<QString, QString>> &treatmentNames = QMap<QString, QMap<QString, QString>>()
+    );
+    
     void setData(const DataTable &data);
     void setupAxes(const QString &xVar);
     void autoFitAxes();
@@ -162,6 +171,7 @@ public:
     void setShowGrid(bool show);
     void setPlotTitle(const QString &title);
     void setAxisTitles(const QString &xTitle, const QString &yTitle);
+    void setXAxisButtonsVisible(bool visible);  // Show/hide DAS, DAP, DATE buttons
     
     // Simple legend functionality (matching Python)
     
@@ -301,6 +311,7 @@ private:
     QMap<QString, QColor> m_treatmentColorMap;
     PlotSettings m_plotSettings;
     int m_maxLegendEntries;
+    bool m_isScatterMode;
     
     // Data processor reference
     DataProcessor *m_dataProcessor;

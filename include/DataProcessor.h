@@ -56,6 +56,7 @@ public:
     bool readOutFile(const QString &filePath, DataTable &table);
     bool readOsuFile(const QString &filePath, DataTable &table);
     bool readTFile(const QString &filePath, DataTable &table);
+    bool readEvaluateFile(const QString &filePath, DataTable &table);  // Read EVALUATE.OUT file
 
     QStringList prepareFolders(bool includeExtraFolders);
     QStringList prepareOutFiles(const QString &folderName);
@@ -102,6 +103,10 @@ public: // Static utility functions
     static bool verifyDssatInstallation(const QString &basePath);
     static QMap<QString, QString> getOutfileDescriptions();
     static QString findOutfileCde();
+    
+    // EVALUATE.OUT specific functions
+    static QVector<QMap<QString, QString>> getEvaluateVariablePairs(const DataTable &evaluateData);
+    static QVector<QPair<QString, QString>> getAllEvaluateVariables(const DataTable &evaluateData);
 
 private: // Private helper functions (non-static)
     bool parseFileHeader(const QString &filePath, QStringList &headers);

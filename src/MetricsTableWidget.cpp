@@ -9,11 +9,16 @@
 #include <QUrl>
 
 // MetricsTableModel Implementation
-MetricsTableModel::MetricsTableModel(const QVariantList& data, QObject* parent)
+MetricsTableModel::MetricsTableModel(const QVariantList& data, bool isScatterPlot, QObject* parent)
     : QAbstractTableModel(parent)
     , m_data(data)
 {
-    m_headers = {"Treatment", "Treatment Name", "Experiment", "Crop", "Variable", "n", "R²", "RMSE", "d-stat"};
+    // For scatter plots, exclude Treatment and Treatment Name columns
+    if (isScatterPlot) {
+        m_headers = {"Experiment", "Crop", "Variable", "n", "R²", "RMSE", "d-stat"};
+    } else {
+        m_headers = {"Treatment", "Treatment Name", "Experiment", "Crop", "Variable", "n", "R²", "RMSE", "d-stat"};
+    }
     
     // Set up key mapping for flexible data access
     m_keyMap["Treatment"] = {"Treatment", "treatment", "trt", "TRT"};
@@ -66,10 +71,12 @@ QVariant MetricsTableModel::data(const QModelIndex& index, int role) const
         }
         
         // Numeric fields - format as numbers
-        // Special handling for R² - not calculated, always show "-"
         if (columnName == "R²") {
-            // R² is not calculated for time series data - always return "-"
-            return "-";
+            if (value.canConvert<double>()) {
+                return QString::number(value.toDouble(), 'f', 3);
+            }
+            // If R² not provided, show "-"
+            return value.toString().isEmpty() ? "-" : value.toString();
         }
         
         if (columnName == "n" || columnName == "RMSE" || columnName == "d-stat") {
@@ -224,7 +231,7 @@ void MetricsTableWidget::setupUI()
     m_layout->addWidget(m_exportButton);
 }
 
-void MetricsTableWidget::setMetrics(const QVariantList& metricsData)
+void MetricsTableWidget::setMetrics(const QVariantList& metricsData, bool isScatterPlot)
 {
     if (metricsData.isEmpty()) {
         clear();
@@ -233,7 +240,7 @@ void MetricsTableWidget::setMetrics(const QVariantList& metricsData)
     
     m_metricsData = metricsData;
     
-    MetricsTableModel* model = new MetricsTableModel(m_metricsData, this);
+    MetricsTableModel* model = new MetricsTableModel(m_metricsData, isScatterPlot, this);
     m_tableView->setModel(model);
     
     // Auto-fit columns to content initially
@@ -336,11 +343,11 @@ void MetricsTableWidget::exportMetrics()
         const QVariantMap rowData = item.toMap();
         QStringList rowValues;
         
-        // Use the model's key mapping if available, otherwise use fallback
-        MetricsTableModel* model = qobject_cast<MetricsTableModel*>(m_tableView->model());
-        
-        // Extract values for each column
-        for (const QString& header : headers) {
+    // Use the model's key mapping if available, otherwise use fallback
+    // Headers are already obtained from model above, so they respect scatter plot mode
+    
+    // Extract values for each column
+    for (const QString& header : headers) {
             QVariant value;
             
             // Extract value using same key mapping logic as the model

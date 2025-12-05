@@ -47,6 +47,7 @@ public:
     int selectOutputFiles(const QStringList &fileNames);
     void loadVariables();
     void updateTimeSeriesPlot();
+    void hideFileSelectionUI(bool hide = true);  // Hide crop and file selection UI for command line mode
     
     // Public accessors for command line handler
     QComboBox* getFolderSelector() const { return m_fileComboBox; }
@@ -83,6 +84,7 @@ private slots:
     void onUnselectAllYVars();
     void onShowMetrics();
     void updateTimeSeriesMetrics(const QVector<QMap<QString, QVariant>> &metrics);
+    void updateScatterMetrics(const QVector<QMap<QString, QVariant>> &metrics);
 
 private:
     void setupUI();
@@ -97,6 +99,8 @@ private:
     void updateVariableComboBoxes();
     void updateTreatmentComboBox();
     void updatePlot();
+    void updateScatterPlot();  // Update scatter plot for scatter plot tab
+    void checkAndAutoSwitchToScatterPlot(bool autoPlot = true);  // Auto-switch to scatter plot tab for EVALUATE.OUT files
     void resetInterface();
     void centerWindow();
     void populateFolders();
@@ -116,7 +120,7 @@ private:
     void unselectAllOutFiles();
     void unselectAllYVars();
     void refreshOutputFiles();
-    void updateTimeSeriesMetrics(const QVariantList &metricsData);
+    void updateMetricsButtonState();
     void clearMetrics();
     
     // UI Components
@@ -146,12 +150,17 @@ private:
     QPushButton *m_unselectFilesButton;     // Unselect all outfiles button
     QPushButton *m_unselectYVarsButton;     // Unselect all Y variables button
     
+    // UI groups for hiding/showing in command line mode
+    QGroupBox *m_cropGroup;                 // Crop selection group
+    QGroupBox *m_fileGroup;                 // File selection group
+    
     // Data Panel - matching Python's tab structure
     DataTableWidget *m_dataTableWidget;
     QLabel *m_dataInfoLabel;
     
     // Plot Panel (now integrated into tabs like Python)
-    PlotWidget *m_plotWidget;               // Main plotting widget (like Python PyQtGraph)
+    PlotWidget *m_plotWidget;               // Main plotting widget for time series (like Python PyQtGraph)
+    PlotWidget *m_scatterPlotWidget;       // Plotting widget for scatter plots
     
     // Status and Progress
     StatusWidget *m_statusWidget;
@@ -179,6 +188,7 @@ private:
     QStringList m_selectedTreatments;
     QString m_selectedExperiment;
     QVariantList m_timeSeriesMetrics;
+    QVariantList m_scatterMetrics;
     QVariantList m_currentMetrics;
     QMap<int, bool> m_tabContentLoaded;
     bool m_dataNeedsRefresh;

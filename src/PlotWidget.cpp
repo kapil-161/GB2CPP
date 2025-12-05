@@ -168,6 +168,7 @@ PlotWidget::PlotWidget(QWidget *parent)
     , m_currentPlotType("Line")
     , m_dataProcessor(new DataProcessor(this))
     , m_currentXVar("DAP")
+    , m_isScatterMode(false)
 {
     qDebug() << "PlotWidget::PlotWidget() - CONSTRUCTOR CALLED";
     
@@ -829,6 +830,10 @@ void PlotWidget::plotTimeSeries(
     const DataTable &obsData,
     const QMap<QString, QMap<QString, QString>> &treatmentNames)
 {
+    m_isScatterMode = false;
+    
+    // Show DAS, DAP, DATE buttons for time series plots (they're applicable)
+    setXAxisButtonsVisible(true);
     
     try {
         
@@ -1944,9 +1949,15 @@ void PlotWidget::updateLegend(const QVector<PlotData> &plotDataList)
         qDebug() << "updateLegend: Processing" << category << "data for variable" << plotData->variable 
                  << "treatment" << plotData->treatment << "name" << plotData->treatmentName;
         
-        // Ensure the plotData has valid data
-        if (plotData->variable.isEmpty() || plotData->treatment.isEmpty()) {
-            qDebug() << "updateLegend: Skipping invalid plot data - variable:" << plotData->variable << "treatment:" << plotData->treatment;
+        // For scatter mode, allow empty treatment (we group by variable only)
+        // For other modes, require both variable and treatment
+        if (plotData->variable.isEmpty()) {
+            qDebug() << "updateLegend: Skipping invalid plot data - variable is empty";
+            continue;
+        }
+        
+        if (!m_isScatterMode && plotData->treatment.isEmpty()) {
+            qDebug() << "updateLegend: Skipping invalid plot data - treatment is empty (non-scatter mode)";
             continue;
         }
         
@@ -2214,6 +2225,12 @@ void PlotWidget::clearChart()
 {
     if (m_chart) {
         m_chart->removeAllSeries();
+        
+        // Remove all existing axes to prevent accumulation
+        auto existingAxes = m_chart->axes();
+        for (auto axis : existingAxes) {
+            m_chart->removeAxis(axis);
+        }
     }
     clearLegend();
     m_scalingLabel->clear();
@@ -2234,6 +2251,10 @@ void PlotWidget::clear()
     m_simData.clear();
     m_obsData.clear();
     m_scaleFactors.clear();
+    
+    // Reset scatter mode and show buttons (they'll be hidden again if scatter mode is set)
+    m_isScatterMode = false;
+    setXAxisButtonsVisible(true);
 }
 
 void PlotWidget::exportPlot(const QString &filePath, const QString &format)
@@ -2548,6 +2569,13 @@ void PlotWidget::setShowGrid(bool show)
     }
 }
 
+void PlotWidget::setXAxisButtonsVisible(bool visible)
+{
+    if (m_dasButton) m_dasButton->setVisible(visible);
+    if (m_dapButton) m_dapButton->setVisible(visible);
+    if (m_dateButton) m_dateButton->setVisible(visible);
+}
+
 void PlotWidget::setPlotTitle(const QString &title)
 {
     if (m_chart) {
@@ -2798,28 +2826,41 @@ void PlotWidget::updateLegendAdvanced(const QMap<QString, QMap<QString, QVector<
     m_legendLayout->addWidget(legendTitle);
     
     // Create header row (matching Python)
-    QWidget* headerWidget = new QWidget();
-    QHBoxLayout* headerLayout = new QHBoxLayout();
-    headerLayout->setContentsMargins(0, 2, 0, 2);
-    headerLayout->setSpacing(5);
-    headerWidget->setLayout(headerLayout);
-    
-    QLabel* obsHeader = new QLabel("<b>Obs.</b>");
-    obsHeader->setAlignment(Qt::AlignCenter);
-    obsHeader->setFixedWidth(30);
-    
-    QLabel* simHeader = new QLabel("<b>Sim.</b>");
-    simHeader->setAlignment(Qt::AlignCenter);
-    simHeader->setFixedWidth(30);
-    
-    QLabel* trtHeader = new QLabel("<b>Treatment</b>");
-    trtHeader->setAlignment(Qt::AlignLeft);
-    
-    headerLayout->addWidget(obsHeader);
-    headerLayout->addWidget(simHeader);
-    headerLayout->addWidget(trtHeader, 1);
-    
-    m_legendLayout->addWidget(headerWidget);
+    if (m_isScatterMode) {
+        QWidget* headerWidget = new QWidget();
+        QHBoxLayout* headerLayout = new QHBoxLayout();
+        headerLayout->setContentsMargins(0, 2, 0, 2);
+        headerLayout->setSpacing(5);
+        headerWidget->setLayout(headerLayout);
+        
+        QLabel* varHeader = new QLabel("<b>Variable</b>");
+        varHeader->setAlignment(Qt::AlignLeft);
+        headerLayout->addWidget(varHeader, 1);
+        m_legendLayout->addWidget(headerWidget);
+    } else {
+        QWidget* headerWidget = new QWidget();
+        QHBoxLayout* headerLayout = new QHBoxLayout();
+        headerLayout->setContentsMargins(0, 2, 0, 2);
+        headerLayout->setSpacing(5);
+        headerWidget->setLayout(headerLayout);
+        
+        QLabel* obsHeader = new QLabel("<b>Obs.</b>");
+        obsHeader->setAlignment(Qt::AlignCenter);
+        obsHeader->setFixedWidth(30);
+        
+        QLabel* simHeader = new QLabel("<b>Sim.</b>");
+        simHeader->setAlignment(Qt::AlignCenter);
+        simHeader->setFixedWidth(30);
+        
+        QLabel* trtHeader = new QLabel("<b>Treatment</b>");
+        trtHeader->setAlignment(Qt::AlignLeft);
+        
+        headerLayout->addWidget(obsHeader);
+        headerLayout->addWidget(simHeader);
+        headerLayout->addWidget(trtHeader, 1);
+        
+        m_legendLayout->addWidget(headerWidget);
+    }
     
     // Horizontal separator (matching Python)
     QFrame* separator = new QFrame();
@@ -2859,21 +2900,27 @@ void PlotWidget::updateLegendAdvanced(const QMap<QString, QMap<QString, QVector<
                 if (plotData.isNull()) {
                     continue;
                 }
-                // Use experiment_id + trt for truly unique identification (matching Python)
-                QString expId = plotData->experiment.isEmpty() ? "default" : plotData->experiment;
-                QString cropId = plotData->crop.isEmpty() ? "XX" : plotData->crop;
-                QString uniqueKey = QString("%1__TRT%2__EXP%3__CROP%4")
-                                   .arg(plotData->treatmentName)
-                                   .arg(plotData->treatment)
-                                   .arg(expId)
-                                   .arg(cropId);
+                QString uniqueKey;
+                if (m_isScatterMode) {
+                    // For scatter plots, use variable name as key (no treatment grouping)
+                    uniqueKey = varName;
+                } else {
+                    // Use experiment_id + trt for truly unique identification (matching Python)
+                    QString expId = plotData->experiment.isEmpty() ? "default" : plotData->experiment;
+                    QString cropId = plotData->crop.isEmpty() ? "XX" : plotData->crop;
+                    uniqueKey = QString("%1__TRT%2__EXP%3__CROP%4")
+                                       .arg(plotData->treatmentName)
+                                       .arg(plotData->treatment)
+                                       .arg(expId)
+                                       .arg(cropId);
+                }
                 
                 
                 if (!varTreatments.contains(uniqueKey)) {
                     QMap<QString, QVariant> treatmentData;
                     treatmentData["name"] = plotData->treatmentName;
                     treatmentData["trt_id"] = plotData->treatment;
-                    treatmentData["experiment_id"] = expId;
+                    treatmentData["experiment_id"] = plotData->experiment.isEmpty() ? "default" : plotData->experiment;
                     treatmentData["sim"] = QVariant::fromValue(plotData);
                     treatmentData["obs"] = QVariant();
                     varTreatments[uniqueKey] = treatmentData;
@@ -2887,21 +2934,27 @@ void PlotWidget::updateLegendAdvanced(const QMap<QString, QMap<QString, QVector<
         if (legendEntries.contains("Observed") && legendEntries.value("Observed").contains(varName)) {
             const auto& obsVector = legendEntries.value("Observed").value(varName);
             for (const QSharedPointer<PlotData>& plotData : obsVector) {
-                // Use experiment_id + trt for truly unique identification (matching Python)
-                QString expId = plotData->experiment.isEmpty() ? "default" : plotData->experiment;
-                QString cropId = plotData->crop.isEmpty() ? "XX" : plotData->crop;
-                QString uniqueKey = QString("%1__TRT%2__EXP%3__CROP%4")
-                                   .arg(plotData->treatmentName)
-                                   .arg(plotData->treatment)
-                                   .arg(expId)
-                                   .arg(cropId);
+                QString uniqueKey;
+                if (m_isScatterMode) {
+                    // For scatter plots, use variable name as key (no treatment grouping)
+                    uniqueKey = varName;
+                } else {
+                    // Use experiment_id + trt for truly unique identification (matching Python)
+                    QString expId = plotData->experiment.isEmpty() ? "default" : plotData->experiment;
+                    QString cropId = plotData->crop.isEmpty() ? "XX" : plotData->crop;
+                    uniqueKey = QString("%1__TRT%2__EXP%3__CROP%4")
+                                       .arg(plotData->treatmentName)
+                                       .arg(plotData->treatment)
+                                       .arg(expId)
+                                       .arg(cropId);
+                }
                 
                 
                 if (!varTreatments.contains(uniqueKey)) {
                     QMap<QString, QVariant> treatmentData;
                     treatmentData["name"] = plotData->treatmentName;
                     treatmentData["trt_id"] = plotData->treatment;
-                    treatmentData["experiment_id"] = expId;
+                    treatmentData["experiment_id"] = plotData->experiment.isEmpty() ? "default" : plotData->experiment;
                     treatmentData["sim"] = QVariant();
                     treatmentData["obs"] = QVariant::fromValue(plotData);
                     varTreatments[uniqueKey] = treatmentData;
@@ -2936,24 +2989,54 @@ void PlotWidget::updateLegendAdvanced(const QMap<QString, QMap<QString, QVector<
             }
         }
         
-        // Variable header (matching Python)
-        QWidget* varWidget = new QWidget();
-        QHBoxLayout* varLayout = new QHBoxLayout();
-        varLayout->setContentsMargins(0, 5, 0, 2);
-        varLayout->setSpacing(5);
-        varWidget->setLayout(varLayout);
+        // For scatter plots, extract base variable name to get full name (used in row, not header)
+        QString displayName;
+        if (m_isScatterMode) {
+            // Extract base variable name (remove trailing 's' or 'm')
+            QString baseVarName = varName;
+            if (baseVarName.endsWith("s", Qt::CaseInsensitive) || baseVarName.endsWith("m", Qt::CaseInsensitive)) {
+                baseVarName.chop(1); // Remove the last character ('s' or 'm')
+            }
+            
+            // Try to get full name: first try base name (uppercase), then original variable name
+            QPair<QString, QString> baseVarInfo = DataProcessor::getVariableInfo(baseVarName.toUpper());
+            if (!baseVarInfo.first.isEmpty()) {
+                displayName = baseVarInfo.first;
+            } else {
+                // Try original variable name (uppercase)
+                QPair<QString, QString> origVarInfo = DataProcessor::getVariableInfo(varName.toUpper());
+                if (!origVarInfo.first.isEmpty()) {
+                    displayName = origVarInfo.first;
+                } else {
+                    // Fallback to base name if no info found
+                    displayName = baseVarName;
+                }
+            }
+        } else {
+            // For non-scatter plots, use original logic
+            QPair<QString, QString> varInfo = DataProcessor::getVariableInfo(varName);
+            displayName = varInfo.first.isEmpty() ? varName : varInfo.first;
+        }
         
-        varLayout->addSpacing(65); // Space for columns
-        
-        QPair<QString, QString> varInfo = DataProcessor::getVariableInfo(varName);
-        QString displayName = varInfo.first.isEmpty() ? varName : varInfo.first;
-        QLabel* varLabelWidget = new QLabel(QString("<b>%1</b>").arg(displayName));
-        varLabelWidget->setAlignment(Qt::AlignLeft);
-        varLayout->addWidget(varLabelWidget, 1);
-        
-        m_legendLayout->addWidget(varWidget);
+        // Variable header (skip for scatter plots since we show variable name in row)
+        if (!m_isScatterMode) {
+            QWidget* varWidget = new QWidget();
+            QHBoxLayout* varLayout = new QHBoxLayout();
+            varLayout->setContentsMargins(0, 5, 0, 2);
+            varLayout->setSpacing(5);
+            varWidget->setLayout(varLayout);
+            
+            varLayout->addSpacing(65); // Space for columns
+            
+            QLabel* varLabelWidget = new QLabel(QString("<b>%1</b>").arg(displayName));
+            varLabelWidget->setAlignment(Qt::AlignLeft);
+            varLayout->addWidget(varLabelWidget, 1);
+            
+            m_legendLayout->addWidget(varWidget);
+        }
         
         // Create rows for each treatment (now properly unique) (matching Python)
+        // For scatter plots, this will show the variable name with marker (no duplicate header)
         QStringList sortedKeys = varTreatments.keys();
         sortedKeys.sort();
         for (const QString& uniqueKey : sortedKeys) {
@@ -2982,6 +3065,55 @@ void PlotWidget::createLegendRowFromData(const QMap<QString, QVariant>& treatmen
     rowLayout->setSpacing(5);
     rowWidget->setLayout(rowLayout);
     rowWidget->setCursor(Qt::PointingHandCursor);
+
+    if (m_isScatterMode) {
+        // Scatter legend: single column with marker and variable name (no treatment)
+        QSharedPointer<PlotData> scatterData;
+        if (treatmentData.contains("sim") && treatmentData["sim"].isValid()) {
+            scatterData = treatmentData["sim"].value<QSharedPointer<PlotData>>();
+        } else if (treatmentData.contains("obs") && treatmentData["obs"].isValid()) {
+            scatterData = treatmentData["obs"].value<QSharedPointer<PlotData>>();
+        }
+
+        QWidget* symbolWidget = new QWidget();
+        symbolWidget->setFixedWidth(30);
+        QHBoxLayout* symbolLayout = new QHBoxLayout();
+        symbolLayout->setContentsMargins(0, 0, 0, 0);
+        symbolLayout->setAlignment(Qt::AlignCenter);
+        symbolWidget->setLayout(symbolLayout);
+
+        if (scatterData) {
+            QString tooltip = QString("Variable: %1").arg(displayName);
+            LegendSampleWidget* sample = new LegendSampleWidget(
+                true,
+                scatterData->pen,
+                scatterData->symbol,
+                scatterData->brush,
+                tooltip
+            );
+            symbolLayout->addWidget(sample);
+        }
+
+        // Show variable name instead of treatment name
+        QLabel* varLabel = new QLabel(displayName);
+        varLabel->setAlignment(Qt::AlignLeft | Qt::AlignVCenter);
+
+        rowLayout->addWidget(symbolWidget);
+        rowLayout->addWidget(varLabel, 1);
+
+        QVector<QAbstractSeries*> toggleItems;
+        if (scatterData && scatterData->series) {
+            toggleItems.append(scatterData->series);
+        }
+
+        rowWidget->setProperty("seriesToHighlight", QVariant::fromValue(toggleItems));
+        rowWidget->setProperty("varName", varName);
+        rowWidget->setProperty("trtId", ""); // No treatment ID for scatter plots
+        rowWidget->installEventFilter(this);
+
+        m_legendLayout->addWidget(rowWidget);
+        return;
+    }
     
     // Observed column
     QWidget* obsWidget = new QWidget();
@@ -3946,4 +4078,322 @@ void PlotWidget::setXAxisVariable(const QString &xVar)
     }
 }
 
+void PlotWidget::plotScatter(
+    const DataTable &evaluateData,
+    const QString &xVar,
+    const QString &yVar,
+    const QStringList &selectedTreatments,
+    const QMap<QString, QMap<QString, QString>> &treatmentNames)
+{
+        qDebug() << "PlotWidget::plotScatter() - ENTRY";
+        m_isScatterMode = true;
+        
+        // Hide DAS, DAP, DATE buttons for scatter plots (not applicable)
+        setXAxisButtonsVisible(false);
+        qDebug() << "  X Variable:" << xVar;
+        qDebug() << "  Y Variable:" << yVar;
+        qDebug() << "  Treatments:" << selectedTreatments;
+        qDebug() << "  Data row count:" << evaluateData.rowCount;
+        qDebug() << "  Available columns:" << evaluateData.columnNames;
+        
+        try {
+            clear();
+            
+            if (evaluateData.rowCount == 0) {
+                qWarning() << "PlotWidget: No data available for scatter plot";
+                return;
+            }
+            
+            const DataColumn *xCol = evaluateData.getColumn(xVar);
+            const DataColumn *yCol = evaluateData.getColumn(yVar);
+            
+            qDebug() << "PlotWidget::plotScatter() - X column found:" << (xCol != nullptr);
+            qDebug() << "PlotWidget::plotScatter() - Y column found:" << (yCol != nullptr);
+            
+            if (!xCol || !yCol) {
+                qWarning() << "PlotWidget: X or Y column not found";
+                qWarning() << "  X column name:" << xVar << "exists:" << evaluateData.columnNames.contains(xVar);
+                qWarning() << "  Y column name:" << yVar << "exists:" << evaluateData.columnNames.contains(yVar);
+                return;
+            }
+        
+        // Get experiment code column (EXCODE in EVALUATE.OUT) for metrics
+        const DataColumn *excodeCol = evaluateData.getColumn("EXCODE");
+        const DataColumn *crCol = evaluateData.getColumn("CR");  // Crop code
+        
+        // Collect all data points (not grouped by treatment) and by experiment (for metrics)
+        QVector<QPointF> allPoints;
+        QMap<QString, QVector<QPointF>> experimentPoints;
+        QMap<QString, QString> experimentCropCodes;
+        
+        int validPointCount = 0;
+        for (int i = 0; i < evaluateData.rowCount; ++i) {
+            QVariant xVal = xCol->data.value(i);
+            QVariant yVal = yCol->data.value(i);
+            
+            // Skip missing values
+            if (DataProcessor::isMissingValue(xVal) || DataProcessor::isMissingValue(yVal)) {
+                continue;
+            }
+            
+            bool okX, okY;
+            double x = DataProcessor::toDouble(xVal, &okX);
+            double y = DataProcessor::toDouble(yVal, &okY);
+            
+            if (!okX || !okY) {
+                qDebug() << "PlotWidget::plotScatter() - Row" << i << "failed conversion: x=" << xVal << "y=" << yVal;
+                continue;
+            }
+            
+            validPointCount++;
+            
+            // Get experiment code and crop for metrics
+            QString expCode = "";
+            QString cropCode = "";
+            if (excodeCol && i < excodeCol->data.size()) {
+                QVariant excodeVal = excodeCol->data.value(i);
+                if (!DataProcessor::isMissingValue(excodeVal)) {
+                    expCode = excodeVal.toString();
+                }
+            }
+            if (crCol && i < crCol->data.size()) {
+                QVariant crVal = crCol->data.value(i);
+                if (!DataProcessor::isMissingValue(crVal)) {
+                    cropCode = crVal.toString();
+                }
+            }
+            
+            // Create experiment key (use experiment code when available)
+            QString experimentKey = expCode.isEmpty() ? QString("Experiment") : expCode;
+
+            // Add point to all points (no treatment filtering)
+            allPoints.append(QPointF(x, y));
+
+            experimentPoints[experimentKey].append(QPointF(x, y));
+            if (!cropCode.isEmpty()) {
+                experimentCropCodes[experimentKey] = cropCode;
+            }
+        }
+        
+        qDebug() << "PlotWidget::plotScatter() - Valid points found:" << validPointCount;
+        
+        if (allPoints.isEmpty()) {
+            qWarning() << "PlotWidget: No valid data points for scatter plot";
+            qWarning() << "  Total rows processed:" << evaluateData.rowCount;
+            qWarning() << "  Valid points found:" << validPointCount;
+            return;
+        }
+        
+        // Chart is already cleared by clear() call at the beginning of this function
+        // Just ensure plotDataList is cleared
+        m_plotDataList.clear();
+        
+        // Create a single scatter series for all points with one shape marker
+        // Extract base variable name (remove trailing 's' or 'm') to get full name
+        QString baseVarName = yVar;
+        if (baseVarName.endsWith("s", Qt::CaseInsensitive) || baseVarName.endsWith("m", Qt::CaseInsensitive)) {
+            baseVarName.chop(1); // Remove the last character ('s' or 'm')
+        }
+        
+        // Try to get full name: first try base name (uppercase), then original variable name
+        QPair<QString, QString> baseVarInfo = DataProcessor::getVariableInfo(baseVarName.toUpper());
+        QString yTitle;
+        if (!baseVarInfo.first.isEmpty()) {
+            yTitle = baseVarInfo.first;
+        } else {
+            // Try original variable name (uppercase)
+            QPair<QString, QString> origVarInfo = DataProcessor::getVariableInfo(yVar.toUpper());
+            if (!origVarInfo.first.isEmpty()) {
+                yTitle = origVarInfo.first;
+            } else {
+                // Fallback to base name if no info found
+                yTitle = baseVarName;
+            }
+        }
+        
+        // Use a default color (blue) for all points
+        QColor pointColor = QColor("#1f77b4"); // Default blue color
+        
+        QScatterSeries *scatterSeries = new QScatterSeries();
+        scatterSeries->setUseOpenGL(false);
+        scatterSeries->setName(yTitle); // Use base variable full name instead of treatment
+        scatterSeries->setColor(pointColor);
+        scatterSeries->setMarkerSize(8.0);
+        scatterSeries->setMarkerShape(QScatterSeries::MarkerShapeCircle);
+        scatterSeries->setPen(QPen(pointColor, 2));
+        scatterSeries->setBrush(QBrush(pointColor));
+        
+        for (const QPointF &point : allPoints) {
+            scatterSeries->append(point);
+        }
+        
+        m_chart->addSeries(scatterSeries);
+        
+        // Store plot data for legend (variable-based, not treatment-based)
+        QSharedPointer<PlotData> plotData = QSharedPointer<PlotData>::create();
+        plotData->treatment = ""; // No treatment grouping
+        plotData->treatmentName = yTitle; // Use variable name
+        plotData->variable = yVar;
+        plotData->points = allPoints;
+        plotData->color = pointColor;
+        plotData->isObserved = false;
+        plotData->series = scatterSeries;
+        plotData->pen = QPen(pointColor, 2);
+        plotData->brush = QBrush(pointColor);
+        plotData->symbol = "o";
+        m_plotDataList.append(plotData);
+        
+        // Add 1:1 reference line
+        QLineSeries *referenceLine = new QLineSeries();
+        referenceLine->setName("1:1 Line");
+        referenceLine->setColor(Qt::black);
+        QPen refPen(Qt::black, 2, Qt::DashLine);
+        referenceLine->setPen(refPen);
+        
+        // Find min and max values for reference line
+        double minVal = std::numeric_limits<double>::max();
+        double maxVal = std::numeric_limits<double>::lowest();
+        
+        for (const QPointF &point : allPoints) {
+            minVal = qMin(minVal, qMin(point.x(), point.y()));
+            maxVal = qMax(maxVal, qMax(point.x(), point.y()));
+        }
+        
+        // Handle case where all values are the same (or very close)
+        double range = maxVal - minVal;
+        double padding;
+        if (range < 1e-10) {
+            // All points are at the same location - create a visible range around the value
+            double center = minVal; // minVal == maxVal in this case
+            if (qAbs(center) < 1e-10) {
+                // Value is near zero, use a small range around zero
+                minVal = -1.0;
+                maxVal = 1.0;
+            } else {
+                // Use 5% of the absolute value as padding (smaller padding for better visibility)
+                padding = qAbs(center) * 0.05;
+                if (padding < 1.0) {
+                    padding = 1.0; // Minimum 1 unit padding
+                }
+                minVal = center - padding;
+                maxVal = center + padding;
+            }
+        } else {
+            // Normal case - add padding
+            padding = range * 0.1;
+            minVal -= padding;
+            maxVal += padding;
+        }
+        
+        referenceLine->append(minVal, minVal);
+        referenceLine->append(maxVal, maxVal);
+        m_chart->addSeries(referenceLine);
+        
+        qDebug() << "PlotWidget::plotScatter() - Axis range: min=" << minVal << "max=" << maxVal;
+        
+        // Setup axes
+        QValueAxis *xAxis = new QValueAxis();
+        QValueAxis *yAxis = new QValueAxis();
+        
+        // Extract base variable name for X axis (remove trailing 'm')
+        QString baseXVarName = xVar;
+        if (baseXVarName.endsWith("m", Qt::CaseInsensitive)) {
+            baseXVarName.chop(1); // Remove the last character ('m')
+        }
+        
+        // Try to get full name: first try base name (uppercase), then original variable name
+        QPair<QString, QString> baseXVarInfo = DataProcessor::getVariableInfo(baseXVarName.toUpper());
+        QString xTitle;
+        if (!baseXVarInfo.first.isEmpty()) {
+            xTitle = baseXVarInfo.first;
+        } else {
+            // Try original variable name (uppercase)
+            QPair<QString, QString> origXVarInfo = DataProcessor::getVariableInfo(xVar.toUpper());
+            if (!origXVarInfo.first.isEmpty()) {
+                xTitle = origXVarInfo.first;
+            } else {
+                // Fallback to base name if no info found
+                xTitle = baseXVarName;
+            }
+        }
+        // yTitle already declared above (using base variable name)
+        
+        // Add "(measured)" to X-axis and "(simulated)" to Y-axis for scatter plots
+        xAxis->setTitleText(xTitle + " (measured)");
+        yAxis->setTitleText(yTitle + " (simulated)");
+        
+        // Set axis ranges
+        xAxis->setRange(minVal, maxVal);
+        yAxis->setRange(minVal, maxVal);
+        
+        // Add axes to chart (using non-deprecated method)
+        m_chart->addAxis(xAxis, Qt::AlignBottom);
+        m_chart->addAxis(yAxis, Qt::AlignLeft);
+        
+        // Attach series to axes
+        for (QAbstractSeries *series : m_chart->series()) {
+            if (series != referenceLine) {
+                static_cast<QXYSeries*>(series)->attachAxis(xAxis);
+                static_cast<QXYSeries*>(series)->attachAxis(yAxis);
+            }
+        }
+        referenceLine->attachAxis(xAxis);
+        referenceLine->attachAxis(yAxis);
+        
+        // Calculate metrics for each experiment (since scatter data has one point per treatment)
+        QVector<QMap<QString, QVariant>> metrics;
+        for (auto it = experimentPoints.begin(); it != experimentPoints.end(); ++it) {
+            QString experimentKey = it.key();
+            QVector<QPointF> points = it.value();
+            
+            QVector<double> xValues, yValues;
+            for (const QPointF &point : points) {
+                xValues.append(point.x());
+                yValues.append(point.y());
+            }
+            
+            // Calculate metrics (X = measured, Y = simulated)
+            QVariantMap metricResult = MetricsCalculator::calculateMetrics(yValues, xValues, 0);
+            
+            // Calculate R² for scatter plots
+            double rSquared = MetricsCalculator::rSquared(xValues, yValues);
+            metricResult["R²"] = rSquared;
+            
+            QMap<QString, QVariant> metricMap;
+            for (auto it2 = metricResult.begin(); it2 != metricResult.end(); ++it2) {
+                metricMap[it2.key()] = it2.value();
+            }
+            metricMap["Treatment"] = experimentKey;
+            metricMap["TreatmentName"] = experimentKey;
+            metricMap["Experiment"] = experimentKey;
+            metricMap["ExperimentName"] = experimentKey;
+            metricMap["Variable"] = baseVarName; // Use base variable name (without 's' or 'm')
+            metricMap["VariableName"] = yTitle; // Use full name from variable info
+
+            QString cropCodeForExp = experimentCropCodes.value(experimentKey);
+            if (!cropCodeForExp.isEmpty()) {
+                metricMap["Crop"] = cropCodeForExp;
+                QString cropDisplay = getCropNameFromCode(cropCodeForExp);
+                if (!cropDisplay.isEmpty()) {
+                    metricMap["CropName"] = cropDisplay;
+                }
+            }
+            metrics.append(metricMap);
+        }
+        
+        // Emit metrics signal
+        emit metricsCalculated(metrics);
+        
+        // Update legend (updateLegend uses m_plotDataList internally, parameter is unused)
+        QVector<PlotData> emptyPlotDataList;
+        updateLegend(emptyPlotDataList);
+        
+        emit plotUpdated();
+        
+    } catch (const std::exception& e) {
+        QString error = QString("Error in plotScatter: %1").arg(e.what());
+        qWarning() << error;
+        emit errorOccurred(error);
+    }
+}
 

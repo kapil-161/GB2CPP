@@ -85,6 +85,7 @@ void CommandLineHandler::setupCommandLineIntegration(MainWindow *mainWindow, con
     
     if (m_args.isValid) {
         qDebug() << "Processing command line arguments...";
+        // UI is already hidden in main.cpp before window is shown
         // Use a timer to apply args after UI is fully initialized
         QTimer::singleShot(500, this, &CommandLineHandler::applyCommandLineArgsToUI);
     } else {
@@ -103,17 +104,20 @@ void CommandLineHandler::applyCommandLineArgsToUI()
                  << "Files:" << m_args.outputFiles;
         
         // Step 1: Select the crop folder
+        // This automatically populates the file list via onFolderSelectionChanged()
         if (!selectCropFolder(m_args.cropName)) {
             QString message = QString("Crop folder '%1' not found").arg(m_args.cropName);
             QMessageBox::warning(m_mainWindow, "Command Line Warning", message);
             return;
         }
         
-        // Step 2: Load data for the selected folder
-        m_mainWindow->loadExperiments();
-        m_mainWindow->loadOutputFiles();
+        // Hide crop and file selection UI immediately (synchronously) since they're auto-selected
+        // This prevents any visible UI change - hide before window is fully rendered
+        m_mainWindow->hideFileSelectionUI(true);
         
-        // Step 3: Select output files (with delay to ensure UI is ready)
+        // Step 2: Select output files (with delay to ensure file list is populated)
+        // Note: selectCropFolder() already populated files via onFolderSelectionChanged(),
+        // so we just need to wait for UI to be ready before selecting files
         QTimer::singleShot(200, this, &CommandLineHandler::selectOutputFiles);
         
     } catch (const std::exception &e) {
@@ -131,6 +135,7 @@ void CommandLineHandler::selectOutputFiles()
 {
     if (!m_mainWindow || m_args.outputFiles.isEmpty()) {
         qDebug() << "No output files specified in command line";
+        // UI is already hidden in applyCommandLineArgsToUI, so just return
         return;
     }
     
