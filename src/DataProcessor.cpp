@@ -358,24 +358,12 @@ bool DataProcessor::readOutFile(const QString &filePath, DataTable &table)
         return false;
     }
     
-    // Combine all tables (simplified version of Python's concat)
-    table = allTables[0]; // Start with first table
-    
-    for (int t = 1; t < allTables.size(); ++t) {
-        const DataTable &otherTable = allTables[t];
-        
-        // Add rows from other tables (basic concatenation)
-        for (int r = 0; r < otherTable.rowCount; ++r) {
-            QVector<QVariant> rowData;
-            for (const QString &colName : table.columnNames) {
-                const DataColumn* col = otherTable.getColumn(colName);
-                if (col && r < col->data.size()) {
-                    rowData.append(col->data[r]);
-                } else {
-                    rowData.append(QVariant());
-                }
-            }
-            table.addRow(rowData);
+    // Combine all tables while preserving all columns from every section
+    // Use DataTable::merge so that columns unique to later sections are kept
+    table.clear();
+    for (const DataTable &sectionTable : allTables) {
+        if (sectionTable.rowCount > 0) {
+            table.merge(sectionTable);
         }
     }
     

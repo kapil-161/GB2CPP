@@ -1234,6 +1234,12 @@ void PlotWidget::plotDatasets(const DataTable &simData, const DataTable &obsData
     // Clear existing chart and set up appropriate axes
     clearChart();
     setupAxes(xVar);
+
+    // Reset chart margins to default
+    if (m_chart) {
+        m_chart->setMargins(QMargins(0, 0, 0, 0));  // Use default margins
+    }
+
     qDebug() << "PlotWidget::plotDatasets() - ENTRY with Y vars:" << yVars;
     
     // Debug: Check if we're receiving scaled data
@@ -4042,7 +4048,7 @@ void PlotWidget::applyPlotSettings(const PlotSettings &settings)
     // Update plot settings (including error bar settings)
     m_plotSettings = settings;
     
-    // If error bar settings changed, replot to apply aggregation
+    // If error bar settings changed, replot to apply changes
     bool errorBarChanged = (m_plotSettings.showErrorBars != settings.showErrorBars) ||
                           (m_plotSettings.errorBarType != settings.errorBarType);
     
@@ -4100,7 +4106,12 @@ void PlotWidget::plotScatter(
             clear();
             // Re-set scatter mode after clear() (which resets it to false)
             m_isScatterMode = true;
-            
+
+            // Reset chart margins for scatter plots
+            if (m_chart) {
+                m_chart->setMargins(QMargins(0, 0, 0, 0));  // Use default margins
+            }
+
             if (evaluateData.rowCount == 0) {
                 qWarning() << "PlotWidget: No data available for scatter plot";
                 return;
@@ -4398,4 +4409,5 @@ void PlotWidget::plotScatter(
         emit errorOccurred(error);
     }
 }
+
 
