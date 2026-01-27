@@ -136,6 +136,12 @@ if(WIN32)
     )
 endif()
 
+# Disable debug output for release builds
+# In Release mode, ENABLE_DEBUG_OUTPUT is not defined, so all debug output is suppressed
+if(NOT CMAKE_BUILD_TYPE STREQUAL "Release")
+    target_compile_definitions(GB2 PRIVATE ENABLE_DEBUG_OUTPUT)
+endif()
+
 # Set output directory
 set_target_properties(GB2 PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin

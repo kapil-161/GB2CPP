@@ -1407,6 +1407,13 @@ void MainWindow::updatePlot()
         
         
         // Debug observed data before plotting
+        qDebug() << "MainWindow::updatePlot() - Observed data status:";
+        qDebug() << "  Observed data rows:" << m_currentObsData.rowCount;
+        qDebug() << "  Observed data columns:" << m_currentObsData.columnNames;
+        qDebug() << "  X variable:" << xVar;
+        qDebug() << "  Y variables:" << yVars;
+        qDebug() << "  Treatment:" << treatment;
+        qDebug() << "  Selected experiment:" << m_selectedExperiment;
         
         // Call the enhanced plotTimeSeries method
         m_plotWidget->plotTimeSeries(
@@ -1857,13 +1864,26 @@ void MainWindow::onFileSelectionChanged()
                 qDebug() << "MainWindow: Found" << allCropDetails.size() << "crop details";
                 for (const CropDetails& crop : allCropDetails) {
                     QString dirName = QFileInfo(crop.directory).fileName().toLower();
-                    // Check if the directory path contains the selected folder name (using both / and \ separators)
-                    bool pathContainsFolder = crop.directory.toLower().contains("/" + m_selectedFolder.toLower()) || 
-                                            crop.directory.toLower().contains("\\" + m_selectedFolder.toLower());
+                    QString cropNameLower = crop.cropName.toLower();
+                    QString selectedFolderLower = m_selectedFolder.toLower();
+                    
+                    // Check multiple matching strategies:
+                    // 1. Directory name matches (e.g., "drybean" == "drybean")
+                    // 2. Crop name matches (e.g., "dry bean" == "dry bean")
+                    // 3. Directory path contains folder name
+                    // 4. Crop name contains folder name or vice versa (for partial matches)
+                    bool dirNameMatch = (dirName == selectedFolderLower);
+                    bool cropNameMatch = (cropNameLower == selectedFolderLower);
+                    bool pathContainsFolder = crop.directory.toLower().contains("/" + selectedFolderLower) || 
+                                            crop.directory.toLower().contains("\\" + selectedFolderLower);
+                    bool cropNameContains = cropNameLower.contains(selectedFolderLower) || 
+                                          selectedFolderLower.contains(cropNameLower);
+                    
                     qDebug() << "MainWindow: Checking crop:" << crop.cropCode << "name:" << crop.cropName << "dir:" << crop.directory << "dirName:" << dirName << "pathContains:" << pathContainsFolder;
-                    if (dirName == m_selectedFolder.toLower() || pathContainsFolder) {
+                    
+                    if (dirNameMatch || cropNameMatch || pathContainsFolder || cropNameContains) {
                         cropCode = crop.cropCode.toUpper();
-                        qDebug() << "MainWindow: MATCHED! Setting cropCode to:" << cropCode;
+                        qDebug() << "MainWindow: MATCHED! Setting cropCode to:" << cropCode << "(match type: dirName=" << dirNameMatch << " cropName=" << cropNameMatch << " pathContains=" << pathContainsFolder << " nameContains=" << cropNameContains << ")";
                         break;
                     }
                 }
@@ -1897,19 +1917,32 @@ void MainWindow::onFileSelectionChanged()
                 }
             } else {
                 // Regular crop folder - use standard observed data lookup
+                qDebug() << "MainWindow: Attempting to load observed data for crop code:" << cropCode;
+                qDebug() << "MainWindow: Unique experiment codes:" << uniqueExperimentCodes;
+                qDebug() << "MainWindow: First valid regular file:" << firstValidRegularFile;
+                
                 for (const QString& expCode : uniqueExperimentCodes) {
                     DataTable tempObsData;
+                    qDebug() << "MainWindow: Trying to read observed data for experiment:" << expCode;
                     // Use the first valid regular file path for observed data lookup
                     if (!firstValidRegularFile.isEmpty() && m_dataProcessor->readObservedData(firstValidRegularFile, expCode, cropCode, tempObsData)) {
+                        qDebug() << "MainWindow: Successfully loaded observed data for" << expCode << "- Rows:" << tempObsData.rowCount << "Columns:" << tempObsData.columnNames;
                         m_currentObsData.merge(tempObsData);
+                        qDebug() << "MainWindow: Total observed data after merge - Rows:" << m_currentObsData.rowCount << "Columns:" << m_currentObsData.columnNames;
+                    } else {
+                        qDebug() << "MainWindow: Failed to load observed data for experiment:" << expCode;
                     }
                 }
             }
             
             // Add DAS/DAP columns to observed data if it exists
             if (m_currentObsData.rowCount > 0) {
-                qDebug() << "MainWindow: Adding DAS/DAP columns to observed data";
+                qDebug() << "MainWindow: Adding DAS/DAP columns to observed data. Current rows:" << m_currentObsData.rowCount;
+                qDebug() << "MainWindow: Observed data columns:" << m_currentObsData.columnNames;
                 m_dataProcessor->addDasDapColumns(m_currentObsData, m_currentData);
+                qDebug() << "MainWindow: After adding DAS/DAP - Rows:" << m_currentObsData.rowCount << "Columns:" << m_currentObsData.columnNames;
+            } else {
+                qDebug() << "MainWindow: No observed data loaded (rowCount = 0)";
             }
         }
         

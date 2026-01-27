@@ -8,6 +8,12 @@
 #include <QLoggingCategory>
 #include <QDebug>
 
+#ifdef Q_OS_WIN
+#include <windows.h>
+#include <io.h>
+#include <fcntl.h>
+#endif
+
 #include "MainWindow.h"
 #include "Config.h"
 #include "CommandLineHandler.h"
@@ -15,6 +21,60 @@
 
 // Enable/disable debug output
 Q_LOGGING_CATEGORY(appCategory, "app")
+
+// Global flag for verbose mode (set from command line)
+static bool g_verboseMode = false;
+
+// Message handler to suppress all debug output in release builds (unless verbose mode)
+void releaseMessageHandler(QtMsgType type, const QMessageLogContext &context, const QString &msg)
+{
+    // Always show observed data messages, even in release builds
+    if (g_verboseMode || msg.contains("observed", Qt::CaseInsensitive) || 
+        msg.contains("Observed", Qt::CaseInsensitive) ||
+        msg.contains("readObservedData", Qt::CaseInsensitive) ||
+        msg.contains("readSensWorkObservedData", Qt::CaseInsensitive) ||
+        msg.contains("readTFile", Qt::CaseInsensitive) ||
+        msg.contains("DataProcessor: Attempting to find", Qt::CaseInsensitive) ||
+        msg.contains("DataProcessor: Found observed", Qt::CaseInsensitive) ||
+        msg.contains("DataProcessor: Reading observed", Qt::CaseInsensitive) ||
+        msg.contains("DataProcessor: Successfully read observed", Qt::CaseInsensitive) ||
+        msg.contains("MainWindow: Attempting to load observed", Qt::CaseInsensitive) ||
+        msg.contains("MainWindow: Successfully loaded observed", Qt::CaseInsensitive)) {
+        // Print to stderr so it shows in console
+        const char *typeStr = "";
+        switch (type) {
+            case QtDebugMsg: typeStr = "DEBUG"; break;
+            case QtInfoMsg: typeStr = "INFO"; break;
+            case QtWarningMsg: typeStr = "WARNING"; break;
+            case QtCriticalMsg: typeStr = "CRITICAL"; break;
+            case QtFatalMsg: typeStr = "FATAL"; break;
+        }
+        fprintf(stderr, "[%s] %s\n", typeStr, msg.toLocal8Bit().constData());
+        return;
+    }
+    
+    Q_UNUSED(type);
+    Q_UNUSED(context);
+    Q_UNUSED(msg);
+    // Suppress all other messages in release builds
+}
+
+// Verbose message handler that shows all debug output
+void verboseMessageHandler(QtMsgType type, const QMessageLogContext &context, const QString &msg)
+{
+    Q_UNUSED(context);
+    
+    const char *typeStr = "";
+    switch (type) {
+        case QtDebugMsg: typeStr = "DEBUG"; break;
+        case QtInfoMsg: typeStr = "INFO"; break;
+        case QtWarningMsg: typeStr = "WARNING"; break;
+        case QtCriticalMsg: typeStr = "CRITICAL"; break;
+        case QtFatalMsg: typeStr = "FATAL"; break;
+    }
+    
+    fprintf(stderr, "[%s] %s\n", typeStr, msg.toLocal8Bit().constData());
+}
 
 void setupApplicationIcon(QApplication &app)
 {
@@ -177,8 +237,89 @@ void setupApplicationStyle(QApplication &app)
 
 int main(int argc, char *argv[])
 {
-    // Create single instance application
-    SingleInstanceApp app(argc, argv);
+    // Check for verbose/debug flag before creating application
+    QStringList args;
+    for (int i = 0; i < argc; ++i) {
+        args << QString::fromLocal8Bit(argv[i]);
+    }
+    
+    // Check for --verbose or --debug flags
+    g_verboseMode = args.contains("--verbose", Qt::CaseInsensitive) || 
+                    args.contains("--debug", Qt::CaseInsensitive) ||
+                    args.contains("-v", Qt::CaseInsensitive);
+    
+    // Remove verbose flags from args so they don't interfere with other processing
+    args.removeAll("--verbose");
+    args.removeAll("--debug");
+    args.removeAll("-v");
+    
+    // Convert back to argc/argv format for QApplication
+    QVector<QByteArray> argvData;
+    QVector<char*> argvPtrs;
+    for (const QString &arg : args) {
+        argvData.append(arg.toLocal8Bit());
+        argvPtrs.append(argvData.last().data());
+    }
+    argvPtrs.append(nullptr);
+    
+    int newArgc = argvPtrs.size() - 1;
+    char **newArgv = argvPtrs.data();
+    
+    // Setup message handler based on build type and verbose mode
+    if (g_verboseMode) {
+        // Verbose mode: show all debug output
+        qInstallMessageHandler(verboseMessageHandler);
+    } else {
+#ifndef ENABLE_DEBUG_OUTPUT
+        // Release build without verbose: suppress most output but allow observed data
+        qInstallMessageHandler(releaseMessageHandler);
+#endif
+    }
+
+#ifdef Q_OS_WIN
+    // Allocate console for Windows to see debug output when run from command line
+    // Strategy:
+    // 1. Always try to attach to parent console (if run from terminal, this succeeds)
+    // 2. Only allocate NEW console if verbose mode is enabled (to avoid popup windows)
+    // 3. Observed data messages will be visible if console exists (attached or allocated)
+#ifdef ENABLE_DEBUG_OUTPUT
+    bool shouldAllocConsole = true;
+#else
+    // In release builds, try to attach to existing console first
+    // Only allocate new console if verbose mode is explicitly enabled
+    bool shouldAllocConsole = g_verboseMode;
+#endif
+    
+    // Try to attach to parent console first (works if run from command prompt)
+    bool consoleAttached = AttachConsole(ATTACH_PARENT_PROCESS);
+    
+    // If not attached and we should allocate, create new console
+    if (!consoleAttached && shouldAllocConsole) {
+        consoleAttached = AllocConsole();
+    }
+    
+    if (consoleAttached) {
+        FILE* pCout;
+        FILE* pCerr;
+        FILE* pCin;
+        freopen_s(&pCout, "CONOUT$", "w", stdout);
+        freopen_s(&pCerr, "CONOUT$", "w", stderr);
+        freopen_s(&pCin, "CONIN$", "r", stdin);
+        std::ios::sync_with_stdio();
+        
+        if (g_verboseMode) {
+            fprintf(stdout, "\n=== GB2 Verbose Mode Enabled ===\n");
+            fprintf(stdout, "All debug output will be shown, especially observed data messages.\n\n");
+        } else {
+            fprintf(stdout, "\n=== GB2 Running ===\n");
+            fprintf(stdout, "Observed data messages will be shown in this console.\n");
+            fprintf(stdout, "Use --verbose or --debug flag to see all debug messages.\n\n");
+        }
+    }
+#endif
+
+    // Create single instance application with modified args
+    SingleInstanceApp app(newArgc, newArgv);
     
     // Set application properties
     QCoreApplication::setApplicationName(Config::APP_NAME);
@@ -187,13 +328,24 @@ int main(int argc, char *argv[])
     
     // High DPI scaling is enabled by default in Qt6
     
+#ifdef ENABLE_DEBUG_OUTPUT
     qCInfo(appCategory) << "Starting" << Config::APP_NAME << "version" << Config::APP_VERSION;
     qCInfo(appCategory) << "Qt version:" << QT_VERSION_STR;
     qCInfo(appCategory) << "Platform:" << QApplication::platformName();
+#else
+    if (g_verboseMode) {
+        qCInfo(appCategory) << "Starting" << Config::APP_NAME << "version" << Config::APP_VERSION;
+        qCInfo(appCategory) << "Qt version:" << QT_VERSION_STR;
+        qCInfo(appCategory) << "Platform:" << QApplication::platformName();
+        qCInfo(appCategory) << "Verbose mode: ENABLED - All debug output will be shown";
+    }
+#endif
     
     // Check if another instance is already running
     if (!app.isFirstInstance()) {
+#ifdef ENABLE_DEBUG_OUTPUT
         qCWarning(appCategory) << "Another instance of" << Config::APP_NAME << "is already running";
+#endif
         app.showAlreadyRunningMessage();
         return 1;
     }
@@ -224,16 +376,27 @@ int main(int argc, char *argv[])
         CommandLineHandler cmdHandler;
         cmdHandler.setupCommandLineIntegration(&window, app.arguments());
         
+#ifdef ENABLE_DEBUG_OUTPUT
         qCInfo(appCategory) << "Application started successfully";
+#else
+        if (g_verboseMode) {
+            qCInfo(appCategory) << "Application started successfully";
+            qCInfo(appCategory) << "Observed data debug messages will appear in this console";
+        }
+#endif
         
         // Run event loop
         int result = app.exec();
         
+#ifdef ENABLE_DEBUG_OUTPUT
         qCInfo(appCategory) << "Application exiting with code:" << result;
+#endif
         return result;
         
     } catch (const std::exception &e) {
+#ifdef ENABLE_DEBUG_OUTPUT
         qCCritical(appCategory) << "Fatal error:" << e.what();
+#endif
         
         QMessageBox::critical(
             nullptr,
@@ -244,7 +407,9 @@ int main(int argc, char *argv[])
         return 1;
         
     } catch (...) {
+#ifdef ENABLE_DEBUG_OUTPUT
         qCCritical(appCategory) << "Unknown fatal error occurred";
+#endif
         
         QMessageBox::critical(
             nullptr,

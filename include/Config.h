@@ -7,6 +7,19 @@
 #include <QSize>
 #include <set>
 
+// Debug output control - disable for release builds
+#if defined(ENABLE_DEBUG_OUTPUT) && ENABLE_DEBUG_OUTPUT
+    #include <QDebug>
+    #define DEBUG_OUTPUT(x) qDebug() << x
+    #define WARNING_OUTPUT(x) qWarning() << x
+    #define CRITICAL_OUTPUT(x) qCritical() << x
+#else
+    // Release build - all debug output disabled
+    #define DEBUG_OUTPUT(x) ((void)0)
+    #define WARNING_OUTPUT(x) ((void)0)
+    #define CRITICAL_OUTPUT(x) ((void)0)
+#endif
+
 namespace Config {
     // Application information
     const QString APP_NAME = "GB2";

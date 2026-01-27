@@ -391,6 +391,29 @@ bool DataProcessor::readOutFile(const QString &filePath, DataTable &table)
         }
     }
     
+    // Handle run columns (find RUNNO column and rename to RUN, similar to TRNO)
+    // Only rename if RUN column doesn't already exist (from *RUN header)
+    if (!table.columnNames.contains("RUN")) {
+        DataColumn* runnoColumn = table.getColumn("RUNNO");
+        if (runnoColumn) {
+            bool hasValidData = false;
+            for (const QVariant &val : runnoColumn->data) {
+                if (!val.toString().isEmpty() && val.toString() != "0") {
+                    hasValidData = true;
+                    break;
+                }
+            }
+            if (hasValidData) {
+                // Rename RUNNO column to RUN
+                int colIndex = table.getColumnIndex("RUNNO");
+                if (colIndex >= 0) {
+                    table.columnNames[colIndex] = "RUN";
+                    table.columns[colIndex].name = "RUN";
+                }
+            }
+        }
+    }
+    
     // Create DATE column from YEAR and DOY if available
     DataColumn* yearCol = table.getColumn("YEAR");
     DataColumn* doyCol = table.getColumn("DOY");
@@ -589,7 +612,7 @@ bool DataProcessor::readOsuFile(const QString &filePath, DataTable &table)
     
     // Optimize column name standardization with single loop
     QString tnamColumnName, exnameColumnName;
-    int crIndex = -1, trtIndex = -1;
+    int crIndex = -1, trtIndex = -1, runnoIndex = -1;
     
     // Single pass to find all columns that need renaming
     for (int i = 0; i < table.columnNames.size(); ++i) {
@@ -600,6 +623,9 @@ bool DataProcessor::readOsuFile(const QString &filePath, DataTable &table)
         }
         else if (colName == "TRNO" && trtIndex == -1) {
             trtIndex = i; // Use first TRNO found
+        }
+        else if (colName == "RUNNO" && runnoIndex == -1 && !table.columnNames.contains("RUN")) {
+            runnoIndex = i; // Use first RUNNO found, but only if RUN doesn't already exist
         }
         else if (colName.startsWith("TNAM") && tnamColumnName.isEmpty()) {
             tnamColumnName = colName;
@@ -618,6 +644,11 @@ bool DataProcessor::readOsuFile(const QString &filePath, DataTable &table)
     if (trtIndex >= 0) {
         table.columnNames[trtIndex] = "TRT";
         table.columns[trtIndex].name = "TRT";
+    }
+    
+    if (runnoIndex >= 0) {
+        table.columnNames[runnoIndex] = "RUN";
+        table.columns[runnoIndex].name = "RUN";
     }
     
     if (!tnamColumnName.isEmpty()) {
@@ -727,42 +758,150 @@ bool DataProcessor::readOsuFile(const QString &filePath, DataTable &table)
     return true;
 }
 
+// Helper function to get directory from DSSATPRO using 3-letter code (cropCode + "D")
+static QString getDirectoryFromDssatProByThreeLetterCode(const QString &threeLetterCode)
+{
+    QString dssatProPath = DataProcessor::findDssatProFile();
+    if (dssatProPath.isEmpty()) {
+        qDebug() << "getDirectoryFromDssatProByThreeLetterCode: DSSATPRO file not found";
+        return QString();
+    }
+    
+    QFile proFile(dssatProPath);
+    if (!proFile.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        qDebug() << "getDirectoryFromDssatProByThreeLetterCode: Cannot open DSSATPRO file";
+        return QString();
+    }
+    
+    QTextStream in(&proFile);
+    QString driveLetter;
+    QRegularExpression drivePattern("([A-Z]:)\\s+\\\\");
+    
+    while (!in.atEnd()) {
+        QString line = in.readLine().trimmed();
+        if (line.isEmpty() || line.startsWith("*")) {
+            continue;
+        }
+        
+        // Match any drive letter (C:, D:, E:, etc.) followed by space and backslash
+        QRegularExpressionMatch match = drivePattern.match(line);
+        if (match.hasMatch()) {
+            driveLetter = match.captured(1);
+            QString separator = QString(" %1 ").arg(driveLetter);
+            if (line.contains(separator)) {
+                QStringList parts = line.split(separator, Qt::SkipEmptyParts);
+                if (parts.size() >= 2) {
+                    QString folderCode = parts[0].trimmed();
+                    QString directory = parts[1].trimmed();
+                    
+                    // Check if this line matches our 3-letter code
+                    if (folderCode.compare(threeLetterCode, Qt::CaseInsensitive) == 0) {
+                        // Fix Windows paths that start with backslash (missing drive letter)
+                        if (!driveLetter.isEmpty() && directory.startsWith("\\") && !directory.startsWith(driveLetter)) {
+                            directory = driveLetter + directory;
+                        }
+                        
+                        // Normalize the path to match actual folder names
+                        QDir dir(directory);
+                        if (dir.exists()) {
+                            QString canonicalPath = dir.canonicalPath();
+                            if (!canonicalPath.isEmpty()) {
+                                directory = canonicalPath;
+                            } else {
+                                directory = dir.absolutePath();
+                            }
+                        }
+                        
+                        proFile.close();
+                        qDebug() << "getDirectoryFromDssatProByThreeLetterCode: Found directory for" << threeLetterCode << "->" << directory;
+                        return directory;
+                    }
+                }
+            }
+        } else if (line.contains(" // ")) {
+            QStringList parts = line.split(" // ", Qt::SkipEmptyParts);
+            if (parts.size() >= 2) {
+                QString folderCode = parts[0].trimmed();
+                QString directory = parts[1].trimmed();
+                
+                if (folderCode.compare(threeLetterCode, Qt::CaseInsensitive) == 0) {
+                    QDir dir(directory);
+                    if (dir.exists()) {
+                        QString canonicalPath = dir.canonicalPath();
+                        if (!canonicalPath.isEmpty()) {
+                            directory = canonicalPath;
+                        } else {
+                            directory = dir.absolutePath();
+                        }
+                    }
+                    
+                    proFile.close();
+                    qDebug() << "getDirectoryFromDssatProByThreeLetterCode: Found directory for" << threeLetterCode << "->" << directory;
+                    return directory;
+                }
+            }
+        }
+    }
+    
+    proFile.close();
+    qDebug() << "getDirectoryFromDssatProByThreeLetterCode: No directory found for" << threeLetterCode;
+    return QString();
+}
+
 bool DataProcessor::readObservedData(const QString &simulatedFilePath, const QString &experimentCode, const QString &cropCode, DataTable &table)
 {
     qDebug() << "DataProcessor: Attempting to find and read observed data for:" << simulatedFilePath << ", Exp Code:" << experimentCode << ", Crop Code:" << cropCode;
     table.clear(); // Clear the table before populating
 
-    QFileInfo simFileInfo(simulatedFilePath);
-    QString folderPath = simFileInfo.absolutePath(); // e.g., /Applications/DSSAT48/Alfalfa
+    // Use DSSATPRO directory path using 3-letter code (cropCode + "D")
+    QString folderPath;
+    if (!cropCode.isEmpty() && cropCode != "XX") {
+        // Create 3-letter code by adding "D" to crop code (e.g., "BN" -> "BND")
+        QString threeLetterCode = cropCode.toUpper() + "D";
+        qDebug() << "DataProcessor: Looking up directory in DSSATPRO using 3-letter code:" << threeLetterCode;
+        
+        folderPath = getDirectoryFromDssatProByThreeLetterCode(threeLetterCode);
+        if (!folderPath.isEmpty()) {
+            qDebug() << "DataProcessor: Using DSSATPRO directory for observed data:" << folderPath;
+        }
+    }
+    
+    // Fallback to simulated file path if DSSATPRO directory not found
+    if (folderPath.isEmpty()) {
+        QFileInfo simFileInfo(simulatedFilePath);
+        folderPath = simFileInfo.absolutePath();
+        qDebug() << "DataProcessor: DSSATPRO directory not found, falling back to simulated file path:" << folderPath;
+    }
 
     QString baseName = experimentCode; // Use the passed experimentCode as the base name for the T file
 
     QStringList tFilePatterns;
     if (!cropCode.isEmpty() && cropCode != "XX") {
-        // Primary crop-specific pattern: {experiment}.{cropCode}T
+        // Observed data file pattern: {experimentCode}.{cropCode}T
+        // DSSATPRO.V48 is only used to get the directory path, not for file patterns
         tFilePatterns.append(QString("%1.%2T").arg(baseName).arg(cropCode));
-        
-        // Also check for DSSAT version-specific extensions
-#ifdef Q_OS_WIN
-        tFilePatterns.append(QString("%1.V48").arg(baseName));
-#else
-        tFilePatterns.append(QString("%1.L48").arg(baseName));
-#endif
     }
 
     QString foundTFile;
+    qDebug() << "DataProcessor: Searching for observed files in directory:" << folderPath;
+    qDebug() << "DataProcessor: File patterns to search:" << tFilePatterns;
+    
     for (const QString& pattern : tFilePatterns) {
         QString fullPath = QDir(folderPath).absoluteFilePath(pattern);
         qDebug() << "DataProcessor: Checking for observed file:" << fullPath;
-        if (QFile::exists(fullPath)) {
+        bool exists = QFile::exists(fullPath);
+        qDebug() << "DataProcessor: File exists:" << exists;
+        if (exists) {
             foundTFile = fullPath;
+            qDebug() << "DataProcessor: Found observed data file:" << foundTFile;
             break;
         }
     }
 
     if (!foundTFile.isEmpty()) {
-        qDebug() << "DataProcessor: Found observed data file:" << foundTFile;
+        qDebug() << "DataProcessor: Reading observed data file:" << foundTFile;
         bool success = readTFile(foundTFile, table);
+        qDebug() << "DataProcessor: readTFile result:" << success << "Rows:" << table.rowCount << "Columns:" << table.columnNames.size();
         if (success) {
             // Add EXPERIMENT column to tag data with experiment code
             if (!table.columnNames.contains("EXPERIMENT")) {
@@ -790,6 +929,9 @@ bool DataProcessor::readObservedData(const QString &simulatedFilePath, const QSt
         return success;
     } else {
         qDebug() << "DataProcessor: No observed data file found for:" << simulatedFilePath;
+        qDebug() << "DataProcessor: Searched in directory:" << folderPath;
+        qDebug() << "DataProcessor: Patterns searched:" << tFilePatterns;
+        qDebug() << "DataProcessor: Experiment code:" << experimentCode << "Crop code:" << cropCode;
         return false;
     }
 }
@@ -1386,8 +1528,16 @@ QVector<CropDetails> DataProcessor::getCropDetails()
             
             // Handle the DSSATPRO format: "ALD C: \DSSAT48\ALFALFA" or "ALD // /Applications/DSSAT48/ALFALFA"
             QStringList parts;
-            if (line.contains(" C: ")) {
-                parts = line.split(" C: ", Qt::SkipEmptyParts);
+            QString driveLetter;
+            // Match any drive letter (C:, D:, E:, etc.) followed by space and backslash
+            QRegularExpression drivePattern("([A-Z]:)\\s+\\\\");
+            QRegularExpressionMatch match = drivePattern.match(line);
+            if (match.hasMatch()) {
+                driveLetter = match.captured(1); // e.g., "C:"
+                QString separator = QString(" %1 ").arg(driveLetter);
+                if (line.contains(separator)) {
+                    parts = line.split(separator, Qt::SkipEmptyParts);
+                }
             } else if (line.contains(" // ")) {
                 parts = line.split(" // ", Qt::SkipEmptyParts);
             }
@@ -1395,6 +1545,30 @@ QVector<CropDetails> DataProcessor::getCropDetails()
             if (parts.size() >= 2) {
                 QString folderCode = parts[0].trimmed();
                 QString directory = parts[1].trimmed();
+                
+                // Fix Windows paths that start with backslash (missing drive letter)
+                // e.g., "\DSSAT48\DRYBEAN" should become "C:\DSSAT48\DRYBEAN"
+                if (!driveLetter.isEmpty() && directory.startsWith("\\") && !directory.startsWith(driveLetter)) {
+                    directory = driveLetter + directory;
+                }
+                
+                // Normalize the path to match actual folder names (handle case and spaces)
+                // Use QDir::canonicalPath() to get the actual folder name that exists on disk
+                // This resolves "DRYBEAN" to "Drybean" and handles case differences
+                QDir dir(directory);
+                if (dir.exists()) {
+                    QString canonicalPath = dir.canonicalPath();
+                    if (!canonicalPath.isEmpty()) {
+                        directory = canonicalPath;
+                        qDebug() << "DSSATPRO: Normalized directory path to actual folder:" << directory;
+                    } else {
+                        // Fallback to absolutePath if canonicalPath fails
+                        directory = dir.absolutePath();
+                        qDebug() << "DSSATPRO: Using absolute path (canonical failed):" << directory;
+                    }
+                } else {
+                    qDebug() << "DSSATPRO: Directory does not exist, using as-is:" << directory;
+                }
                 
                 if (folderCode.endsWith("D") && folderCode.length() >= 3) {
                     QString code = folderCode.left(folderCode.length() - 1); // Remove 'D'
@@ -1563,58 +1737,30 @@ bool DataProcessor::readSensWorkObservedData(const QString &sensWorkFilePath, Da
     QString observedFileName = QString("%1.%2T").arg(experimentCode).arg(cropCode);
     qDebug() << "DataProcessor::readSensWorkObservedData - Looking for observed data file:" << observedFileName;
     
-    // Search for observed data file in SensWork directory and crop directories
-    QStringList searchPaths;
-    
-    // 1. First check SensWork directory itself
+    // Search for observed data file ONLY in SensWork directory
     QString sensWorkDir = QFileInfo(sensWorkFilePath).absolutePath();
-    searchPaths << sensWorkDir;
+    qDebug() << "DataProcessor::readSensWorkObservedData - Searching only in SensWork directory:" << sensWorkDir;
     
-    // 2. Then check the original crop directory where the experiment likely came from
-    QVector<CropDetails> cropDetails = getCropDetails();
-    for (const CropDetails &crop : cropDetails) {
-        if (crop.cropCode.compare(cropCode, Qt::CaseInsensitive) == 0 && !crop.directory.isEmpty()) {
-            searchPaths << crop.directory;
-            qDebug() << "DataProcessor::readSensWorkObservedData - Added crop directory to search:" << crop.directory;
-        }
-    }
-    
-    // 3. As fallback, check standard DSSAT directories
-    QString dssatBase = getDSSATBase();
-    QStringList possibleCropDirs = {
-        QDir(dssatBase).absoluteFilePath("Maize"),
-        QDir(dssatBase).absoluteFilePath("MAIZE"), 
-        QDir(dssatBase).absoluteFilePath("Wheat"),
-        QDir(dssatBase).absoluteFilePath("WHEAT"),
-        QDir(dssatBase).absoluteFilePath("Soybean"),
-        QDir(dssatBase).absoluteFilePath("SOYBEAN")
-    };
-    searchPaths << possibleCropDirs;
-    
-    // Search for the observed data file
+    // Search for the observed data file in SensWork directory only
     QString observedFilePath;
-    for (const QString &searchPath : searchPaths) {
-        QDir dir(searchPath);
-        if (!dir.exists()) continue;
-        
+    QDir dir(sensWorkDir);
+    if (dir.exists()) {
         // Try exact filename
         QString candidatePath = dir.absoluteFilePath(observedFileName);
         if (QFile::exists(candidatePath)) {
             observedFilePath = candidatePath;
             qDebug() << "DataProcessor::readSensWorkObservedData - Found observed data at:" << observedFilePath;
-            break;
-        }
-        
-        // Try case-insensitive search
-        QStringList filters;
-        filters << QString("*%1*").arg(observedFileName.toUpper())
-                << QString("*%1*").arg(observedFileName.toLower());
-        
-        QStringList matches = dir.entryList(filters, QDir::Files);
-        if (!matches.isEmpty()) {
-            observedFilePath = dir.absoluteFilePath(matches.first());
-            qDebug() << "DataProcessor::readSensWorkObservedData - Found observed data (case-insensitive):" << observedFilePath;
-            break;
+        } else {
+            // Try case-insensitive search
+            QStringList filters;
+            filters << QString("*%1*").arg(observedFileName.toUpper())
+                    << QString("*%1*").arg(observedFileName.toLower());
+            
+            QStringList matches = dir.entryList(filters, QDir::Files);
+            if (!matches.isEmpty()) {
+                observedFilePath = dir.absoluteFilePath(matches.first());
+                qDebug() << "DataProcessor::readSensWorkObservedData - Found observed data (case-insensitive):" << observedFilePath;
+            }
         }
     }
     
@@ -2030,11 +2176,18 @@ bool DataProcessor::readTFile(const QString &filePath, DataTable &table)
         return false;
     }
 
-    // Rename common columns (TRNO to TRT)
+    // Rename common columns (TRNO to TRT, RUNNO to RUN)
     if (table.columnNames.contains("TRNO")) {
         int idx = table.getColumnIndex("TRNO");
         table.columnNames[idx] = "TRT";
         table.columns[idx].name = "TRT";
+    }
+    
+    // Rename RUNNO to RUN if RUN column doesn't already exist (from *RUN header)
+    if (!table.columnNames.contains("RUN") && table.columnNames.contains("RUNNO")) {
+        int idx = table.getColumnIndex("RUNNO");
+        table.columnNames[idx] = "RUN";
+        table.columns[idx].name = "RUN";
     }
 
     // Convert dates (PDAT or DATE) to unified format
@@ -2405,7 +2558,7 @@ QVector<QMap<QString, QString>> DataProcessor::getEvaluateVariablePairs(const Da
     QVector<QMap<QString, QString>> pairs;
     
     // Metadata columns to exclude (EXCODE, TRT, CR, RN are metadata in EVALUATE.OUT)
-    QStringList metadataColumns = {"RUN", "TRNO", "EXPNO", "EXPERIMENT", "TREATMENT", "TRTNO", "TRT", "EXP", 
+    QStringList metadataColumns = {"RUN", "RUNNO", "TRNO", "EXPNO", "EXPERIMENT", "TREATMENT", "TRTNO", "TRT", "EXP", 
                                    "EXCODE", "CR", "RN"};
     
     // Find all simulated variables (ending with 'S')
@@ -2513,7 +2666,7 @@ QVector<QPair<QString, QString>> DataProcessor::getAllEvaluateVariables(const Da
     QVector<QPair<QString, QString>> variables;
     
     // Metadata columns to exclude (EXCODE, TRT, CR, RN are metadata in EVALUATE.OUT)
-    QStringList metadataColumns = {"RUN", "TRNO", "EXPNO", "EXPERIMENT", "TREATMENT", "TRTNO", "TRT", "EXP", 
+    QStringList metadataColumns = {"RUN", "RUNNO", "TRNO", "EXPNO", "EXPERIMENT", "TREATMENT", "TRTNO", "TRT", "EXP", 
                                    "EXCODE", "CR", "RN"};
     
     for (const QString &colName : evaluateData.columnNames) {

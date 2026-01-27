@@ -1,14 +1,8 @@
 @echo off
-REM Suppress all output except errors for final build
-if "%1"=="quiet" (
-    @echo off >nul 2>&1
-    set QUIET_MODE=1
-) else (
-    echo ========================================
-    echo GB2 Build and Deployment Script
-    echo ========================================
-    echo.
-)
+echo ========================================
+echo GB2 Build and Deployment Script
+echo ========================================
+echo.
 
 REM Set Qt license bypass
 set QTFRAMEWORK_BYPASS_LICENSE_CHECK=1
@@ -103,7 +97,7 @@ mkdir build_win
 cd build_win
 
 echo.
-if not defined QUIET_MODE echo Step 2: Configuring with CMake...
+echo Step 2: Configuring with CMake...
 
 REM Add MinGW to PATH temporarily
 set PATH=%MINGW_PATH%;%PATH%
@@ -115,21 +109,15 @@ if not exist "%MINGW_PATH%\g++.exe" (
     exit /b 1
 )
 
-if not defined QUIET_MODE (
-    echo Using compiler: %MINGW_PATH%\g++.exe
-    echo Using Qt path: %QT_DIR%
-)
+echo Using compiler: %MINGW_PATH%\g++.exe
+echo Using Qt path: %QT_DIR%
 
-if defined QUIET_MODE (
-    "%CMAKE_PATH%" .. -G "MinGW Makefiles" -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER="%MINGW_PATH%\g++.exe" -DCMAKE_C_COMPILER="%MINGW_PATH%\gcc.exe" -DCMAKE_MAKE_PROGRAM="%MINGW_PATH%\mingw32-make.exe" -DCMAKE_PREFIX_PATH="%QT_DIR%" >nul 2>&1
-) else (
-    "%CMAKE_PATH%" .. -G "MinGW Makefiles" ^
-      -DCMAKE_BUILD_TYPE=Release ^
-      -DCMAKE_CXX_COMPILER="%MINGW_PATH%\g++.exe" ^
-      -DCMAKE_C_COMPILER="%MINGW_PATH%\gcc.exe" ^
-      -DCMAKE_MAKE_PROGRAM="%MINGW_PATH%\mingw32-make.exe" ^
-      -DCMAKE_PREFIX_PATH="%QT_DIR%"
-)
+"%CMAKE_PATH%" .. -G "MinGW Makefiles" ^
+  -DCMAKE_BUILD_TYPE=Release ^
+  -DCMAKE_CXX_COMPILER="%MINGW_PATH%\g++.exe" ^
+  -DCMAKE_C_COMPILER="%MINGW_PATH%\gcc.exe" ^
+  -DCMAKE_MAKE_PROGRAM="%MINGW_PATH%\mingw32-make.exe" ^
+  -DCMAKE_PREFIX_PATH="%QT_DIR%"
 
 if %ERRORLEVEL% neq 0 (
     echo ERROR: CMake configuration failed!
@@ -137,13 +125,9 @@ if %ERRORLEVEL% neq 0 (
     exit /b 1
 )
 
-if not defined QUIET_MODE echo.
-if not defined QUIET_MODE echo Step 3: Building application...
-if defined QUIET_MODE (
-    "%MINGW_PATH%\mingw32-make.exe" >nul 2>&1
-) else (
-    "%MINGW_PATH%\mingw32-make.exe"
-)
+echo.
+echo Step 3: Building application...
+"%MINGW_PATH%\mingw32-make.exe"
 
 if %ERRORLEVEL% neq 0 (
     echo ERROR: Build failed!
@@ -151,8 +135,8 @@ if %ERRORLEVEL% neq 0 (
     exit /b 1
 )
 
-if not defined QUIET_MODE echo.
-if not defined QUIET_MODE echo Step 4: Creating deployment folder...
+echo.
+echo Step 4: Creating deployment folder...
 cd /d "%PROJECT_DIR%"
 if exist manual_deployment rmdir /s /q manual_deployment
 mkdir manual_deployment
@@ -170,13 +154,9 @@ if exist build_win\bin\GB2.exe (
 REM Copy resources
 if exist resources xcopy /E /I resources manual_deployment\resources
 
-if not defined QUIET_MODE echo.
-if not defined QUIET_MODE echo Step 5: Deploying Qt6 dependencies...
-if defined QUIET_MODE (
-    "%QT_DIR%\bin\windeployqt.exe" --release --no-translations --no-system-d3d-compiler --no-opengl-sw manual_deployment\GB2.exe >nul 2>&1
-) else (
-    "%QT_DIR%\bin\windeployqt.exe" --release --no-translations --no-system-d3d-compiler --no-opengl-sw manual_deployment\GB2.exe
-)
+echo.
+echo Step 5: Deploying Qt6 dependencies...
+"%QT_DIR%\bin\windeployqt.exe" --release --no-translations --no-system-d3d-compiler --no-opengl-sw manual_deployment\GB2.exe
 
 if %ERRORLEVEL% neq 0 (
     echo ERROR: windeployqt failed!
@@ -184,8 +164,8 @@ if %ERRORLEVEL% neq 0 (
     exit /b 1
 )
 
-if not defined QUIET_MODE echo.
-if not defined QUIET_MODE echo Step 6: Removing unnecessary files and folders...
+echo.
+echo Step 6: Removing unnecessary files and folders...
 REM Remove unwanted plugin folders (KEEP platforms folder - it's essential!)
 if exist manual_deployment\generic rmdir /s /q manual_deployment\generic
 if exist manual_deployment\iconengines rmdir /s /q manual_deployment\iconengines
@@ -200,35 +180,30 @@ if exist manual_deployment\Qt6Svg.dll del manual_deployment\Qt6Svg.dll
 if exist manual_deployment\D3Dcompiler_47.dll del manual_deployment\D3Dcompiler_47.dll
 if exist manual_deployment\opengl32sw.dll del manual_deployment\opengl32sw.dll
 
-if not defined QUIET_MODE (
-    echo Removed unnecessary files to minimize deployment size
-    echo KEPT: platforms folder, libgcc/libwinpthread
-    echo.
-    echo Step 7: Testing deployment...
-    cd manual_deployment
-    echo Testing if GB2.exe runs...
-    start "" GB2.exe
-    timeout /t 3 /nobreak >nul
-    echo.
-    echo ========================================
-    echo SUCCESS: Build and deployment complete!
-    echo ========================================
-    echo.
-    echo Deployment folder: %PROJECT_DIR%manual_deployment
-    echo.
-    echo Next steps:
-    echo 1. Open Enigma Virtual Box
-    echo 2. Input File: %PROJECT_DIR%manual_deployment\GB2.exe
-    echo 3. Add ALL files from manual_deployment folder
-    echo 4. PRESERVE folder structure (especially platforms\)
-    echo 5. Process to create single executable
-    echo.
-    echo Expected result: ~60MB single executable
-    echo ========================================
-    pause
-) else (
-    cd manual_deployment
-    start "" GB2.exe >nul 2>&1
-    timeout /t 2 /nobreak >nul
-    echo Build complete. Deployment folder: %PROJECT_DIR%manual_deployment
-)
+echo Removed unnecessary files to minimize deployment size
+echo KEPT: platforms folder, libgcc/libwinpthread
+
+echo.
+echo Step 7: Testing deployment...
+cd manual_deployment
+echo Testing if GB2.exe runs...
+start "" GB2.exe
+timeout /t 3 /nobreak >nul
+
+echo.
+echo ========================================
+echo SUCCESS: Build and deployment complete!
+echo ========================================
+echo.
+echo Deployment folder: %PROJECT_DIR%manual_deployment
+echo.
+echo Next steps:
+echo 1. Open Enigma Virtual Box
+echo 2. Input File: %PROJECT_DIR%manual_deployment\GB2.exe
+echo 3. Add ALL files from manual_deployment folder
+echo 4. PRESERVE folder structure (especially platforms\)
+echo 5. Process to create single executable
+echo.
+echo Expected result: ~60MB single executable
+echo ========================================
+pause

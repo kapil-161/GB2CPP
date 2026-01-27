@@ -187,6 +187,13 @@ PlotWidget::PlotWidget(QWidget *parent)
 
     m_markerSymbols = {"o", "s", "d", "t", "+", "x", "p", "h", "star"};
     
+    // Initialize optimization variables
+    m_autoFitPending = false;
+    m_autoFitTimer = new QTimer(this);
+    m_autoFitTimer->setSingleShot(true);
+    m_autoFitTimer->setInterval(100);  // 100ms delay for auto-fit
+    connect(m_autoFitTimer, &QTimer::timeout, this, &PlotWidget::autoFitAxes);
+    
     setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
 }
 
@@ -517,6 +524,9 @@ void PlotWidget::setupAxes(const QString &xVar)
 
 void PlotWidget::autoFitAxes()
 {
+    // Reset pending flag when auto-fit executes
+    m_autoFitPending = false;
+    
     qDebug() << "PlotWidget::autoFitAxes() - CALLED";
     
     auto series = m_chart->series();
@@ -905,17 +915,31 @@ QMap<QString, QMap<QString, ScalingInfo>> PlotWidget::calculateScalingFactors(co
     QMap<QString, double> magnitudes;
     QMap<QString, double> maxValues;
     
-    // Collect statistics for simulated data
+    // Collect statistics from both simulated and observed data
     for (const QString &var : yVars) {
-        const DataColumn *column = simData.getColumn(var);
-        if (!column) continue;
-        
         QVector<double> values;
-        for (const QVariant &val : column->data) {
-            if (!DataProcessor::isMissingValue(val)) {
-                bool ok;
-                double numVal = val.toDouble(&ok);
-                if (ok) values.append(numVal);
+        
+        // Collect values from simulated data
+        const DataColumn *simColumn = simData.getColumn(var);
+        if (simColumn) {
+            for (const QVariant &val : simColumn->data) {
+                if (!DataProcessor::isMissingValue(val)) {
+                    bool ok;
+                    double numVal = val.toDouble(&ok);
+                    if (ok) values.append(numVal);
+                }
+            }
+        }
+        
+        // Collect values from observed data
+        const DataColumn *obsColumn = obsData.getColumn(var);
+        if (obsColumn) {
+            for (const QVariant &val : obsColumn->data) {
+                if (!DataProcessor::isMissingValue(val)) {
+                    bool ok;
+                    double numVal = val.toDouble(&ok);
+                    if (ok) values.append(numVal);
+                }
             }
         }
         
@@ -948,7 +972,7 @@ QMap<QString, QMap<QString, ScalingInfo>> PlotWidget::calculateScalingFactors(co
                 maxValues[var] = maxVal;
                 qDebug() << "PlotWidget: Variable" << var << "- values count:" << values.size() 
                          << "min:" << minVal << "max:" << maxVal << "meanAbs:" << meanAbs 
-                         << "magnitude:" << magnitudes[var];
+                         << "magnitude:" << magnitudes[var] << "(from sim + obs data)";
             } else {
                 qDebug() << "PlotWidget: Variable" << var << "has zero mean absolute value, skipping";
             }
@@ -1265,6 +1289,7 @@ void PlotWidget::plotDatasets(const DataTable &simData, const DataTable &obsData
     
     QVector<PlotData> plotDataList;
     int colorIndex = 0;
+    QSet<QString> simulatedTreatmentKeys; // Collect treatment keys (including run info) from simulated data
     
     qDebug() << "PlotWidget: plotDatasets - Plotting simulated data...";
     // Plot simulated data
@@ -1341,27 +1366,10 @@ void PlotWidget::plotDatasets(const DataTable &simData, const DataTable &obsData
             // Handle DATE and other date-related variables specially
             if (xVar == "DATE") {
                 QString dateStr = xVal.toString();
-                qDebug() << "PlotWidget: Parsing DATE string:" << dateStr;
-                
-                QDateTime dateTime = QDateTime::fromString(dateStr, "yyyy-MM-dd");
-                if (!dateTime.isValid()) {
-                    // Try alternative formats
-                    dateTime = QDateTime::fromString(dateStr, "yyyyMMdd");
-                    if (!dateTime.isValid()) {
-                        dateTime = QDateTime::fromString(dateStr, Qt::ISODate);
-                        if (!dateTime.isValid()) {
-                            // Try DSSAT format (might be YYYY-DOY)
-                            dateTime = QDateTime::fromString(dateStr, "yyyy-DDD");
-                        }
-                    }
-                }
-                
-                if (dateTime.isValid()) {
-                    x = dateTime.toMSecsSinceEpoch();  // Use milliseconds for QDateTimeAxis
+                // Use cached date parsing (reduces logging and improves performance)
+                if (parseDateCached(dateStr, x, false)) {
                     xOk = true;
-                    qDebug() << "PlotWidget: Successfully parsed DATE" << dateStr << "to timestamp" << x;
                 } else {
-                    qDebug() << "PlotWidget: Failed to parse DATE string:" << dateStr;
                     continue; // Skip invalid dates
                 }
             } else if (xVar == "SDAT" || xVar == "PDAT" || xVar == "HDAT" || xVar == "MDAT" || 
@@ -1406,10 +1414,21 @@ void PlotWidget::plotDatasets(const DataTable &simData, const DataTable &obsData
             }
             
             experimentTreatmentData[expTrtKey].append(QPointF(x, y));
-            qDebug() << "PlotWidget: *** POINT ADDED *** X:" << x << "Y:" << y << "for" << expTrtKey;
+            // Removed excessive POINT ADDED logging (was generating 333+ log entries per plot)
         }
         
         qDebug() << "PlotWidget: Selected treatments filter:" << treatments;
+        
+        // Collect treatment keys from this variable's data (including run when present).
+        // Also add base keys (crop__experiment__treatment) so observed data (no run) can match.
+        for (auto it = experimentTreatmentData.begin(); it != experimentTreatmentData.end(); ++it) {
+            simulatedTreatmentKeys.insert(it.key());
+            QStringList keyParts = it.key().split("__");
+            if (keyParts.size() >= 3) {
+                QString baseKey = QString("%1__%2__%3").arg(keyParts[0]).arg(keyParts[1]).arg(keyParts[2]);
+                simulatedTreatmentKeys.insert(baseKey);
+            }
+        }
         
         // Pre-compute how many runs exist per crop+experiment+treatment to decide if RUN needs to be shown
         QMap<QString, int> baseKeyToRunCount;
@@ -1455,10 +1474,11 @@ void PlotWidget::plotDatasets(const DataTable &simData, const DataTable &obsData
             }
             plotData.variable = yVar;
             plotData.points = it.value();
-            // Use base treatmentId (without RUN) for color assignment so observed and simulated data match
-            // RUN information is used for display name but not for color matching
-            QString treatmentId = crop + "__" + experiment + "__" + treatment;
-            plotData.color = getColorForTreatment(treatmentId, colorIndex); // Use base treatment identifier for consistent colors
+            // Use run number as primary treatment ID when present, otherwise use crop__experiment__treatment
+            QString treatmentId = runPart.isEmpty()
+                ? QString("%1__%2__%3").arg(crop).arg(experiment).arg(treatment)
+                : runPart; // Use run number as primary ID when run is present
+            plotData.color = getColorForTreatment(treatmentId, colorIndex);
             // Line style based on variable index, not treatment index
             plotData.lineStyleIndex = yVars.indexOf(yVar) % 4;
             // Marker based on variable index to ensure each variable gets a different marker
@@ -1471,13 +1491,7 @@ void PlotWidget::plotDatasets(const DataTable &simData, const DataTable &obsData
     }
     
     // Collect treatment keys from simulated data to filter observed data
-    QSet<QString> simulatedTreatmentKeys;
-    for (const PlotData &plotData : plotDataList) {
-        if (!plotData.isObserved) {
-            QString key = QString("%1__%2__%3").arg(plotData.crop).arg(plotData.experiment).arg(plotData.treatment);
-            simulatedTreatmentKeys.insert(key);
-        }
-    }
+    // Keys are collected inside the yVar loop above, so simulatedTreatmentKeys is already populated
     
     qDebug() << "PlotWidget: plotDatasets - Plotting observed data (if available). Row count:" << obsData.rowCount << ", Columns:" << obsData.columnNames;
     qDebug() << "PlotWidget: Available simulated treatment keys:" << simulatedTreatmentKeys;
@@ -1537,10 +1551,10 @@ void PlotWidget::plotDatasets(const DataTable &simData, const DataTable &obsData
                     }
                 }
                 
-                // Create unique key for crop-experiment-treatment combination
+                // Observed data has no run; always use base key crop__experiment__treatment
                 QString expTrtKey = QString("%1__%2__%3").arg(crop).arg(experiment).arg(trt);
                 
-                // Skip observed data if treatment key doesn't exist in simulated data
+                // Skip observed data if base treatment key doesn't exist in simulated data
                 if (!simulatedTreatmentKeys.contains(expTrtKey)) {
                     qDebug() << "PlotWidget: Skipping observed data for treatment key not found in simulated data:" << expTrtKey;
                     continue;
@@ -1559,27 +1573,10 @@ void PlotWidget::plotDatasets(const DataTable &simData, const DataTable &obsData
                 // Handle DATE variable specially
                 if (xVar == "DATE") {
                     QString dateStr = xVal.toString();
-                    qDebug() << "PlotWidget: Parsing observed DATE string:" << dateStr;
-                    
-                    QDateTime dateTime = QDateTime::fromString(dateStr, "yyyy-MM-dd");
-                    if (!dateTime.isValid()) {
-                        // Try alternative formats
-                        dateTime = QDateTime::fromString(dateStr, "yyyyMMdd");
-                        if (!dateTime.isValid()) {
-                            dateTime = QDateTime::fromString(dateStr, Qt::ISODate);
-                            if (!dateTime.isValid()) {
-                                // Try DSSAT format (might be YYYY-DOY)
-                                dateTime = QDateTime::fromString(dateStr, "yyyy-DDD");
-                            }
-                        }
-                    }
-                    
-                    if (dateTime.isValid()) {
-                        x = dateTime.toMSecsSinceEpoch();  // Use milliseconds for QDateTimeAxis
+                    // Use cached date parsing (reduces logging and improves performance)
+                    if (parseDateCached(dateStr, x, true)) {
                         xOk = true;
-                        qDebug() << "PlotWidget: Successfully parsed observed DATE" << dateStr << "to timestamp" << x;
                     } else {
-                        qDebug() << "PlotWidget: Failed to parse observed DATE string:" << dateStr;
                         continue; // Skip invalid dates
                     }
                 } else {
@@ -1598,10 +1595,10 @@ void PlotWidget::plotDatasets(const DataTable &simData, const DataTable &obsData
             }
             
             // Create plot data for observed data (each experiment-treatment combination)
+            // Observed data has no run; keys are always crop__experiment__treatment
             for (auto it = experimentTreatmentData.begin(); it != experimentTreatmentData.end(); ++it) {
-                // Parse the crop-experiment-treatment key
                 QStringList keyParts = it.key().split("__");
-                if (keyParts.size() != 3) continue;
+                if (keyParts.size() < 3) continue;
                 
                 QString crop = keyParts[0];
                 QString experiment = keyParts[1];
@@ -1611,11 +1608,10 @@ void PlotWidget::plotDatasets(const DataTable &simData, const DataTable &obsData
                 plotData.crop = crop;
                 plotData.treatment = treatment;
                 plotData.experiment = experiment;
-                // Get treatment display name using the actual experiment and crop from data
                 plotData.treatmentName = getTreatmentDisplayName(treatment, experiment, crop);
                 plotData.variable = yVar;
-                // Use base treatmentId (without RUN) to match simulated data colors
-                QString treatmentId = crop + "__" + experiment + "__" + treatment;
+                // Observed has no run; always use base treatment ID
+                QString treatmentId = QString("%1__%2__%3").arg(crop).arg(experiment).arg(treatment);
                 
                 // Aggregate replicates if error bars are enabled (ONLY for observed data, not simulated)
                 if (m_plotSettings.showErrorBars && it.value().size() > 0) {
@@ -1915,14 +1911,11 @@ void PlotWidget::addSeriesToPlot(const QVector<PlotData> &plotDataList)
     
     qDebug() << "addSeriesToPlot: Chart has" << m_chart->series().count() << "series and" << m_chart->axes().count() << "axes";
     
-    // Auto-fit the chart view to the data
-    autoFitAxes();
-    
-    // Ensure auto-fit is applied after chart update with a small delay
-    QTimer::singleShot(50, this, [this]() {
-        autoFitAxes();
-        qDebug() << "addSeriesToPlot: Delayed auto-fit completed";
-    });
+    // Schedule auto-fit using timer (consolidates multiple auto-fit calls)
+    if (m_autoFitTimer && !m_autoFitPending) {
+        m_autoFitPending = true;
+        m_autoFitTimer->start();
+    }
     
     
     // Style axes
@@ -2169,8 +2162,50 @@ void PlotWidget::calculateMetrics()
     
     qDebug() << "PlotWidget::calculateMetrics() - Calculated" << metrics.size() << "metrics";
     
+    // Sort metrics by Treatment (numerically), then by Variable, Experiment, and Crop
     if (!metrics.isEmpty()) {
-        qDebug() << "PlotWidget: Emitting metricsCalculated signal with" << metrics.size() << "metrics";
+        std::sort(metrics.begin(), metrics.end(), [](const QMap<QString, QVariant>& a, const QMap<QString, QVariant>& b) {
+            // Extract Treatment values and convert to integers for numerical sorting
+            QString trtA = a.value("Treatment").toString();
+            QString trtB = b.value("Treatment").toString();
+            
+            bool okA, okB;
+            int trtNumA = trtA.toInt(&okA);
+            int trtNumB = trtB.toInt(&okB);
+            
+            // If both are valid integers, sort numerically
+            if (okA && okB) {
+                if (trtNumA != trtNumB) {
+                    return trtNumA < trtNumB;
+                }
+            } else {
+                // If not both integers, sort as strings
+                if (trtA != trtB) {
+                    return trtA < trtB;
+                }
+            }
+            
+            // If treatments are equal, sort by Variable
+            QString varA = a.value("Variable").toString();
+            QString varB = b.value("Variable").toString();
+            if (varA != varB) {
+                return varA < varB;
+            }
+            
+            // If variables are equal, sort by Experiment
+            QString expA = a.value("Experiment").toString();
+            QString expB = b.value("Experiment").toString();
+            if (expA != expB) {
+                return expA < expB;
+            }
+            
+            // If experiments are equal, sort by Crop
+            QString cropA = a.value("Crop").toString();
+            QString cropB = b.value("Crop").toString();
+            return cropA < cropB;
+        });
+        
+        qDebug() << "PlotWidget: Emitting metricsCalculated signal with" << metrics.size() << "metrics (sorted by Treatment)";
         emit metricsCalculated(metrics);
     } else {
         qDebug() << "PlotWidget: No metrics to emit - metrics vector is empty";
@@ -2258,9 +2293,55 @@ void PlotWidget::clear()
     m_obsData.clear();
     m_scaleFactors.clear();
     
+    // Clear date cache when starting new plot
+    m_dateCache.clear();
+    m_autoFitPending = false;
+    if (m_autoFitTimer) {
+        m_autoFitTimer->stop();
+    }
+    
     // Reset scatter mode and show buttons (they'll be hidden again if scatter mode is set)
     m_isScatterMode = false;
     setXAxisButtonsVisible(true);
+}
+
+// Optimization: Cached date parsing to avoid re-parsing same dates
+bool PlotWidget::parseDateCached(const QString &dateStr, double &timestamp, bool isObserved)
+{
+    // Check cache first
+    if (m_dateCache.contains(dateStr)) {
+        timestamp = m_dateCache[dateStr];
+        return true;
+    }
+    
+    // Parse the date
+    QDateTime dateTime = QDateTime::fromString(dateStr, "yyyy-MM-dd");
+    if (!dateTime.isValid()) {
+        // Try alternative formats
+        dateTime = QDateTime::fromString(dateStr, "yyyyMMdd");
+        if (!dateTime.isValid()) {
+            dateTime = QDateTime::fromString(dateStr, Qt::ISODate);
+            if (!dateTime.isValid()) {
+                // Try DSSAT format (might be YYYY-DOY)
+                dateTime = QDateTime::fromString(dateStr, "yyyy-DDD");
+            }
+        }
+    }
+    
+    if (dateTime.isValid()) {
+        timestamp = dateTime.toMSecsSinceEpoch();
+        // Cache the result
+        m_dateCache[dateStr] = timestamp;
+        return true;
+    }
+    
+    // Only log errors, not every parse attempt
+    if (!isObserved) {
+        qDebug() << "PlotWidget: Failed to parse DATE string:" << dateStr;
+    } else {
+        qDebug() << "PlotWidget: Failed to parse observed DATE string:" << dateStr;
+    }
+    return false;
 }
 
 void PlotWidget::exportPlot(const QString &filePath, const QString &format)
@@ -2798,11 +2879,11 @@ void PlotWidget::updatePlotWithScaling()
     qDebug() << "PlotWidget::updatePlotWithScaling() - About to update scaling label";
     updateScalingLabel(m_currentYVars);
     
-    // Ensure final auto-fit after all data is plotted and scaled
-    QTimer::singleShot(100, this, [this]() {
-        autoFitAxes();
-        qDebug() << "updatePlotWithScaling: Final delayed auto-fit completed";
-    });
+    // Schedule auto-fit using timer (consolidates multiple auto-fit calls)
+    if (m_autoFitTimer && !m_autoFitPending) {
+        m_autoFitPending = true;
+        m_autoFitTimer->start();
+    }
     
     qDebug() << "PlotWidget::updatePlotWithScaling() - COMPLETED";
 }
@@ -2927,6 +3008,15 @@ void PlotWidget::updateLegendAdvanced(const QMap<QString, QMap<QString, QVector<
                     treatmentData["name"] = plotData->treatmentName;
                     treatmentData["trt_id"] = plotData->treatment;
                     treatmentData["experiment_id"] = plotData->experiment.isEmpty() ? "default" : plotData->experiment;
+                    // Extract treatmentId (run number when present) by finding which key in m_treatmentColorMap matches this color
+                    QString treatmentId;
+                    for (auto it = m_treatmentColorMap.begin(); it != m_treatmentColorMap.end(); ++it) {
+                        if (it.value() == plotData->color) {
+                            treatmentId = it.key();
+                            break;
+                        }
+                    }
+                    treatmentData["treatment_id"] = treatmentId; // Store treatmentId for sorting
                     treatmentData["sim"] = QVariant::fromValue(plotData);
                     treatmentData["obs"] = QVariant();
                     varTreatments[uniqueKey] = treatmentData;
@@ -2961,11 +3051,31 @@ void PlotWidget::updateLegendAdvanced(const QMap<QString, QMap<QString, QVector<
                     treatmentData["name"] = plotData->treatmentName;
                     treatmentData["trt_id"] = plotData->treatment;
                     treatmentData["experiment_id"] = plotData->experiment.isEmpty() ? "default" : plotData->experiment;
+                    // Extract treatmentId (run number when present) by finding which key in m_treatmentColorMap matches this color
+                    QString treatmentId;
+                    for (auto it = m_treatmentColorMap.begin(); it != m_treatmentColorMap.end(); ++it) {
+                        if (it.value() == plotData->color) {
+                            treatmentId = it.key();
+                            break;
+                        }
+                    }
+                    treatmentData["treatment_id"] = treatmentId; // Store treatmentId for sorting
                     treatmentData["sim"] = QVariant();
                     treatmentData["obs"] = QVariant::fromValue(plotData);
                     varTreatments[uniqueKey] = treatmentData;
                 } else {
                     varTreatments[uniqueKey]["obs"] = QVariant::fromValue(plotData);
+                    // Update treatment_id if not set (shouldn't happen, but just in case)
+                    if (!varTreatments[uniqueKey].contains("treatment_id")) {
+                        QString treatmentId;
+                        for (auto it = m_treatmentColorMap.begin(); it != m_treatmentColorMap.end(); ++it) {
+                            if (it.value() == plotData->color) {
+                                treatmentId = it.key();
+                                break;
+                            }
+                        }
+                        varTreatments[uniqueKey]["treatment_id"] = treatmentId;
+                    }
                 }
             }
         }
@@ -3044,7 +3154,47 @@ void PlotWidget::updateLegendAdvanced(const QMap<QString, QMap<QString, QVector<
         // Create rows for each treatment (now properly unique) (matching Python)
         // For scatter plots, this will show the variable name with marker (no duplicate header)
         QStringList sortedKeys = varTreatments.keys();
-        sortedKeys.sort();
+        
+        // Custom sort: sort by treatment ID (run number when present, numeric) otherwise alphabetically
+        std::sort(sortedKeys.begin(), sortedKeys.end(), [&varTreatments](const QString& a, const QString& b) {
+            QMap<QString, QVariant> dataA = varTreatments[a];
+            QMap<QString, QVariant> dataB = varTreatments[b];
+            
+            QString treatmentIdA = dataA["treatment_id"].toString();
+            QString treatmentIdB = dataB["treatment_id"].toString();
+            
+            // Extract run number from treatmentId (e.g., "RUN1" -> 1, "RUN2" -> 2)
+            auto extractRunNumber = [](const QString& treatmentId) -> int {
+                if (treatmentId.startsWith("RUN")) {
+                    QString numStr = treatmentId.mid(3); // After "RUN"
+                    bool ok;
+                    int runNum = numStr.toInt(&ok);
+                    if (ok) {
+                        return runNum;
+                    }
+                }
+                return -1; // Not a run number
+            };
+            
+            int runA = extractRunNumber(treatmentIdA);
+            int runB = extractRunNumber(treatmentIdB);
+            
+            // If both have run numbers, sort numerically
+            if (runA >= 0 && runB >= 0) {
+                return runA < runB;
+            }
+            // If only A has run number, A comes first
+            if (runA >= 0 && runB < 0) {
+                return true;
+            }
+            // If only B has run number, B comes first
+            if (runA < 0 && runB >= 0) {
+                return false;
+            }
+            // If neither has run number, sort alphabetically by treatment ID
+            return treatmentIdA < treatmentIdB;
+        });
+        
         for (const QString& uniqueKey : sortedKeys) {
             createLegendRowFromData(varTreatments[uniqueKey], varName, displayName);
         }
@@ -4392,6 +4542,42 @@ void PlotWidget::plotScatter(
                 }
             }
             metrics.append(metricMap);
+        }
+        
+        // Sort scatter plot metrics by Experiment (which serves as treatment identifier), then by Variable and Crop
+        if (!metrics.isEmpty()) {
+            std::sort(metrics.begin(), metrics.end(), [](const QMap<QString, QVariant>& a, const QMap<QString, QVariant>& b) {
+                // Sort by Experiment (treatment identifier in scatter plots)
+                QString expA = a.value("Experiment").toString();
+                QString expB = b.value("Experiment").toString();
+                
+                // Try to extract numeric part for numerical sorting
+                bool okA, okB;
+                int expNumA = expA.toInt(&okA);
+                int expNumB = expB.toInt(&okB);
+                
+                if (okA && okB) {
+                    if (expNumA != expNumB) {
+                        return expNumA < expNumB;
+                    }
+                } else {
+                    if (expA != expB) {
+                        return expA < expB;
+                    }
+                }
+                
+                // If experiments are equal, sort by Variable
+                QString varA = a.value("Variable").toString();
+                QString varB = b.value("Variable").toString();
+                if (varA != varB) {
+                    return varA < varB;
+                }
+                
+                // If variables are equal, sort by Crop
+                QString cropA = a.value("Crop").toString();
+                QString cropB = b.value("Crop").toString();
+                return cropA < cropB;
+            });
         }
         
         // Emit metrics signal

@@ -263,6 +263,9 @@ private:
     QString getTreatmentNameFromData(const QString &treatment, const QString &experiment, const QString &crop);
     void testScalingFunctionality(); // TEMPORARY: Test scaling logic
     
+    // Optimization: Cached date parsing helper
+    bool parseDateCached(const QString &dateStr, double &timestamp, bool isObserved = false);
+    
     // UI Components
     QHBoxLayout *m_mainLayout;
     QWidget *m_leftContainer;
@@ -315,6 +318,13 @@ private:
     
     // Data processor reference
     DataProcessor *m_dataProcessor;
+    
+    // Optimization: Date parsing cache to avoid re-parsing same dates
+    QMap<QString, qint64> m_dateCache;
+    
+    // Optimization: Track pending auto-fit to avoid multiple calls
+    bool m_autoFitPending;
+    QTimer *m_autoFitTimer;
 };
 
 #endif // PLOTWIDGET_H
