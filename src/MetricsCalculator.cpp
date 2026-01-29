@@ -6,6 +6,8 @@
 double MetricsCalculator::dStat(const QVector<double>& measured, const QVector<double>& simulated)
 {
     try {
+        qDebug() << "[DEBUG] MetricsCalculator::dStat - ENTRY. measured size:" << measured.size() << ", simulated size:" << simulated.size();
+
         if (measured.isEmpty() || simulated.isEmpty()) {
             qWarning() << "Empty input arrays for d-stat calculation";
             return 0.0;
@@ -20,13 +22,17 @@ double MetricsCalculator::dStat(const QVector<double>& measured, const QVector<d
         auto filteredPair = filterPairs(measured, simulated);
         const auto& M = filteredPair.first;
         const auto& S = filteredPair.second;
-        
+
+        qDebug() << "[DEBUG] MetricsCalculator::dStat - After filterPairs: valid pairs n =" << M.size()
+                 << "(dropped" << (measured.size() - M.size()) << ")";
+
         if (M.isEmpty()) {
             qWarning() << "No valid data pairs for d-stat calculation";
             return 0.0;
         }
         
         double M_mean = mean(M);
+        qDebug() << "[DEBUG] MetricsCalculator::dStat - M_mean (mean of measured) =" << M_mean;
         
         // Calculate numerator: sum((M - S)^2)
         double numerator = 0.0;
@@ -41,12 +47,25 @@ double MetricsCalculator::dStat(const QVector<double>& measured, const QVector<d
             double term = std::abs(M[i] - M_mean) + std::abs(S[i] - M_mean);
             denominator += term * term;
         }
+
+        qDebug() << "[DEBUG] MetricsCalculator::dStat - numerator sum((M-S)^2) =" << numerator
+                 << ", denominator sum((|M-M_mean|+|S-M_mean|)^2) =" << denominator;
         
         if (denominator == 0.0) {
+            qDebug() << "[DEBUG] MetricsCalculator::dStat - denominator 0, returning 0";
             return 0.0;
         }
         
-        return 1.0 - (numerator / denominator);
+        double d = 1.0 - (numerator / denominator);
+        qDebug() << "[DEBUG] MetricsCalculator::dStat - d-stat = 1 - (num/den) =" << d;
+        if (!M.isEmpty()) {
+            QString pairs;
+            int n = std::min(3, static_cast<int>(M.size()));
+            for (int i = 0; i < n; ++i)
+                pairs += QString(" (%1,%2)").arg(M[i], 0, 'f', 4).arg(S[i], 0, 'f', 4);
+            qDebug() << "[DEBUG] MetricsCalculator::dStat - First 3 pairs (M=measured, S=simulated):" << pairs;
+        }
+        return d;
         
     } catch (const std::exception& e) {
         qWarning() << "Error calculating d-stat:" << e.what();
@@ -159,6 +178,9 @@ QVariantMap MetricsCalculator::calculateMetrics(const QVector<double>& simValues
     QVariantMap result;
     
     try {
+        qDebug() << "[DEBUG] MetricsCalculator::calculateMetrics - ENTRY. TRT:" << treatmentNumber
+                 << ", simValues size:" << simValues.size() << ", obsValues size:" << obsValues.size();
+
         if (simValues.isEmpty() || obsValues.isEmpty()) {
             qWarning() << "Empty input arrays for metrics calculation";
             return result;
@@ -168,10 +190,15 @@ QVariantMap MetricsCalculator::calculateMetrics(const QVector<double>& simValues
         int minLength = std::min(simValues.size(), obsValues.size());
         QVector<double> sim_subset = simValues.mid(0, minLength);
         QVector<double> obs_subset = obsValues.mid(0, minLength);
+        qDebug() << "[DEBUG] MetricsCalculator::calculateMetrics - minLength:" << minLength
+                 << ", using sim[0.." << (minLength - 1) << "], obs[0.." << (minLength - 1) << "]";
         
-        auto filteredPair = filterPairs(sim_subset, obs_subset);
-        const auto& sim = filteredPair.second;  // simulated
+        auto filteredPair = filterPairs(obs_subset, sim_subset);
         const auto& obs = filteredPair.first;   // observed
+        const auto& sim = filteredPair.second;  // simulated
+
+        qDebug() << "[DEBUG] MetricsCalculator::calculateMetrics - After filterPairs: obs size:" << obs.size()
+                 << ", sim size:" << sim.size();
         
         if (obs.isEmpty()) {
             qWarning() << "No valid pairs after filtering for metrics calculation";
@@ -183,6 +210,8 @@ QVariantMap MetricsCalculator::calculateMetrics(const QVector<double>& simValues
         int n = obs.size();
         double rmse_value = rmse(obs, sim);
         double nrmse = (mean_obs != 0.0) ? (rmse_value / mean_obs) * 100.0 : 0.0;
+        qDebug() << "[DEBUG] MetricsCalculator::calculateMetrics - n:" << n << ", mean_obs:" << mean_obs
+                 << ", RMSE:" << rmse_value << ", NRMSE%:" << nrmse << "; calling dStat(obs, sim)...";
         double d_stat = dStat(obs, sim);
         // R² not calculated for time series data - leave as "-"
         // double r_squared = rSquared(obs, sim);
@@ -194,6 +223,9 @@ QVariantMap MetricsCalculator::calculateMetrics(const QVector<double>& simValues
         result["NRMSE"] = nrmse;
         result["Willmott's d-stat"] = d_stat;
         result["R²"] = "-";  // Not calculated for time series data
+
+        qDebug() << "[DEBUG] MetricsCalculator::calculateMetrics - RESULT TRT:" << treatmentNumber
+                 << "n:" << n << "RMSE:" << rmse_value << "d-stat:" << d_stat;
         
     } catch (const std::exception& e) {
         qWarning() << "Error calculating metrics:" << e.what();

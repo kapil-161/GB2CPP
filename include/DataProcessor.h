@@ -84,6 +84,8 @@ public: // Static utility functions
     static QMap<QString, QPair<QString, QString>> m_variableInfoCache;
     static bool m_variableInfoLoaded;
     static QString m_dssatBasePath;
+    static QVector<CropDetails> m_cropDetailsCache;
+    static bool m_cropDetailsCached;
 
     static void parseDataCDE();
     static QPair<QString, QString> getVariableInfo(const QString &variableName);

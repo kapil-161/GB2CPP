@@ -127,6 +127,8 @@ void DataTable::merge(const DataTable &other)
 QMap<QString, QPair<QString, QString>> DataProcessor::m_variableInfoCache;
 bool DataProcessor::m_variableInfoLoaded = false;
 QString DataProcessor::m_dssatBasePath = "";
+QVector<CropDetails> DataProcessor::m_cropDetailsCache;
+bool DataProcessor::m_cropDetailsCached = false;
 
 // DataProcessor implementation
 DataProcessor::DataProcessor(QObject *parent)
@@ -1445,9 +1447,16 @@ void DataProcessor::parseDataCDE()
 
 QVector<CropDetails> DataProcessor::getCropDetails()
 {
+    // Return cached results if available
+    if (m_cropDetailsCached && !m_cropDetailsCache.isEmpty()) {
+        return m_cropDetailsCache;
+    }
+
+    qDebug() << "DataProcessor::getCropDetails() - Reading DETAIL.CDE and DSSATPRO files (first time or cache cleared)";
+
     QVector<CropDetails> cropDetails;
-    
-    
+
+
     // Find DETAIL.CDE and DSSATPRO files
     QString detailPath = findDetailCde();
     QString dssatProPath = findDssatProFile();
@@ -1591,7 +1600,12 @@ QVector<CropDetails> DataProcessor::getCropDetails()
     for (auto it = cropMap.begin(); it != cropMap.end(); ++it) {
         cropDetails.append(it.value());
     }
-    
+
+    // Cache the results
+    m_cropDetailsCache = cropDetails;
+    m_cropDetailsCached = true;
+    qDebug() << "DataProcessor::getCropDetails() - Cached" << cropDetails.size() << "crop details";
+
     return cropDetails;
 }
 
