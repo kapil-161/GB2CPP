@@ -47,27 +47,21 @@ void ErrorBarChartView::setErrorBarData(const QMap<QAbstractSeries*, QVector<Err
     update();  // Trigger repaint
 }
 
-void ErrorBarChartView::paintEvent(QPaintEvent *event)
+void ErrorBarChartView::paintErrorBars(QPainter *painter, const QPoint &viewportOffset)
 {
-    // First, draw the chart normally
-    QChartView::paintEvent(event);
-    
-    // Then draw error bars on top
-    if (m_errorBars.isEmpty() || !chart()) {
-        return;
+    if (!painter || m_errorBars.isEmpty() || !chart()) return;
+
+    painter->save();
+    if (!viewportOffset.isNull()) {
+        painter->translate(viewportOffset);
     }
-    
-    QPainter painter(this->viewport());
-    painter.setRenderHint(QPainter::Antialiasing, true);
-    
-    // Get the chart's plot area
+    painter->setRenderHint(QPainter::Antialiasing, true);
+
     QRectF plotArea = chart()->plotArea();
-    
-    // Get axes for coordinate conversion
     QList<QAbstractAxis*> axes = chart()->axes();
     QAbstractAxis *xAxis = nullptr;
     QAbstractAxis *yAxis = nullptr;
-    
+
     for (QAbstractAxis *axis : axes) {
         if (axis->alignment() == Qt::AlignBottom || axis->alignment() == Qt::AlignTop) {
             xAxis = axis;
@@ -75,33 +69,28 @@ void ErrorBarChartView::paintEvent(QPaintEvent *event)
             yAxis = axis;
         }
     }
-    
+
     if (!xAxis || !yAxis) {
+        painter->restore();
         return;
     }
-    
-    // Draw error bars for each series
+
     for (auto it = m_errorBars.begin(); it != m_errorBars.end(); ++it) {
         QAbstractSeries *series = it.key();
         const QVector<ErrorBarData> &errorBars = it.value();
-        
+
         if (errorBars.isEmpty()) continue;
-        
-        // Get series color
+
         QColor color = Qt::black;
         if (auto lineSeries = qobject_cast<QLineSeries*>(series)) {
             color = lineSeries->pen().color();
         } else if (auto scatterSeries = qobject_cast<QScatterSeries*>(series)) {
-            // Prefer pen color; fall back to brush color
             QColor penColor = scatterSeries->pen().color();
             color = penColor.isValid() ? penColor : scatterSeries->brush().color();
         }
-        QPen errorPen(color, 1.5);
-        painter.setPen(errorPen);
-        
-        // Get axis ranges for coordinate conversion
+        painter->setPen(QPen(color, 1.5));
+
         double xMin, xMax, yMin, yMax;
-        
         if (QValueAxis *valueXAxis = qobject_cast<QValueAxis*>(xAxis)) {
             xMin = valueXAxis->min();
             xMax = valueXAxis->max();
@@ -111,39 +100,42 @@ void ErrorBarChartView::paintEvent(QPaintEvent *event)
         } else {
             continue;
         }
-        
+
         if (QValueAxis *valueYAxis = qobject_cast<QValueAxis*>(yAxis)) {
             yMin = valueYAxis->min();
             yMax = valueYAxis->max();
         } else {
             continue;
         }
-        
-        // Draw each error bar
+
         for (const ErrorBarData &errorBar : errorBars) {
-            // Convert data coordinates to plot area coordinates
             double xRatio = (errorBar.meanX - xMin) / (xMax - xMin);
             double yRatio = (errorBar.meanY - yMin) / (yMax - yMin);
-            
+
             double x = plotArea.left() + xRatio * plotArea.width();
-            double y = plotArea.top() + (1.0 - yRatio) * plotArea.height();  // Invert Y
-            
-            // Calculate error bar height in pixels
+            double y = plotArea.top() + (1.0 - yRatio) * plotArea.height();
+
             double errorHeight = (errorBar.errorValue / (yMax - yMin)) * plotArea.height();
-            
-            // Draw vertical error bar
             double topY = y - errorHeight;
             double bottomY = y + errorHeight;
-            
-            // Draw main vertical line
-            painter.drawLine(QPointF(x, topY), QPointF(x, bottomY));
-            
-            // Draw horizontal caps (top and bottom)
-            double capWidth = 5.0;  // Width of error bar caps in pixels
-            painter.drawLine(QPointF(x - capWidth, topY), QPointF(x + capWidth, topY));
-            painter.drawLine(QPointF(x - capWidth, bottomY), QPointF(x + capWidth, bottomY));
+
+            painter->drawLine(QPointF(x, topY), QPointF(x, bottomY));
+            const double capWidth = 5.0;
+            painter->drawLine(QPointF(x - capWidth, topY), QPointF(x + capWidth, topY));
+            painter->drawLine(QPointF(x - capWidth, bottomY), QPointF(x + capWidth, bottomY));
         }
     }
+    painter->restore();
+}
+
+void ErrorBarChartView::paintEvent(QPaintEvent *event)
+{
+    QChartView::paintEvent(event);
+
+    if (m_errorBars.isEmpty() || !chart()) return;
+
+    QPainter painter(this->viewport());
+    paintErrorBars(&painter, QPoint(0, 0));
 }
 
 PlotWidget::PlotWidget(QWidget *parent)
@@ -1992,12 +1984,15 @@ void PlotWidget::calculateMetrics()
     
     // Calculate metrics for each Y variable and treatment combination
     for (const QString &yVar : m_currentYVars) {
+        qDebug() << "[DEBUG] PlotWidget::calculateMetrics - Processing Y variable:" << yVar;
+
         const DataColumn *simYColumn = m_simData.getColumn(yVar);
         const DataColumn *obsYColumn = m_obsData.getColumn(yVar);
         const DataColumn *simTrtColumn = m_simData.getColumn("TRT");
         const DataColumn *obsTrtColumn = m_obsData.getColumn("TRT");
         
         if (!simYColumn || !obsYColumn || !simTrtColumn || !obsTrtColumn) {
+            qDebug() << "[DEBUG] PlotWidget::calculateMetrics - Skip" << yVar << "(missing sim/obs Y or TRT column)";
             continue;
         }
         
@@ -2045,6 +2040,11 @@ void PlotWidget::calculateMetrics()
                 runMap[runId] = yVal.toDouble(); // empty runId means no RUN column
             }
         }
+
+        int nSimKeys = simDataByBaseKeyToRuns.size();
+        QStringList sampleSimKeys = simDataByBaseKeyToRuns.keys().mid(0, 5);
+        qDebug() << "[DEBUG] PlotWidget::calculateMetrics - simDataByBaseKeyToRuns:"
+                 << nSimKeys << "match keys (trt_exp_crop_date). Sample:" << sampleSimKeys;
         
         // Collect observed data with match keys and create matched pairs grouped by treatment+variable+experiment+crop(+run)
         QMap<QString, QVector<double>> simByTreatmentVarExpCrop;
@@ -2057,6 +2057,10 @@ void PlotWidget::calculateMetrics()
         QMap<QString, QSet<QString>> baseGroupToRuns;
         
         int matchedPairs = 0;
+        int obsRowsWithVal = 0;
+        int obsRowsMatched = 0;
+        int obsRowsNoSim = 0;
+        QStringList sampleNoSimKeys;
         for (int row = 0; row < m_obsData.rowCount; ++row) {
             if (row >= obsYColumn->data.size() || row >= obsTrtColumn->data.size() || row >= obsDateColumn->data.size()) continue;
             
@@ -2067,10 +2071,12 @@ void PlotWidget::calculateMetrics()
             QVariant obsVal = obsYColumn->data[row];
             
             if (!DataProcessor::isMissingValue(obsVal)) {
+                obsRowsWithVal++;
                 QString matchKey = createMatchKey(trt, exp, crop, date);
                 
                 // Only add if we have matching simulated data for the same key
                 if (simDataByBaseKeyToRuns.contains(matchKey)) {
+                    obsRowsMatched++;
                     const auto &runMap = simDataByBaseKeyToRuns[matchKey];
                     QString baseGroupKey = QString("%1_%2_%3_%4").arg(trt, yVar, exp, crop);
                     if (runMap.isEmpty()) {
@@ -2098,8 +2104,24 @@ void PlotWidget::calculateMetrics()
                             matchedPairs++;
                         }
                     }
+                } else {
+                    obsRowsNoSim++;
+                    if (sampleNoSimKeys.size() < 5) sampleNoSimKeys << matchKey;
                 }
             }
+        }
+
+        qDebug() << "[DEBUG] PlotWidget::calculateMetrics - Obs data flow for" << yVar
+                 << ": obs rows with valid" << yVar << "=" << obsRowsWithVal
+                 << ", matched (sim exists for matchKey)=" << obsRowsMatched
+                 << ", skipped (no sim for matchKey)=" << obsRowsNoSim
+                 << ", matchedPairs added=" << matchedPairs;
+        if (!sampleNoSimKeys.isEmpty())
+            qDebug() << "[DEBUG] PlotWidget::calculateMetrics - Sample matchKeys with no sim:" << sampleNoSimKeys;
+        qDebug() << "[DEBUG] PlotWidget::calculateMetrics - Group keys (trt_var_exp_crop):" << simByTreatmentVarExpCrop.size();
+        if (!simByTreatmentVarExpCrop.isEmpty()) {
+            auto gk = simByTreatmentVarExpCrop.keys();
+            qDebug() << "[DEBUG] PlotWidget::calculateMetrics - Sample group keys:" << gk.mid(0, qMin(8, gk.size()));
         }
         
         // Calculate metrics for each treatment+variable+experiment+crop(+run) combination
@@ -2127,7 +2149,9 @@ void PlotWidget::calculateMetrics()
                 continue;
             }
             
-            
+            qDebug() << "[DEBUG] PlotWidget::calculateMetrics - Calling MetricsCalculator: groupKey=" << groupKey
+                     << "trt=" << trt << "variable=" << variable << "n_sim=" << simValues.size()
+                     << "n_obs=" << obsValues.size();
             // Use MetricsCalculator
             QVariantMap result = MetricsCalculator::calculateMetrics(simValues, obsValues, trt.toInt());
             
@@ -2351,6 +2375,11 @@ void PlotWidget::exportPlot(const QString &filePath, const QString &format)
     // Ensure everything is visible and updated
     this->show();
     this->update();
+    // Force chart view to repaint so error bars (drawn in paintEvent) are in the buffer
+    if (m_chartView) {
+        m_chartView->update();
+        m_chartView->repaint();
+    }
     QApplication::processEvents();
     
     // Respect legend visibility setting
@@ -2361,8 +2390,16 @@ void PlotWidget::exportPlot(const QString &filePath, const QString &format)
         }
     }
     
-    // Use current widget size for quick export (includes chart + legend)
-    QPixmap pixmap = this->grab();
+    // Use render() instead of grab() so custom-painted content (error bars in ErrorBarChartView::paintEvent)
+    // is included. grab() can miss custom paint on some platforms.
+    QPixmap pixmap(this->size());
+    pixmap.fill(Qt::white);
+    QPainter painter(&pixmap);
+    painter.setRenderHint(QPainter::Antialiasing, true);
+    painter.setRenderHint(QPainter::TextAntialiasing, true);
+    painter.setRenderHint(QPainter::SmoothPixmapTransform, true);
+    this->render(&painter);
+    painter.end();
     
     qDebug() << "Quick export: Widget size" << this->size() << "pixmap size" << pixmap.size();
     
@@ -2401,8 +2438,12 @@ void PlotWidget::exportPlot(const QString &filePath, const QString &format, int 
 {
     if (!this) return;
     
-    // Ensure the widget is properly laid out before export
+    // Ensure the widget is properly laid out before export; force chart view repaint so error bars are painted
     this->update();
+    if (m_chartView) {
+        m_chartView->update();
+        m_chartView->repaint();
+    }
     this->repaint();
     QApplication::processEvents();
     
@@ -2501,16 +2542,23 @@ void PlotWidget::exportPlotComposite(const QString &filePath, const QString &for
 {
     if (!m_chartView || !m_legendWidget) return;
     
-    // Ensure everything is visible and updated
+    // Ensure everything is visible and updated; force chart view repaint so error bars are painted
     this->show();
     this->update();
+    m_chartView->update();
+    m_chartView->repaint();
     QApplication::processEvents();
     
-    // Render chart and legend to separate pixmaps
+    // Render chart to pixmap (QChartView::render() does not include our custom error bars from paintEvent)
     QPixmap chartPixmap(m_chartView->size());
     chartPixmap.fill(Qt::white);
     QPainter chartPainter(&chartPixmap);
     m_chartView->render(&chartPainter);
+    chartPainter.end();
+
+    // Draw error bars on top of the chart pixmap so composite export includes them
+    chartPainter.begin(&chartPixmap);
+    m_chartView->paintErrorBars(&chartPainter, m_chartView->viewport()->pos());
     chartPainter.end();
 
     QPixmap legendPixmap;

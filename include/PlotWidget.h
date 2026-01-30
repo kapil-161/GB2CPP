@@ -26,6 +26,7 @@
 #include <QListWidget>
 #include <QSplitter>
 #include <QMap>
+#include <QPoint>
 #include <QVector>
 #include <QSharedPointer>
 #include <QPointer>
@@ -65,10 +66,12 @@ class ErrorBarChartView : public QChartView
 public:
     explicit ErrorBarChartView(QChart *chart, QWidget *parent = nullptr);
     void setErrorBarData(const QMap<QAbstractSeries*, QVector<ErrorBarData>> &errorBars);
-    
+    /** Draw error bars onto the given painter. Use viewportOffset when painting on full chart-view-sized pixmap (e.g. export). */
+    void paintErrorBars(QPainter *painter, const QPoint &viewportOffset = QPoint(0, 0));
+
 protected:
     void paintEvent(QPaintEvent *event) override;
-    
+
 private:
     QMap<QAbstractSeries*, QVector<ErrorBarData>> m_errorBars;
 };
