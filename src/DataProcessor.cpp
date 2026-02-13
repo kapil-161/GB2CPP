@@ -1385,15 +1385,23 @@ bool DataProcessor::verifyDssatInstallation(const QString &basePath)
     return true;
 }
 
+QString DataProcessor::findDataCde()
+{
+    QString base = getDSSATBase();
+    if (base.isEmpty()) {
+        return QString();
+    }
+    return base + QDir::separator() + "DATA.CDE";
+}
+
 void DataProcessor::parseDataCDE()
 {
     if (m_variableInfoLoaded) {
         return; // Already loaded
     }
 
-    QString cdeFile = Config::DSSAT_BASE + QDir::separator() + "DATA.CDE";
-
-    if (!QFile::exists(cdeFile)) {
+    QString cdeFile = findDataCde();
+    if (cdeFile.isEmpty() || !QFile::exists(cdeFile)) {
         qDebug() << "DATA.CDE file not found:" << cdeFile;
         return;
     }

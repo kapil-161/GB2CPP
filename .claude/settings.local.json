@@ -2,7 +2,8 @@
   "permissions": {
     "allow": [
       "Bash(mv:*)",
-      "Bash(./GB2.exe --version)"
+      "Bash(./GB2.exe --version)",
+      "Bash(git push:*)"
     ],
     "deny": [],
     "ask": []

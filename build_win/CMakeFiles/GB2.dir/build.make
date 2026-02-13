@@ -300,9 +300,24 @@ CMakeFiles/GB2.dir/src/PlotSettingsDialog.cpp.s: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/GB2.dir/src/PlotSettingsDialog.cpp.s"
 	C:\Qt\Tools\mingw1310_64\bin\g++.exe $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S C:\DSSAT48\Tools\GB2CPP\src\PlotSettingsDialog.cpp -o CMakeFiles\GB2.dir\src\PlotSettingsDialog.cpp.s
 
+CMakeFiles/GB2.dir/src/CDECodesDialog.cpp.obj: CMakeFiles/GB2.dir/flags.make
+CMakeFiles/GB2.dir/src/CDECodesDialog.cpp.obj: CMakeFiles/GB2.dir/includes_CXX.rsp
+CMakeFiles/GB2.dir/src/CDECodesDialog.cpp.obj: C:/DSSAT48/Tools/GB2CPP/src/CDECodesDialog.cpp
+CMakeFiles/GB2.dir/src/CDECodesDialog.cpp.obj: CMakeFiles/GB2.dir/compiler_depend.ts
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=C:\DSSAT48\Tools\GB2CPP\build_win\CMakeFiles --progress-num=$(CMAKE_PROGRESS_17) "Building CXX object CMakeFiles/GB2.dir/src/CDECodesDialog.cpp.obj"
+	C:\Qt\Tools\mingw1310_64\bin\g++.exe $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/GB2.dir/src/CDECodesDialog.cpp.obj -MF CMakeFiles\GB2.dir\src\CDECodesDialog.cpp.obj.d -o CMakeFiles\GB2.dir\src\CDECodesDialog.cpp.obj -c C:\DSSAT48\Tools\GB2CPP\src\CDECodesDialog.cpp
+
+CMakeFiles/GB2.dir/src/CDECodesDialog.cpp.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CXX source to CMakeFiles/GB2.dir/src/CDECodesDialog.cpp.i"
+	C:\Qt\Tools\mingw1310_64\bin\g++.exe $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E C:\DSSAT48\Tools\GB2CPP\src\CDECodesDialog.cpp > CMakeFiles\GB2.dir\src\CDECodesDialog.cpp.i
+
+CMakeFiles/GB2.dir/src/CDECodesDialog.cpp.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/GB2.dir/src/CDECodesDialog.cpp.s"
+	C:\Qt\Tools\mingw1310_64\bin\g++.exe $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S C:\DSSAT48\Tools\GB2CPP\src\CDECodesDialog.cpp -o CMakeFiles\GB2.dir\src\CDECodesDialog.cpp.s
+
 CMakeFiles/GB2.dir/resources/version.rc.obj: CMakeFiles/GB2.dir/flags.make
 CMakeFiles/GB2.dir/resources/version.rc.obj: C:/DSSAT48/Tools/GB2CPP/resources/version.rc
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=C:\DSSAT48\Tools\GB2CPP\build_win\CMakeFiles --progress-num=$(CMAKE_PROGRESS_17) "Building RC object CMakeFiles/GB2.dir/resources/version.rc.obj"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=C:\DSSAT48\Tools\GB2CPP\build_win\CMakeFiles --progress-num=$(CMAKE_PROGRESS_18) "Building RC object CMakeFiles/GB2.dir/resources/version.rc.obj"
 	C:\Qt\Tools\mingw1310_64\bin\windres.exe -O coff $(RC_DEFINES) $(RC_INCLUDES) $(RC_FLAGS) C:\DSSAT48\Tools\GB2CPP\resources\version.rc CMakeFiles\GB2.dir\resources\version.rc.obj
 
 # Object files for target GB2
@@ -322,6 +337,7 @@ GB2_OBJECTS = \
 "CMakeFiles/GB2.dir/src/CommandLineHandler.cpp.obj" \
 "CMakeFiles/GB2.dir/src/SingleInstanceApp.cpp.obj" \
 "CMakeFiles/GB2.dir/src/PlotSettingsDialog.cpp.obj" \
+"CMakeFiles/GB2.dir/src/CDECodesDialog.cpp.obj" \
 "CMakeFiles/GB2.dir/resources/version.rc.obj"
 
 # External object files for target GB2
@@ -342,6 +358,7 @@ bin/GB2.exe: CMakeFiles/GB2.dir/src/DataTableWidget.cpp.obj
 bin/GB2.exe: CMakeFiles/GB2.dir/src/CommandLineHandler.cpp.obj
 bin/GB2.exe: CMakeFiles/GB2.dir/src/SingleInstanceApp.cpp.obj
 bin/GB2.exe: CMakeFiles/GB2.dir/src/PlotSettingsDialog.cpp.obj
+bin/GB2.exe: CMakeFiles/GB2.dir/src/CDECodesDialog.cpp.obj
 bin/GB2.exe: CMakeFiles/GB2.dir/resources/version.rc.obj
 bin/GB2.exe: CMakeFiles/GB2.dir/build.make
 bin/GB2.exe: C:/Qt/6.9.1/mingw_64/lib/libQt6Charts.a
@@ -354,7 +371,7 @@ bin/GB2.exe: C:/Qt/6.9.1/mingw_64/lib/libQt6EntryPoint.a
 bin/GB2.exe: CMakeFiles/GB2.dir/linkLibs.rsp
 bin/GB2.exe: CMakeFiles/GB2.dir/objects1.rsp
 bin/GB2.exe: CMakeFiles/GB2.dir/link.txt
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --bold --progress-dir=C:\DSSAT48\Tools\GB2CPP\build_win\CMakeFiles --progress-num=$(CMAKE_PROGRESS_18) "Linking CXX executable bin\GB2.exe"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --bold --progress-dir=C:\DSSAT48\Tools\GB2CPP\build_win\CMakeFiles --progress-num=$(CMAKE_PROGRESS_19) "Linking CXX executable bin\GB2.exe"
 	$(CMAKE_COMMAND) -E cmake_link_script CMakeFiles\GB2.dir\link.txt --verbose=$(VERBOSE)
 	C:\Qt\Tools\CMake_64\bin\cmake.exe -E copy_directory C:/DSSAT48/Tools/GB2CPP/resources C:/DSSAT48/Tools/GB2CPP/build_win/bin/resources
 

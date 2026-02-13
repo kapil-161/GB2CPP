@@ -15,6 +15,9 @@
 #include <QLabel>
 #include <QSlider>
 #include <QLineEdit>
+#include <QTreeWidget>
+#include <QTreeWidgetItem>
+#include <QSet>
 
 // Forward declaration
 class PlotWidget;
@@ -64,6 +67,15 @@ struct PlotSettings {
     int legendFontSize = 9;
     bool boldTitle = true;
     bool boldAxisLabels = false;
+
+    // Treatment filter (empty excludedSeriesKeys = show all)
+    QSet<QString> excludedSeriesKeys;  // format: "varName::expId::trtId"
+    QStringList availableExperiments;
+    QMap<QString, QStringList> experimentTreatments;  // expId -> [trtIds]
+    QMap<QString, QString> treatmentDisplayNames;  // "expId::trtId" -> display name
+    QStringList lastYVars;  // Track Y vars to reset filter on variable change
+    QStringList availableYVars;  // Y variables for tree hierarchy
+    QMap<QString, QString> yVarDisplayNames;  // varCode -> display name
 };
 
 class PlotSettingsDialog : public QDialog
@@ -82,6 +94,7 @@ private slots:
     void onResetDefaults();
     void onPreviewSettings();
     void onExportPlot();
+    void onTreeItemChanged(QTreeWidgetItem *item, int column);
 
 private:
     void setupUI();
@@ -134,6 +147,11 @@ private:
     QSpinBox *m_legendFontSizeSpinBox;
     QCheckBox *m_boldTitleCheckBox;
     QCheckBox *m_boldAxisLabelsCheckBox;
+
+    // Treatment filter controls
+    QTreeWidget *m_treatmentTreeWidget;
+    QPushButton *m_selectAllButton;
+    QPushButton *m_deselectAllButton;
 
     // Buttons
     QPushButton *m_resetButton;

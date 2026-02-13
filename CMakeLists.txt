@@ -56,6 +56,7 @@ set(SOURCES
     src/CommandLineHandler.cpp
     src/SingleInstanceApp.cpp
     src/PlotSettingsDialog.cpp
+    src/CDECodesDialog.cpp
 )
 
 # Header files
@@ -74,6 +75,7 @@ set(HEADERS
     include/CommandLineHandler.h
     include/SingleInstanceApp.h
     include/PlotSettingsDialog.h
+    include/CDECodesDialog.h
 )
 
 # Add version resource for Windows

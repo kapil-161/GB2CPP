@@ -52,6 +52,31 @@ PlotSettings PlotSettingsDialog::getSettings() const
     settings.boldTitle = m_boldTitleCheckBox->isChecked();
     settings.boldAxisLabels = m_boldAxisLabelsCheckBox->isChecked();
 
+    // Collect excluded series keys from tree (unchecked leaf items: var > exp > trt)
+    QSet<QString> excluded;
+    for (int i = 0; i < m_treatmentTreeWidget->topLevelItemCount(); ++i) {
+        QTreeWidgetItem *varItem = m_treatmentTreeWidget->topLevelItem(i);
+        QString varName = varItem->data(0, Qt::UserRole).toString();
+        for (int j = 0; j < varItem->childCount(); ++j) {
+            QTreeWidgetItem *expItem = varItem->child(j);
+            QString expId = expItem->data(0, Qt::UserRole).toString();
+            for (int k = 0; k < expItem->childCount(); ++k) {
+                QTreeWidgetItem *trtItem = expItem->child(k);
+                if (trtItem->checkState(0) == Qt::Unchecked) {
+                    QString trtId = trtItem->data(0, Qt::UserRole).toString();
+                    excluded.insert(varName + "::" + expId + "::" + trtId);
+                }
+            }
+        }
+    }
+    settings.excludedSeriesKeys = excluded;
+    // Preserve available data, display names, and Y vars
+    settings.availableExperiments = m_settings.availableExperiments;
+    settings.experimentTreatments = m_settings.experimentTreatments;
+    settings.treatmentDisplayNames = m_settings.treatmentDisplayNames;
+    settings.availableYVars = m_settings.availableYVars;
+    settings.yVarDisplayNames = m_settings.yVarDisplayNames;
+
     return settings;
 }
 
@@ -308,6 +333,119 @@ void PlotSettingsDialog::setupUI()
 
     tabWidget->addTab(fontTab, "Fonts");
 
+    // Treatments Tab
+    QWidget *treatmentsTab = new QWidget();
+    QVBoxLayout *treatmentsLayout = new QVBoxLayout(treatmentsTab);
+
+    QGroupBox *treatmentGroup = new QGroupBox("Series Filter");
+    QVBoxLayout *treatmentGroupLayout = new QVBoxLayout(treatmentGroup);
+
+    QLabel *treatmentHelpLabel = new QLabel("Select which treatments to display per variable:");
+    treatmentHelpLabel->setWordWrap(true);
+    treatmentGroupLayout->addWidget(treatmentHelpLabel);
+
+    // Select All / Deselect All buttons
+    QHBoxLayout *treatmentButtonLayout = new QHBoxLayout();
+    m_selectAllButton = new QPushButton("Select All");
+    m_deselectAllButton = new QPushButton("Deselect All");
+    treatmentButtonLayout->addWidget(m_selectAllButton);
+    treatmentButtonLayout->addWidget(m_deselectAllButton);
+    treatmentButtonLayout->addStretch();
+    treatmentGroupLayout->addLayout(treatmentButtonLayout);
+
+    // Tree widget with variable > treatment hierarchy
+    m_treatmentTreeWidget = new QTreeWidget();
+    m_treatmentTreeWidget->setHeaderHidden(true);
+    m_treatmentTreeWidget->setSelectionMode(QAbstractItemView::NoSelection);
+
+    // Populate tree: Variable > Experiment > Treatment (3-level hierarchy)
+    for (const QString &yVar : m_settings.availableYVars) {
+        QTreeWidgetItem *varItem = new QTreeWidgetItem(m_treatmentTreeWidget);
+        QString varDisplayName = m_settings.yVarDisplayNames.value(yVar, yVar);
+        varItem->setText(0, varDisplayName);
+        varItem->setData(0, Qt::UserRole, yVar);
+        varItem->setFlags(varItem->flags() | Qt::ItemIsUserCheckable);
+
+        int varChecked = 0, varTotal = 0;
+
+        for (const QString &expId : m_settings.availableExperiments) {
+            QStringList treatments = m_settings.experimentTreatments.value(expId);
+            if (treatments.isEmpty()) continue;
+
+            QTreeWidgetItem *expItem = new QTreeWidgetItem(varItem);
+            expItem->setText(0, expId);
+            expItem->setData(0, Qt::UserRole, expId);
+            expItem->setFlags(expItem->flags() | Qt::ItemIsUserCheckable);
+
+            int expChecked = 0;
+
+            for (const QString &trtId : treatments) {
+                QTreeWidgetItem *trtItem = new QTreeWidgetItem(expItem);
+                QString pairKey = expId + "::" + trtId;
+                QString displayName = m_settings.treatmentDisplayNames.value(pairKey, trtId);
+                trtItem->setText(0, QString("%1 - %2").arg(trtId, displayName));
+                trtItem->setData(0, Qt::UserRole, trtId);
+                trtItem->setFlags(trtItem->flags() | Qt::ItemIsUserCheckable);
+
+                QString key = yVar + "::" + expId + "::" + trtId;
+                bool excluded = m_settings.excludedSeriesKeys.contains(key);
+                trtItem->setCheckState(0, excluded ? Qt::Unchecked : Qt::Checked);
+                if (!excluded) { expChecked++; varChecked++; }
+                varTotal++;
+            }
+
+            // Set experiment check state
+            if (expChecked == treatments.size()) {
+                expItem->setCheckState(0, Qt::Checked);
+            } else if (expChecked == 0) {
+                expItem->setCheckState(0, Qt::Unchecked);
+            } else {
+                expItem->setCheckState(0, Qt::PartiallyChecked);
+            }
+        }
+
+        // Set variable check state
+        if (varChecked == varTotal) {
+            varItem->setCheckState(0, Qt::Checked);
+        } else if (varChecked == 0) {
+            varItem->setCheckState(0, Qt::Unchecked);
+        } else {
+            varItem->setCheckState(0, Qt::PartiallyChecked);
+        }
+    }
+
+    m_treatmentTreeWidget->expandAll();
+    treatmentGroupLayout->addWidget(m_treatmentTreeWidget);
+    treatmentsLayout->addWidget(treatmentGroup);
+
+    tabWidget->addTab(treatmentsTab, "Treatments");
+
+    // Connect tree item changed for parent/child sync
+    connect(m_treatmentTreeWidget, &QTreeWidget::itemChanged, this, &PlotSettingsDialog::onTreeItemChanged);
+
+    // Connect select/deselect buttons
+    auto setAllCheckState = [this](Qt::CheckState state) {
+        m_treatmentTreeWidget->blockSignals(true);
+        for (int i = 0; i < m_treatmentTreeWidget->topLevelItemCount(); ++i) {
+            QTreeWidgetItem *varItem = m_treatmentTreeWidget->topLevelItem(i);
+            varItem->setCheckState(0, state);
+            for (int j = 0; j < varItem->childCount(); ++j) {
+                QTreeWidgetItem *expItem = varItem->child(j);
+                expItem->setCheckState(0, state);
+                for (int k = 0; k < expItem->childCount(); ++k) {
+                    expItem->child(k)->setCheckState(0, state);
+                }
+            }
+        }
+        m_treatmentTreeWidget->blockSignals(false);
+    };
+    connect(m_selectAllButton, &QPushButton::clicked, this, [setAllCheckState]() {
+        setAllCheckState(Qt::Checked);
+    });
+    connect(m_deselectAllButton, &QPushButton::clicked, this, [setAllCheckState]() {
+        setAllCheckState(Qt::Unchecked);
+    });
+
     mainLayout->addWidget(tabWidget);
     
     // Control buttons
@@ -399,6 +537,21 @@ void PlotSettingsDialog::onResetDefaults()
     m_legendFontSizeSpinBox->setValue(defaults.legendFontSize);
     m_boldTitleCheckBox->setChecked(defaults.boldTitle);
     m_boldAxisLabelsCheckBox->setChecked(defaults.boldAxisLabels);
+
+    // Re-check all items in tree (3 levels)
+    m_treatmentTreeWidget->blockSignals(true);
+    for (int i = 0; i < m_treatmentTreeWidget->topLevelItemCount(); ++i) {
+        QTreeWidgetItem *varItem = m_treatmentTreeWidget->topLevelItem(i);
+        varItem->setCheckState(0, Qt::Checked);
+        for (int j = 0; j < varItem->childCount(); ++j) {
+            QTreeWidgetItem *expItem = varItem->child(j);
+            expItem->setCheckState(0, Qt::Checked);
+            for (int k = 0; k < expItem->childCount(); ++k) {
+                expItem->child(k)->setCheckState(0, Qt::Checked);
+            }
+        }
+    }
+    m_treatmentTreeWidget->blockSignals(false);
 }
 
 void PlotSettingsDialog::onPreviewSettings()
@@ -497,4 +650,50 @@ void PlotSettingsDialog::onExportPlot()
     if (msgBox.clickedButton() == viewButton) {
         QDesktopServices::openUrl(QUrl::fromLocalFile(fileName));
     }
+}
+
+static void propagateDown(QTreeWidgetItem *item, Qt::CheckState state)
+{
+    for (int i = 0; i < item->childCount(); ++i) {
+        item->child(i)->setCheckState(0, state);
+        propagateDown(item->child(i), state);
+    }
+}
+
+static void updateParentState(QTreeWidgetItem *parent)
+{
+    if (!parent) return;
+    int checked = 0, total = parent->childCount();
+    for (int i = 0; i < total; ++i) {
+        Qt::CheckState cs = parent->child(i)->checkState(0);
+        if (cs == Qt::Checked) checked++;
+        else if (cs == Qt::PartiallyChecked) { checked = -1; break; }
+    }
+    if (checked == total) {
+        parent->setCheckState(0, Qt::Checked);
+    } else if (checked == 0) {
+        parent->setCheckState(0, Qt::Unchecked);
+    } else {
+        parent->setCheckState(0, Qt::PartiallyChecked);
+    }
+    // Recurse up to grandparent (variable level)
+    updateParentState(parent->parent());
+}
+
+void PlotSettingsDialog::onTreeItemChanged(QTreeWidgetItem *item, int column)
+{
+    Q_UNUSED(column);
+    m_treatmentTreeWidget->blockSignals(true);
+
+    if (item->childCount() > 0) {
+        // Non-leaf: propagate check state down to all descendants
+        propagateDown(item, item->checkState(0));
+        // Update ancestors
+        updateParentState(item->parent());
+    } else {
+        // Leaf: update parent and grandparent states
+        updateParentState(item->parent());
+    }
+
+    m_treatmentTreeWidget->blockSignals(false);
 }

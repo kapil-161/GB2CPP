@@ -31,6 +31,7 @@
 #include "DataTableWidget.h"
 
 class PlotWidget;
+class CDECodesDialog;
 
 class MainWindow : public QMainWindow
 {
@@ -66,6 +67,7 @@ private slots:
     void onExportPlot();
     void onCopyPlot();
     void onAbout();
+    void onCDECodesReference();
     void onDataFileChanged();
     void onXVariableChanged();
     void onYVariableChanged();

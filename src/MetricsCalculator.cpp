@@ -171,6 +171,100 @@ double MetricsCalculator::rSquared(const QVector<double>& x, const QVector<doubl
     }
 }
 
+double MetricsCalculator::meanError(const QVector<double>& observed, const QVector<double>& simulated)
+{
+    // Mean bias error: mean(sim - obs) on filtered pairs
+    if (observed.isEmpty() || simulated.isEmpty() || observed.size() != simulated.size()) {
+        return 0.0;
+    }
+
+    auto filteredPair = filterPairs(observed, simulated);
+    const auto& obs = filteredPair.first;
+    const auto& sim = filteredPair.second;
+
+    if (obs.isEmpty()) {
+        return 0.0;
+    }
+
+    double sumDiff = 0.0;
+    for (int i = 0; i < obs.size(); ++i) {
+        sumDiff += (sim[i] - obs[i]);
+    }
+    return sumDiff / obs.size();
+}
+
+void MetricsCalculator::mseDecomposition(const QVector<double>& observed,
+                                         const QVector<double>& simulated,
+                                         double& mseSystematic,
+                                         double& mseUnsystematic)
+{
+    mseSystematic = 0.0;
+    mseUnsystematic = 0.0;
+
+    if (observed.isEmpty() || simulated.isEmpty() || observed.size() != simulated.size()) {
+        return;
+    }
+
+    auto filteredPair = filterPairs(observed, simulated);
+    const auto& obs = filteredPair.first;
+    const auto& sim = filteredPair.second;
+
+    const int n = obs.size();
+    if (n == 0) {
+        return;
+    }
+
+    // Linear regression of sim on obs: sim_hat = a + b * obs
+    double sumObs = 0.0;
+    double sumSim = 0.0;
+    double sumObs2 = 0.0;
+    double sumObsSim = 0.0;
+
+    for (int i = 0; i < n; ++i) {
+        const double xo = obs[i];
+        const double ys = sim[i];
+        sumObs += xo;
+        sumSim += ys;
+        sumObs2 += xo * xo;
+        sumObsSim += xo * ys;
+    }
+
+    const double denom = (n * sumObs2 - sumObs * sumObs);
+    if (denom == 0.0) {
+        // All observed values identical – fall back to no decomposition
+        double sumSquaredDiff = 0.0;
+        for (int i = 0; i < n; ++i) {
+            double diff = obs[i] - sim[i];
+            sumSquaredDiff += diff * diff;
+        }
+        const double mseTotal = sumSquaredDiff / static_cast<double>(n);
+        mseSystematic = 0.0;
+        mseUnsystematic = mseTotal;
+        return;
+    }
+
+    const double slope = (n * sumObsSim - sumObs * sumSim) / denom;
+    const double intercept = (sumSim - slope * sumObs) / static_cast<double>(n);
+
+    double sumSquaredSys = 0.0;
+    double sumSquaredUnsys = 0.0;
+
+    for (int i = 0; i < n; ++i) {
+        const double xo = obs[i];
+        const double ys = sim[i];
+        const double yHat = intercept + slope * xo;   // systematic component
+
+        const double sysDiff = yHat - xo;
+        const double unsysDiff = ys - yHat;
+
+        sumSquaredSys += sysDiff * sysDiff;
+        sumSquaredUnsys += unsysDiff * unsysDiff;
+    }
+
+    mseSystematic = sumSquaredSys / static_cast<double>(n);
+    mseUnsystematic = sumSquaredUnsys / static_cast<double>(n);
+}
+
 QVariantMap MetricsCalculator::calculateMetrics(const QVector<double>& simValues, 
                                               const QVector<double>& obsValues, 
                                               int treatmentNumber)
@@ -210,6 +304,14 @@ QVariantMap MetricsCalculator::calculateMetrics(const QVector<double>& simValues
         int n = obs.size();
         double rmse_value = rmse(obs, sim);
         double nrmse = (mean_obs != 0.0) ? (rmse_value / mean_obs) * 100.0 : 0.0;
+        // Bias and MSE decomposition (useful particularly for scatter plots)
+        // BIAS as in Eq. (7): (ΣSi - ΣOi) / ΣOi = (bias / mean_obs)
+        double bias = meanError(obs, sim);  // mean(sim - obs)
+        double biasRatio = (mean_obs != 0.0) ? (bias / mean_obs) : 0.0;
+        double mseSystematic = 0.0;
+        double mseUnsystematic = 0.0;
+        mseDecomposition(obs, sim, mseSystematic, mseUnsystematic);
+        double mseTotal = rmse_value * rmse_value;
         qDebug() << "[DEBUG] MetricsCalculator::calculateMetrics - n:" << n << ", mean_obs:" << mean_obs
                  << ", RMSE:" << rmse_value << ", NRMSE%:" << nrmse << "; calling dStat(obs, sim)...";
         double d_stat = dStat(obs, sim);
@@ -222,6 +324,11 @@ QVariantMap MetricsCalculator::calculateMetrics(const QVector<double>& simValues
         result["RMSE"] = rmse_value;
         result["NRMSE"] = nrmse;
         result["Willmott's d-stat"] = d_stat;
+        result["Bias"] = bias;                           // mean(sim - obs)
+        result["BIAS"] = biasRatio;                      // dimensionless bias index (Eq. 7)
+        result["MSE"] = mseTotal;
+        result["MSEs"] = mseSystematic;                  // systematic component
+        result["MSEu"] = mseUnsystematic;                // unsystematic component
         result["R²"] = "-";  // Not calculated for time series data
 
         qDebug() << "[DEBUG] MetricsCalculator::calculateMetrics - RESULT TRT:" << treatmentNumber

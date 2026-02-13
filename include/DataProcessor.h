@@ -99,6 +99,7 @@ public: // Static utility functions
     static int calculateDaysAfterSowing(const QDateTime &date, const QDateTime &sowingDate);
     static int calculateDaysAfterPlanting(const QDateTime &date, const QDateTime &plantingDate);
     static QString getDSSATBase();
+    static QString findDataCde();  // Full path to DATA.CDE, or empty
     static QVector<CropDetails> getCropDetails();
     static QString findDetailCde();
     static QString findDssatProFile();

@@ -16,6 +16,15 @@ public:
     static double rmse(const QVector<double>& observed, const QVector<double>& simulated);
     static double rSquared(const QVector<double>& x, const QVector<double>& y);
     
+    // Decomposition helpers (mainly for scatter-plot evaluation)
+    // Returns mean error (sim - obs)
+    static double meanError(const QVector<double>& observed, const QVector<double>& simulated);
+    // Returns systematic and unsystematic components of MSE (Willmott decomposition)
+    static void mseDecomposition(const QVector<double>& observed,
+                                 const QVector<double>& simulated,
+                                 double& mseSystematic,
+                                 double& mseUnsystematic);
+    
     // Main metrics calculation function
     static QVariantMap calculateMetrics(const QVector<double>& simValues, 
                                        const QVector<double>& obsValues, 

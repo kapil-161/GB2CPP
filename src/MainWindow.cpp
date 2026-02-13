@@ -1,6 +1,7 @@
 #include "MainWindow.h"
 #include "DataTableWidget.h"
 #include "PlotWidget.h"
+#include "CDECodesDialog.h"
 #include <QApplication>
 #include <QMessageBox>
 #include <QCloseEvent>
@@ -125,7 +126,11 @@ void MainWindow::setupMenuBar()
 
     // Help Menu
     QMenu *helpMenu = menuBar->addMenu("&Help");
-    
+
+    QAction *cdeCodesAction = helpMenu->addAction("CDE &Codes Reference...");
+    cdeCodesAction->setStatusTip("Search and browse DSSAT variable codes (CDE, label, description)");
+    connect(cdeCodesAction, &QAction::triggered, this, &MainWindow::onCDECodesReference);
+
     QAction *aboutAction = helpMenu->addAction("&About");
     connect(aboutAction, &QAction::triggered, this, &MainWindow::onAbout);
 }
@@ -609,6 +614,13 @@ void MainWindow::onAbout()
                 "<p>Built with Qt6 and C++</p>"
                 "<p>Copyright © 2025 DSSAT Foundation</p>")
         .arg(Config::APP_NAME, Config::APP_VERSION));
+}
+
+void MainWindow::onCDECodesReference()
+{
+    CDECodesDialog *dialog = new CDECodesDialog(this);
+    dialog->setAttribute(Qt::WA_DeleteOnClose);
+    dialog->show();
 }
 
 void MainWindow::onDataFileChanged()

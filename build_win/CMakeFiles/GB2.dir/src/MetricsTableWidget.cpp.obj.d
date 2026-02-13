@@ -484,5 +484,25 @@ CMakeFiles/GB2.dir/src/MetricsTableWidget.cpp.obj: \
  C:/Qt/6.9.1/mingw_64/include/QtCore/qstandardpaths.h \
  C:/Qt/6.9.1/mingw_64/include/QtCore/QTextStream \
  C:/Qt/6.9.1/mingw_64/include/QtCore/qtextstream.h \
+ C:/DSSAT48/Tools/GB2CPP/include/DataProcessor.h \
+ C:/Qt/6.9.1/mingw_64/include/QtCore/QString \
+ C:/Qt/6.9.1/mingw_64/include/QtCore/QVariant \
+ C:/Qt/6.9.1/mingw_64/include/QtCore/QDateTime \
+ C:/Qt/6.9.1/mingw_64/include/QtCore/qdatetime.h \
+ C:/Qt/6.9.1/mingw_64/include/QtCore/QVector \
+ C:/Qt/6.9.1/mingw_64/include/QtCore/qvector.h \
+ C:/Qt/6.9.1/mingw_64/include/QtCore/QObject \
+ C:/Qt/6.9.1/mingw_64/include/QtCore/qobject.h \
  C:/Qt/6.9.1/mingw_64/include/QtCore/QDebug \
- C:/Qt/6.9.1/mingw_64/include/QtCore/qdebug.h
+ C:/Qt/6.9.1/mingw_64/include/QtCore/qdebug.h \
+ C:/Qt/6.9.1/mingw_64/include/QtWidgets/QMessageBox \
+ C:/Qt/6.9.1/mingw_64/include/QtWidgets/qmessagebox.h \
+ C:/Qt/6.9.1/mingw_64/include/QtWidgets/qdialogbuttonbox.h \
+ C:/Qt/6.9.1/mingw_64/include/QtCore/QDir \
+ C:/Qt/6.9.1/mingw_64/include/QtCore/qdir.h \
+ C:/Qt/6.9.1/mingw_64/include/QtCore/QStringConverter \
+ C:/Qt/6.9.1/mingw_64/include/QtCore/qstringconverter.h \
+ C:/Qt/6.9.1/mingw_64/include/QtGui/QDesktopServices \
+ C:/Qt/6.9.1/mingw_64/include/QtGui/qdesktopservices.h \
+ C:/Qt/6.9.1/mingw_64/include/QtCore/QUrl \
+ C:/Qt/6.9.1/mingw_64/include/QtCore/qurl.h

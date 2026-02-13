@@ -33,6 +33,63 @@ QT_WARNING_PUSH
 QT_WARNING_DISABLE_DEPRECATED
 QT_WARNING_DISABLE_GCC("-Wuseless-cast")
 namespace {
+struct qt_meta_tag_ZN17ErrorBarChartViewE_t {};
+} // unnamed namespace
+
+template <> constexpr inline auto ErrorBarChartView::qt_create_metaobjectdata<qt_meta_tag_ZN17ErrorBarChartViewE_t>()
+{
+    namespace QMC = QtMocConstants;
+    QtMocHelpers::StringRefStorage qt_stringData {
+        "ErrorBarChartView"
+    };
+
+    QtMocHelpers::UintData qt_methods {
+    };
+    QtMocHelpers::UintData qt_properties {
+    };
+    QtMocHelpers::UintData qt_enums {
+    };
+    return QtMocHelpers::metaObjectData<ErrorBarChartView, qt_meta_tag_ZN17ErrorBarChartViewE_t>(QMC::MetaObjectFlag{}, qt_stringData,
+            qt_methods, qt_properties, qt_enums);
+}
+Q_CONSTINIT const QMetaObject ErrorBarChartView::staticMetaObject = { {
+    QMetaObject::SuperData::link<QChartView::staticMetaObject>(),
+    qt_staticMetaObjectStaticContent<qt_meta_tag_ZN17ErrorBarChartViewE_t>.stringdata,
+    qt_staticMetaObjectStaticContent<qt_meta_tag_ZN17ErrorBarChartViewE_t>.data,
+    qt_static_metacall,
+    nullptr,
+    qt_staticMetaObjectRelocatingContent<qt_meta_tag_ZN17ErrorBarChartViewE_t>.metaTypes,
+    nullptr
+} };
+
+void ErrorBarChartView::qt_static_metacall(QObject *_o, QMetaObject::Call _c, int _id, void **_a)
+{
+    auto *_t = static_cast<ErrorBarChartView *>(_o);
+    (void)_t;
+    (void)_c;
+    (void)_id;
+    (void)_a;
+}
+
+const QMetaObject *ErrorBarChartView::metaObject() const
+{
+    return QObject::d_ptr->metaObject ? QObject::d_ptr->dynamicMetaObject() : &staticMetaObject;
+}
+
+void *ErrorBarChartView::qt_metacast(const char *_clname)
+{
+    if (!_clname) return nullptr;
+    if (!strcmp(_clname, qt_staticMetaObjectStaticContent<qt_meta_tag_ZN17ErrorBarChartViewE_t>.strings))
+        return static_cast<void*>(this);
+    return QChartView::qt_metacast(_clname);
+}
+
+int ErrorBarChartView::qt_metacall(QMetaObject::Call _c, int _id, void **_a)
+{
+    _id = QChartView::qt_metacall(_c, _id, _a);
+    return _id;
+}
+namespace {
 struct qt_meta_tag_ZN18LegendSampleWidgetE_t {};
 } // unnamed namespace
 

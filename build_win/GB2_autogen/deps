@@ -4,6 +4,7 @@ GB2_autogen/timestamp: \
 	C:/DSSAT48/Tools/GB2CPP/build_win/CMakeFiles/3.30.5/CMakeRCCompiler.cmake \
 	C:/DSSAT48/Tools/GB2CPP/build_win/CMakeFiles/3.30.5/CMakeSystem.cmake \
 	C:/DSSAT48/Tools/GB2CPP/build_win/GB2_autogen/moc_predefs.h \
+	C:/DSSAT48/Tools/GB2CPP/include/CDECodesDialog.h \
 	C:/DSSAT48/Tools/GB2CPP/include/CommandLineHandler.h \
 	C:/DSSAT48/Tools/GB2CPP/include/Config.h \
 	C:/DSSAT48/Tools/GB2CPP/include/DataProcessor.h \
@@ -18,6 +19,7 @@ GB2_autogen/timestamp: \
 	C:/DSSAT48/Tools/GB2CPP/include/SingleInstanceApp.h \
 	C:/DSSAT48/Tools/GB2CPP/include/StatusWidget.h \
 	C:/DSSAT48/Tools/GB2CPP/include/TableWidget.h \
+	C:/DSSAT48/Tools/GB2CPP/src/CDECodesDialog.cpp \
 	C:/DSSAT48/Tools/GB2CPP/src/CommandLineHandler.cpp \
 	C:/DSSAT48/Tools/GB2CPP/src/DataProcessor.cpp \
 	C:/DSSAT48/Tools/GB2CPP/src/DataTableWidget.cpp \
@@ -64,6 +66,7 @@ GB2_autogen/timestamp: \
 	C:/Qt/6.9.1/mingw_64/include/QtCore/QMap \
 	C:/Qt/6.9.1/mingw_64/include/QtCore/QMargins \
 	C:/Qt/6.9.1/mingw_64/include/QtCore/QObject \
+	C:/Qt/6.9.1/mingw_64/include/QtCore/QPoint \
 	C:/Qt/6.9.1/mingw_64/include/QtCore/QPointer \
 	C:/Qt/6.9.1/mingw_64/include/QtCore/QRect \
 	C:/Qt/6.9.1/mingw_64/include/QtCore/QSharedPointer \
@@ -319,6 +322,7 @@ GB2_autogen/timestamp: \
 	C:/Qt/6.9.1/mingw_64/include/QtWidgets/QStatusBar \
 	C:/Qt/6.9.1/mingw_64/include/QtWidgets/QTabWidget \
 	C:/Qt/6.9.1/mingw_64/include/QtWidgets/QTableView \
+	C:/Qt/6.9.1/mingw_64/include/QtWidgets/QTableWidget \
 	C:/Qt/6.9.1/mingw_64/include/QtWidgets/QTextEdit \
 	C:/Qt/6.9.1/mingw_64/include/QtWidgets/QVBoxLayout \
 	C:/Qt/6.9.1/mingw_64/include/QtWidgets/QWidget \
@@ -368,6 +372,7 @@ GB2_autogen/timestamp: \
 	C:/Qt/6.9.1/mingw_64/include/QtWidgets/qstyleoption.h \
 	C:/Qt/6.9.1/mingw_64/include/QtWidgets/qtabbar.h \
 	C:/Qt/6.9.1/mingw_64/include/QtWidgets/qtableview.h \
+	C:/Qt/6.9.1/mingw_64/include/QtWidgets/qtablewidget.h \
 	C:/Qt/6.9.1/mingw_64/include/QtWidgets/qtabwidget.h \
 	C:/Qt/6.9.1/mingw_64/include/QtWidgets/qtextedit.h \
 	C:/Qt/6.9.1/mingw_64/include/QtWidgets/qtwidgets-config.h \

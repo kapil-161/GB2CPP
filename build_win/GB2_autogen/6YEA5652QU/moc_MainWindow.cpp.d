@@ -3,10 +3,13 @@ C:/DSSAT48/Tools/GB2CPP/build_win/GB2_autogen/6YEA5652QU/moc_MainWindow.cpp: C:/
   C:/DSSAT48/Tools/GB2CPP/include/Config.h \
   C:/DSSAT48/Tools/GB2CPP/include/DataProcessor.h \
   C:/DSSAT48/Tools/GB2CPP/include/DataTableWidget.h \
+  C:/DSSAT48/Tools/GB2CPP/include/MetricsDialog.h \
+  C:/DSSAT48/Tools/GB2CPP/include/MetricsTableWidget.h \
   C:/DSSAT48/Tools/GB2CPP/include/PandasTableModel.h \
   C:/DSSAT48/Tools/GB2CPP/include/StatusWidget.h \
   C:/Qt/6.9.1/mingw_64/include/QtCore/QAbstractTableModel \
   C:/Qt/6.9.1/mingw_64/include/QtCore/QDateTime \
+  C:/Qt/6.9.1/mingw_64/include/QtCore/QList \
   C:/Qt/6.9.1/mingw_64/include/QtCore/QMap \
   C:/Qt/6.9.1/mingw_64/include/QtCore/QObject \
   C:/Qt/6.9.1/mingw_64/include/QtCore/QSize \
@@ -16,6 +19,8 @@ C:/DSSAT48/Tools/GB2CPP/build_win/GB2_autogen/6YEA5652QU/moc_MainWindow.cpp: C:/
   C:/Qt/6.9.1/mingw_64/include/QtCore/QTextStream \
   C:/Qt/6.9.1/mingw_64/include/QtCore/QTimer \
   C:/Qt/6.9.1/mingw_64/include/QtCore/QVariant \
+  C:/Qt/6.9.1/mingw_64/include/QtCore/QVariantList \
+  C:/Qt/6.9.1/mingw_64/include/QtCore/QVariantMap \
   C:/Qt/6.9.1/mingw_64/include/QtCore/QVector \
   C:/Qt/6.9.1/mingw_64/include/QtCore/q17memory.h \
   C:/Qt/6.9.1/mingw_64/include/QtCore/q20functional.h \
@@ -159,12 +164,15 @@ C:/DSSAT48/Tools/GB2CPP/build_win/GB2_autogen/6YEA5652QU/moc_MainWindow.cpp: C:/
   C:/Qt/6.9.1/mingw_64/include/QtCore/qurl.h \
   C:/Qt/6.9.1/mingw_64/include/QtCore/qutf8stringview.h \
   C:/Qt/6.9.1/mingw_64/include/QtCore/qvariant.h \
+  C:/Qt/6.9.1/mingw_64/include/QtCore/qvariantlist.h \
+  C:/Qt/6.9.1/mingw_64/include/QtCore/qvariantmap.h \
   C:/Qt/6.9.1/mingw_64/include/QtCore/qvarlengtharray.h \
   C:/Qt/6.9.1/mingw_64/include/QtCore/qvector.h \
   C:/Qt/6.9.1/mingw_64/include/QtCore/qversiontagging.h \
   C:/Qt/6.9.1/mingw_64/include/QtCore/qxptype_traits.h \
   C:/Qt/6.9.1/mingw_64/include/QtCore/qyieldcpu.h \
   C:/Qt/6.9.1/mingw_64/include/QtGui/QColor \
+  C:/Qt/6.9.1/mingw_64/include/QtGui/QFont \
   C:/Qt/6.9.1/mingw_64/include/QtGui/QStandardItemModel \
   C:/Qt/6.9.1/mingw_64/include/QtGui/qaction.h \
   C:/Qt/6.9.1/mingw_64/include/QtGui/qbitmap.h \
@@ -202,6 +210,8 @@ C:/DSSAT48/Tools/GB2CPP/build_win/GB2_autogen/6YEA5652QU/moc_MainWindow.cpp: C:/
   C:/Qt/6.9.1/mingw_64/include/QtGui/qwindowdefs_win.h \
   C:/Qt/6.9.1/mingw_64/include/QtWidgets/QCheckBox \
   C:/Qt/6.9.1/mingw_64/include/QtWidgets/QComboBox \
+  C:/Qt/6.9.1/mingw_64/include/QtWidgets/QDialog \
+  C:/Qt/6.9.1/mingw_64/include/QtWidgets/QDialogButtonBox \
   C:/Qt/6.9.1/mingw_64/include/QtWidgets/QFileDialog \
   C:/Qt/6.9.1/mingw_64/include/QtWidgets/QGridLayout \
   C:/Qt/6.9.1/mingw_64/include/QtWidgets/QGroupBox \

@@ -566,6 +566,19 @@ void PlotWidget::autoFitAxes()
         return;
     }
     
+    // Include error bar extent in Y bounds when error bars are enabled
+    if (m_plotSettings.showErrorBars) {
+        for (const QSharedPointer<PlotData> &plotData : m_plotDataList) {
+            if (!plotData || plotData->errorBars.isEmpty()) continue;
+            for (const ErrorBarData &errorBar : plotData->errorBars) {
+                double yTop = errorBar.meanY + errorBar.errorValue;
+                double yBottom = errorBar.meanY - errorBar.errorValue;
+                maxY = qMax(maxY, yTop);
+                minY = qMin(minY, yBottom);
+            }
+        }
+    }
+    
     // Add padding (no padding on origin side, 5% on far side for X, top padding for Y)
     double xRightPadding = (maxX - minX) * 0.05;
     double xLeftPadding = 0;  // No padding on origin side
@@ -852,6 +865,38 @@ void PlotWidget::plotTimeSeries(
         m_currentXVar = xVar;
         m_currentYVars = yVars;
         m_treatmentNames = treatmentNames;
+
+        // Reset series filter when dataset or variables change
+        // (filter persists only for same data + same Y vars, or via DAS/DAP/DATE switches)
+        {
+            QMap<QString, QStringList> newExpTrts;
+            const DataColumn *trtCheck = m_simData.getColumn("TRT");
+            const DataColumn *expCheck = m_simData.getColumn("EXPERIMENT");
+            if (trtCheck) {
+                QSet<QString> seenPairs;
+                for (int i = 0; i < m_simData.rowCount; ++i) {
+                    QString trtId = trtCheck->data.value(i).toString();
+                    if (trtId.isEmpty()) continue;
+                    QString expId = m_selectedExperiment;
+                    if (expCheck && i < expCheck->data.size()) {
+                        QString e = expCheck->data[i].toString();
+                        if (!e.isEmpty()) expId = e;
+                    }
+                    QString pk = expId + "::" + trtId;
+                    if (!seenPairs.contains(pk)) {
+                        seenPairs.insert(pk);
+                        newExpTrts[expId].append(trtId);
+                    }
+                }
+            }
+            if (newExpTrts != m_plotSettings.experimentTreatments || yVars != m_plotSettings.lastYVars) {
+                m_plotSettings.excludedSeriesKeys.clear();
+                m_plotSettings.experimentTreatments = newExpTrts;
+                m_plotSettings.availableExperiments = newExpTrts.keys();
+                m_plotSettings.availableYVars = yVars;
+                m_plotSettings.lastYVars = yVars;
+            }
+        }
 
         if (m_simData.rowCount == 0) {
             qWarning() << "PlotWidget: No simulated data available";
@@ -1312,7 +1357,7 @@ void PlotWidget::plotDatasets(const DataTable &simData, const DataTable &obsData
             if (!treatments.isEmpty() && !treatments.contains("All") && !treatments.contains(trt)) {
                 continue;
             }
-            
+
             // Get experiment for this row, or use selectedExperiment as fallback
             QString experiment = selectedExperiment;
             if (expColumn && row < expColumn->data.size()) {
@@ -1320,6 +1365,11 @@ void PlotWidget::plotDatasets(const DataTable &simData, const DataTable &obsData
                 if (!expFromData.isEmpty()) {
                     experiment = expFromData;
                 }
+            }
+
+            // Per-variable filter: skip if this var::exp::trt is excluded
+            if (m_plotSettings.excludedSeriesKeys.contains(yVar + "::" + experiment + "::" + trt)) {
+                continue;
             }
             
             // Get crop for this row if available
@@ -1523,7 +1573,7 @@ void PlotWidget::plotDatasets(const DataTable &simData, const DataTable &obsData
                 if (!treatments.isEmpty() && !treatments.contains("All") && !treatments.contains(trt)) {
                     continue;
                 }
-                
+
                 // Get experiment for this row, or use selectedExperiment as fallback
                 QString experiment = selectedExperiment;
                 if (expColumn && row < expColumn->data.size()) {
@@ -1532,7 +1582,12 @@ void PlotWidget::plotDatasets(const DataTable &simData, const DataTable &obsData
                         experiment = expFromData;
                     }
                 }
-                
+
+                // Per-variable filter: skip if this var::exp::trt is excluded
+                if (m_plotSettings.excludedSeriesKeys.contains(yVar + "::" + experiment + "::" + trt)) {
+                    continue;
+                }
+
                 // Get crop for this row if available
                 QString crop = "XX";  // Default crop code
                 const DataColumn* cropColumn = obsData.getColumn("CROP");
@@ -1542,7 +1597,7 @@ void PlotWidget::plotDatasets(const DataTable &simData, const DataTable &obsData
                         crop = cropFromData;
                     }
                 }
-                
+
                 // Observed data has no run; always use base key crop__experiment__treatment
                 QString expTrtKey = QString("%1__%2__%3").arg(crop).arg(experiment).arg(trt);
                 
@@ -2141,7 +2196,11 @@ void PlotWidget::calculateMetrics()
             if (!m_currentTreatments.contains("All") && !m_currentTreatments.contains(trt)) {
                 continue;
             }
-            
+            // Per-variable filter
+            if (m_plotSettings.excludedSeriesKeys.contains(variable + "::" + experimentName + "::" + trt)) {
+                continue;
+            }
+
             QVector<double> simValues = it.value();
             QVector<double> obsValues = obsByTreatmentVarExpCrop[groupKey];
             
@@ -4106,12 +4165,87 @@ void PlotWidget::onDateButtonClicked()
 void PlotWidget::onSettingsButtonClicked()
 {
     qDebug() << "PlotWidget: Settings button clicked";
-    
+
+    // Populate available experiments and treatments from current data
+    QStringList availableExperiments;
+    QMap<QString, QStringList> experimentTreatments;
+    QMap<QString, QString> treatmentDisplayNames;
+    const DataColumn *trtColumn = m_simData.getColumn("TRT");
+    // For scatter mode (EVALUATE.OUT), prefer EXCODE over the metadata EXPERIMENT column
+    const DataColumn *expColumn = nullptr;
+    if (m_isScatterMode) {
+        expColumn = m_simData.getColumn("EXCODE");
+    }
+    if (!expColumn) expColumn = m_simData.getColumn("EXPERIMENT");
+    if (trtColumn) {
+        QSet<QString> seenPairs;
+        QSet<QString> seenExps;
+        for (int i = 0; i < m_simData.rowCount; ++i) {
+            QString trtId = trtColumn->data.value(i).toString();
+            if (trtId.isEmpty()) continue;
+            QString expId = m_selectedExperiment;
+            if (expColumn && i < expColumn->data.size()) {
+                QString e = expColumn->data[i].toString();
+                if (!e.isEmpty()) expId = e;
+            }
+            QString pairKey = expId + "::" + trtId;
+            if (!seenPairs.contains(pairKey)) {
+                seenPairs.insert(pairKey);
+                if (!seenExps.contains(expId)) {
+                    seenExps.insert(expId);
+                    availableExperiments.append(expId);
+                }
+                experimentTreatments[expId].append(trtId);
+                treatmentDisplayNames[pairKey] = getTreatmentDisplayName(trtId, expId);
+            }
+        }
+    }
+    m_plotSettings.availableExperiments = availableExperiments;
+    m_plotSettings.experimentTreatments = experimentTreatments;
+    m_plotSettings.treatmentDisplayNames = treatmentDisplayNames;
+    m_plotSettings.availableYVars = m_currentYVars;
+    // Build Y variable display names
+    for (const QString &yVar : m_currentYVars) {
+        if (!m_plotSettings.yVarDisplayNames.contains(yVar)) {
+            QPair<QString, QString> varInfo = DataProcessor::getVariableInfo(yVar);
+            // For EVALUATE.OUT variables (e.g. HWAMS, HWAMM), strip S/M suffix for CDE lookup
+            if (varInfo.first.isEmpty() && yVar.length() > 1) {
+                QString baseName = yVar.left(yVar.length() - 1);
+                varInfo = DataProcessor::getVariableInfo(baseName);
+            }
+            m_plotSettings.yVarDisplayNames[yVar] = varInfo.first.isEmpty() ? yVar : varInfo.first;
+        }
+    }
+
     PlotSettingsDialog dialog(m_plotSettings, this, this);
     if (dialog.exec() == QDialog::Accepted) {
         PlotSettings newSettings = dialog.getSettings();
+
+        // Check what changed BEFORE applyPlotSettings overwrites m_plotSettings
+        bool filterChanged = (m_plotSettings.excludedSeriesKeys != newSettings.excludedSeriesKeys);
+        bool errorBarChanged = (m_plotSettings.showErrorBars != newSettings.showErrorBars) ||
+                               (m_plotSettings.errorBarType != newSettings.errorBarType);
+
         applyPlotSettings(newSettings);
         m_plotSettings = newSettings;
+
+        // Re-plot if filter or error bar settings changed
+        bool needsReplot = (filterChanged || errorBarChanged) && m_simData.rowCount > 0;
+        if (needsReplot) {
+            if (m_isScatterMode) {
+                QString yVar = m_currentYVars.isEmpty() ? QString() : m_currentYVars.first();
+                if (!yVar.isEmpty()) {
+                    // Copy data before plotScatter — clear() inside destroys m_simData
+                    DataTable dataCopy = m_simData;
+                    plotScatter(dataCopy, m_currentXVar, yVar, m_currentTreatments, m_treatmentNames);
+                }
+            } else {
+                updatePlotWithScaling();
+                if (m_obsData.rowCount > 0) {
+                    calculateMetrics();
+                }
+            }
+        }
     }
 }
 
@@ -4125,30 +4259,30 @@ void PlotWidget::applyPlotSettings(const PlotSettings &settings)
     // Apply legend settings
     setShowLegend(settings.showLegend);
     
-    // Apply axis settings - always apply, using current defaults if empty
-    QString xTitle = settings.xAxisTitle.isEmpty() ? m_currentXVar : settings.xAxisTitle;
-    
-    // Create default Y title from current Y variables
-    QString defaultYTitle = "Y Variable";
-    if (!m_currentYVars.isEmpty()) {
-        QStringList yLabels;
-        for (const QString &yVar : m_currentYVars) {
-            QPair<QString, QString> yVarInfo = DataProcessor::getVariableInfo(yVar);
-            QString baseLabel = yVarInfo.first.isEmpty() ? yVar : yVarInfo.first;
-            // Include scaling factor if available
-            if (m_scaleFactors.contains("default") && m_scaleFactors["default"].contains(yVar)) {
-                const auto& info = m_scaleFactors["default"][yVar];
-                if (info.scaleFactor != 1.0) {
-                    baseLabel += QString(" (x%1)").arg(info.scaleFactor, 0, 'g', 3);
+    // Apply axis titles (skip for scatter mode — it has its own measured/simulated titles)
+    if (!m_isScatterMode) {
+        QString xTitle = settings.xAxisTitle.isEmpty() ? m_currentXVar : settings.xAxisTitle;
+
+        QString defaultYTitle = "Y Variable";
+        if (!m_currentYVars.isEmpty()) {
+            QStringList yLabels;
+            for (const QString &yVar : m_currentYVars) {
+                QPair<QString, QString> yVarInfo = DataProcessor::getVariableInfo(yVar);
+                QString baseLabel = yVarInfo.first.isEmpty() ? yVar : yVarInfo.first;
+                if (m_scaleFactors.contains("default") && m_scaleFactors["default"].contains(yVar)) {
+                    const auto& info = m_scaleFactors["default"][yVar];
+                    if (info.scaleFactor != 1.0) {
+                        baseLabel += QString(" (x%1)").arg(info.scaleFactor, 0, 'g', 3);
+                    }
                 }
+                yLabels.append(baseLabel);
             }
-            yLabels.append(baseLabel);
+            defaultYTitle = yLabels.join(", ");
         }
-        defaultYTitle = yLabels.join(", ");
+
+        QString yTitle = settings.yAxisTitle.isEmpty() ? defaultYTitle : settings.yAxisTitle;
+        setAxisTitles(xTitle, yTitle);
     }
-    
-    QString yTitle = settings.yAxisTitle.isEmpty() ? defaultYTitle : settings.yAxisTitle;
-    setAxisTitles(xTitle, yTitle);
     
     // Apply plot title - always apply, can be empty to clear title
     setPlotTitle(settings.plotTitle);
@@ -4166,6 +4300,7 @@ void PlotWidget::applyPlotSettings(const PlotSettings &settings)
     
     // Apply axis settings to all axes
     auto axes = m_chart->axes();
+    auto hAxes = m_chart->axes(Qt::Horizontal);
     for (auto axis : axes) {
         // Apply axis tick label font
         QFont tickFont(settings.fontFamily, settings.axisTickFontSize);
@@ -4181,8 +4316,8 @@ void PlotWidget::applyPlotSettings(const PlotSettings &settings)
             valueAxis->setMinorGridLineVisible(settings.showMinorGrid);
             valueAxis->setLabelsVisible(settings.showAxisLabels);
 
-            // Apply X-axis tick customization only to X-axis
-            if (axis == m_chart->axes(Qt::Horizontal).first()) {
+            // Apply X-axis tick customization only to X-axis (skip for scatter)
+            if (!m_isScatterMode && !hAxes.isEmpty() && axis == hAxes.first()) {
                 if (settings.xAxisTickCount > 0) {
                     valueAxis->setTickCount(settings.xAxisTickCount);
                 }
@@ -4197,7 +4332,7 @@ void PlotWidget::applyPlotSettings(const PlotSettings &settings)
             dateTimeAxis->setLabelsVisible(settings.showAxisLabels);
 
             // Apply X-axis tick customization only to X-axis (for DATE variables)
-            if (axis == m_chart->axes(Qt::Horizontal).first()) {
+            if (!hAxes.isEmpty() && axis == hAxes.first()) {
                 if (settings.xAxisTickCount > 0) {
                     dateTimeAxis->setTickCount(settings.xAxisTickCount);
                 }
@@ -4243,18 +4378,11 @@ void PlotWidget::applyPlotSettings(const PlotSettings &settings)
     m_showGrid = settings.showGrid;
     m_showLegend = settings.showLegend;
 
-    // Update plot settings (including error bar settings)
+    // Update internal plot settings
+    // Note: error bar change detection is handled in onSettingsButtonClicked()
+    // before m_plotSettings is overwritten
     m_plotSettings = settings;
-    
-    // If error bar settings changed, replot to apply changes
-    bool errorBarChanged = (m_plotSettings.showErrorBars != settings.showErrorBars) ||
-                          (m_plotSettings.errorBarType != settings.errorBarType);
-    
-    if (errorBarChanged && m_simData.rowCount > 0 && !m_currentYVars.isEmpty()) {
-        qDebug() << "PlotWidget: Error bar settings changed, replotting...";
-        updatePlotWithScaling();
-    }
-    
+
     qDebug() << "PlotWidget: Plot settings applied successfully";
 }
 
@@ -4291,7 +4419,20 @@ void PlotWidget::plotScatter(
 {
         qDebug() << "PlotWidget::plotScatter() - ENTRY";
         m_isScatterMode = true;
-        
+
+        // Store variables for re-plotting from settings dialog
+        m_currentXVar = xVar;
+        m_currentYVars = QStringList() << yVar;
+
+        // Resolve experiment for scatter from EXCODE column
+        const DataColumn *excodeForExp = evaluateData.getColumn("EXCODE");
+        if (excodeForExp && !excodeForExp->data.isEmpty()) {
+            QString firstExcode = excodeForExp->data.first().toString();
+            if (!firstExcode.isEmpty()) {
+                m_selectedExperiment = firstExcode;
+            }
+        }
+
         // Hide DAS, DAP, DATE buttons for scatter plots (not applicable)
         setXAxisButtonsVisible(false);
         qDebug() << "  X Variable:" << xVar;
@@ -4331,33 +4472,90 @@ void PlotWidget::plotScatter(
         // Get experiment code column (EXCODE in EVALUATE.OUT) for metrics
         const DataColumn *excodeCol = evaluateData.getColumn("EXCODE");
         const DataColumn *crCol = evaluateData.getColumn("CR");  // Crop code
-        
-        // Collect all data points (not grouped by treatment) and by experiment (for metrics)
+        const DataColumn *trtCol = evaluateData.getColumn("TRT");
+
+        // Store evaluate data and treatment names for settings dialog
+        m_simData = evaluateData;
+        m_treatmentNames = treatmentNames;
+
+        // Reset treatment filter when dataset or variable changes
+        QMap<QString, QStringList> newExpTrts;
+        if (trtCol) {
+            QSet<QString> seenPairs;
+            for (int i = 0; i < evaluateData.rowCount; ++i) {
+                QString trtId = trtCol->data.value(i).toString();
+                if (trtId.isEmpty()) continue;
+                QString expId = m_selectedExperiment;
+                if (excodeCol && i < excodeCol->data.size()) {
+                    QString e = excodeCol->data.value(i).toString();
+                    if (!e.isEmpty()) expId = e;
+                }
+                QString pk = expId + "::" + trtId;
+                if (!seenPairs.contains(pk)) {
+                    seenPairs.insert(pk);
+                    newExpTrts[expId].append(trtId);
+                }
+            }
+        }
+        QStringList scatterYVars = QStringList() << yVar;
+        if (newExpTrts != m_plotSettings.experimentTreatments || scatterYVars != m_plotSettings.lastYVars) {
+            m_plotSettings.excludedSeriesKeys.clear();
+            m_plotSettings.experimentTreatments = newExpTrts;
+            m_plotSettings.availableExperiments = newExpTrts.keys();
+            m_plotSettings.availableYVars = scatterYVars;
+            m_plotSettings.lastYVars = scatterYVars;
+        }
+
+        // Apply treatment filter
+        if (selectedTreatments.isEmpty() || selectedTreatments.contains("All")) {
+            m_currentTreatments = QStringList() << "All";
+        } else {
+            m_currentTreatments = selectedTreatments;
+        }
+
+        // Collect all data points and by experiment (for metrics), with treatment filtering
         QVector<QPointF> allPoints;
         QMap<QString, QVector<QPointF>> experimentPoints;
         QMap<QString, QString> experimentCropCodes;
-        
+
         int validPointCount = 0;
         for (int i = 0; i < evaluateData.rowCount; ++i) {
             QVariant xVal = xCol->data.value(i);
             QVariant yVal = yCol->data.value(i);
-            
+
             // Skip missing values
             if (DataProcessor::isMissingValue(xVal) || DataProcessor::isMissingValue(yVal)) {
                 continue;
             }
-            
+
+            // Apply treatment filter
+            if (trtCol && i < trtCol->data.size()) {
+                QString trt = trtCol->data.value(i).toString();
+                if (!m_currentTreatments.contains("All") && !m_currentTreatments.contains(trt)) {
+                    continue;
+                }
+                // Per-variable filter: resolve experiment for this row
+                QString rowExp = m_selectedExperiment;
+                if (excodeCol && i < excodeCol->data.size()) {
+                    QString e = excodeCol->data.value(i).toString();
+                    if (!e.isEmpty()) rowExp = e;
+                }
+                if (m_plotSettings.excludedSeriesKeys.contains(yVar + "::" + rowExp + "::" + trt)) {
+                    continue;
+                }
+            }
+
             bool okX, okY;
             double x = DataProcessor::toDouble(xVal, &okX);
             double y = DataProcessor::toDouble(yVal, &okY);
-            
+
             if (!okX || !okY) {
                 qDebug() << "PlotWidget::plotScatter() - Row" << i << "failed conversion: x=" << xVal << "y=" << yVal;
                 continue;
             }
-            
+
             validPointCount++;
-            
+
             // Get experiment code and crop for metrics
             QString expCode = "";
             QString cropCode = "";
@@ -4373,11 +4571,10 @@ void PlotWidget::plotScatter(
                     cropCode = crVal.toString();
                 }
             }
-            
+
             // Create experiment key (use experiment code when available)
             QString experimentKey = expCode.isEmpty() ? QString("Experiment") : expCode;
 
-            // Add point to all points (no treatment filtering)
             allPoints.append(QPointF(x, y));
 
             experimentPoints[experimentKey].append(QPointF(x, y));

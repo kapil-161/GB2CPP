@@ -45,7 +45,9 @@ template <> constexpr inline auto MainWindow::qt_create_metaobjectdata<qt_meta_t
         "",
         "onSaveData",
         "onExportPlot",
+        "onCopyPlot",
         "onAbout",
+        "onCDECodesReference",
         "onDataFileChanged",
         "onXVariableChanged",
         "onYVariableChanged",
@@ -56,6 +58,7 @@ template <> constexpr inline auto MainWindow::qt_create_metaobjectdata<qt_meta_t
         "index",
         "onPlotWidgetXVariableChanged",
         "xVariable",
+        "onDataViewFileTypeChanged",
         "onDataProcessed",
         "message",
         "onDataError",
@@ -70,7 +73,8 @@ template <> constexpr inline auto MainWindow::qt_create_metaobjectdata<qt_meta_t
         "onShowMetrics",
         "updateTimeSeriesMetrics",
         "QList<QMap<QString,QVariant>>",
-        "metrics"
+        "metrics",
+        "updateScatterMetrics"
     };
 
     QtMocHelpers::UintData qt_methods {
@@ -80,55 +84,65 @@ template <> constexpr inline auto MainWindow::qt_create_metaobjectdata<qt_meta_t
         QtMocHelpers::SlotData<void()>(3, 2, QMC::AccessPrivate, QMetaType::Void),
         // Slot 'onExportPlot'
         QtMocHelpers::SlotData<void()>(4, 2, QMC::AccessPrivate, QMetaType::Void),
-        // Slot 'onAbout'
+        // Slot 'onCopyPlot'
         QtMocHelpers::SlotData<void()>(5, 2, QMC::AccessPrivate, QMetaType::Void),
-        // Slot 'onDataFileChanged'
+        // Slot 'onAbout'
         QtMocHelpers::SlotData<void()>(6, 2, QMC::AccessPrivate, QMetaType::Void),
-        // Slot 'onXVariableChanged'
+        // Slot 'onCDECodesReference'
         QtMocHelpers::SlotData<void()>(7, 2, QMC::AccessPrivate, QMetaType::Void),
-        // Slot 'onYVariableChanged'
+        // Slot 'onDataFileChanged'
         QtMocHelpers::SlotData<void()>(8, 2, QMC::AccessPrivate, QMetaType::Void),
-        // Slot 'onTreatmentChanged'
+        // Slot 'onXVariableChanged'
         QtMocHelpers::SlotData<void()>(9, 2, QMC::AccessPrivate, QMetaType::Void),
-        // Slot 'onPlotTypeChanged'
+        // Slot 'onYVariableChanged'
         QtMocHelpers::SlotData<void()>(10, 2, QMC::AccessPrivate, QMetaType::Void),
-        // Slot 'onUpdatePlot'
+        // Slot 'onTreatmentChanged'
         QtMocHelpers::SlotData<void()>(11, 2, QMC::AccessPrivate, QMetaType::Void),
+        // Slot 'onPlotTypeChanged'
+        QtMocHelpers::SlotData<void()>(12, 2, QMC::AccessPrivate, QMetaType::Void),
+        // Slot 'onUpdatePlot'
+        QtMocHelpers::SlotData<void()>(13, 2, QMC::AccessPrivate, QMetaType::Void),
         // Slot 'onTabChanged'
-        QtMocHelpers::SlotData<void(int)>(12, 2, QMC::AccessPrivate, QMetaType::Void, {{
-            { QMetaType::Int, 13 },
+        QtMocHelpers::SlotData<void(int)>(14, 2, QMC::AccessPrivate, QMetaType::Void, {{
+            { QMetaType::Int, 15 },
         }}),
         // Slot 'onPlotWidgetXVariableChanged'
-        QtMocHelpers::SlotData<void(const QString &)>(14, 2, QMC::AccessPrivate, QMetaType::Void, {{
-            { QMetaType::QString, 15 },
-        }}),
-        // Slot 'onDataProcessed'
         QtMocHelpers::SlotData<void(const QString &)>(16, 2, QMC::AccessPrivate, QMetaType::Void, {{
             { QMetaType::QString, 17 },
         }}),
+        // Slot 'onDataViewFileTypeChanged'
+        QtMocHelpers::SlotData<void()>(18, 2, QMC::AccessPrivate, QMetaType::Void),
+        // Slot 'onDataProcessed'
+        QtMocHelpers::SlotData<void(const QString &)>(19, 2, QMC::AccessPrivate, QMetaType::Void, {{
+            { QMetaType::QString, 20 },
+        }}),
         // Slot 'onDataError'
-        QtMocHelpers::SlotData<void(const QString &)>(18, 2, QMC::AccessPrivate, QMetaType::Void, {{
-            { QMetaType::QString, 19 },
+        QtMocHelpers::SlotData<void(const QString &)>(21, 2, QMC::AccessPrivate, QMetaType::Void, {{
+            { QMetaType::QString, 22 },
         }}),
         // Slot 'onProgressUpdate'
-        QtMocHelpers::SlotData<void(int)>(20, 2, QMC::AccessPrivate, QMetaType::Void, {{
-            { QMetaType::Int, 21 },
+        QtMocHelpers::SlotData<void(int)>(23, 2, QMC::AccessPrivate, QMetaType::Void, {{
+            { QMetaType::Int, 24 },
         }}),
         // Slot 'onFolderSelectionChanged'
-        QtMocHelpers::SlotData<void()>(22, 2, QMC::AccessPrivate, QMetaType::Void),
-        // Slot 'onRefreshFiles'
-        QtMocHelpers::SlotData<void()>(23, 2, QMC::AccessPrivate, QMetaType::Void),
-        // Slot 'onFileSelectionChanged'
-        QtMocHelpers::SlotData<void()>(24, 2, QMC::AccessPrivate, QMetaType::Void),
-        // Slot 'onUnselectAllFiles'
         QtMocHelpers::SlotData<void()>(25, 2, QMC::AccessPrivate, QMetaType::Void),
-        // Slot 'onUnselectAllYVars'
+        // Slot 'onRefreshFiles'
         QtMocHelpers::SlotData<void()>(26, 2, QMC::AccessPrivate, QMetaType::Void),
-        // Slot 'onShowMetrics'
+        // Slot 'onFileSelectionChanged'
         QtMocHelpers::SlotData<void()>(27, 2, QMC::AccessPrivate, QMetaType::Void),
+        // Slot 'onUnselectAllFiles'
+        QtMocHelpers::SlotData<void()>(28, 2, QMC::AccessPrivate, QMetaType::Void),
+        // Slot 'onUnselectAllYVars'
+        QtMocHelpers::SlotData<void()>(29, 2, QMC::AccessPrivate, QMetaType::Void),
+        // Slot 'onShowMetrics'
+        QtMocHelpers::SlotData<void()>(30, 2, QMC::AccessPrivate, QMetaType::Void),
         // Slot 'updateTimeSeriesMetrics'
-        QtMocHelpers::SlotData<void(const QVector<QMap<QString,QVariant>> &)>(28, 2, QMC::AccessPrivate, QMetaType::Void, {{
-            { 0x80000000 | 29, 30 },
+        QtMocHelpers::SlotData<void(const QVector<QMap<QString,QVariant>> &)>(31, 2, QMC::AccessPrivate, QMetaType::Void, {{
+            { 0x80000000 | 32, 33 },
+        }}),
+        // Slot 'updateScatterMetrics'
+        QtMocHelpers::SlotData<void(const QVector<QMap<QString,QVariant>> &)>(34, 2, QMC::AccessPrivate, QMetaType::Void, {{
+            { 0x80000000 | 32, 33 },
         }}),
     };
     QtMocHelpers::UintData qt_properties {
@@ -156,25 +170,29 @@ void MainWindow::qt_static_metacall(QObject *_o, QMetaObject::Call _c, int _id, 
         case 0: _t->onOpenFile(); break;
         case 1: _t->onSaveData(); break;
         case 2: _t->onExportPlot(); break;
-        case 3: _t->onAbout(); break;
-        case 4: _t->onDataFileChanged(); break;
-        case 5: _t->onXVariableChanged(); break;
-        case 6: _t->onYVariableChanged(); break;
-        case 7: _t->onTreatmentChanged(); break;
-        case 8: _t->onPlotTypeChanged(); break;
-        case 9: _t->onUpdatePlot(); break;
-        case 10: _t->onTabChanged((*reinterpret_cast< std::add_pointer_t<int>>(_a[1]))); break;
-        case 11: _t->onPlotWidgetXVariableChanged((*reinterpret_cast< std::add_pointer_t<QString>>(_a[1]))); break;
-        case 12: _t->onDataProcessed((*reinterpret_cast< std::add_pointer_t<QString>>(_a[1]))); break;
-        case 13: _t->onDataError((*reinterpret_cast< std::add_pointer_t<QString>>(_a[1]))); break;
-        case 14: _t->onProgressUpdate((*reinterpret_cast< std::add_pointer_t<int>>(_a[1]))); break;
-        case 15: _t->onFolderSelectionChanged(); break;
-        case 16: _t->onRefreshFiles(); break;
-        case 17: _t->onFileSelectionChanged(); break;
-        case 18: _t->onUnselectAllFiles(); break;
-        case 19: _t->onUnselectAllYVars(); break;
-        case 20: _t->onShowMetrics(); break;
-        case 21: _t->updateTimeSeriesMetrics((*reinterpret_cast< std::add_pointer_t<QList<QMap<QString,QVariant>>>>(_a[1]))); break;
+        case 3: _t->onCopyPlot(); break;
+        case 4: _t->onAbout(); break;
+        case 5: _t->onCDECodesReference(); break;
+        case 6: _t->onDataFileChanged(); break;
+        case 7: _t->onXVariableChanged(); break;
+        case 8: _t->onYVariableChanged(); break;
+        case 9: _t->onTreatmentChanged(); break;
+        case 10: _t->onPlotTypeChanged(); break;
+        case 11: _t->onUpdatePlot(); break;
+        case 12: _t->onTabChanged((*reinterpret_cast< std::add_pointer_t<int>>(_a[1]))); break;
+        case 13: _t->onPlotWidgetXVariableChanged((*reinterpret_cast< std::add_pointer_t<QString>>(_a[1]))); break;
+        case 14: _t->onDataViewFileTypeChanged(); break;
+        case 15: _t->onDataProcessed((*reinterpret_cast< std::add_pointer_t<QString>>(_a[1]))); break;
+        case 16: _t->onDataError((*reinterpret_cast< std::add_pointer_t<QString>>(_a[1]))); break;
+        case 17: _t->onProgressUpdate((*reinterpret_cast< std::add_pointer_t<int>>(_a[1]))); break;
+        case 18: _t->onFolderSelectionChanged(); break;
+        case 19: _t->onRefreshFiles(); break;
+        case 20: _t->onFileSelectionChanged(); break;
+        case 21: _t->onUnselectAllFiles(); break;
+        case 22: _t->onUnselectAllYVars(); break;
+        case 23: _t->onShowMetrics(); break;
+        case 24: _t->updateTimeSeriesMetrics((*reinterpret_cast< std::add_pointer_t<QList<QMap<QString,QVariant>>>>(_a[1]))); break;
+        case 25: _t->updateScatterMetrics((*reinterpret_cast< std::add_pointer_t<QList<QMap<QString,QVariant>>>>(_a[1]))); break;
         default: ;
         }
     }
@@ -199,14 +217,14 @@ int MainWindow::qt_metacall(QMetaObject::Call _c, int _id, void **_a)
     if (_id < 0)
         return _id;
     if (_c == QMetaObject::InvokeMetaMethod) {
-        if (_id < 22)
+        if (_id < 26)
             qt_static_metacall(this, _c, _id, _a);
-        _id -= 22;
+        _id -= 26;
     }
     if (_c == QMetaObject::RegisterMethodArgumentMetaType) {
-        if (_id < 22)
+        if (_id < 26)
             *reinterpret_cast<QMetaType *>(_a[0]) = QMetaType();
-        _id -= 22;
+        _id -= 26;
     }
     return _id;
 }

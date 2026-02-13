@@ -525,16 +525,33 @@ CMakeFiles/GB2.dir/src/MainWindow.cpp.obj: \
  C:/Qt/6.9.1/mingw_64/include/QtCore/qvector.h \
  C:/Qt/6.9.1/mingw_64/include/QtCore/QObject \
  C:/Qt/6.9.1/mingw_64/include/QtCore/qobject.h \
- C:/DSSAT48/Tools/GB2CPP/include/DataTableWidget.h \
+ C:/DSSAT48/Tools/GB2CPP/include/MetricsDialog.h \
+ C:/Qt/6.9.1/mingw_64/include/QtWidgets/QDialog \
+ C:/Qt/6.9.1/mingw_64/include/QtWidgets/qdialog.h \
+ C:/Qt/6.9.1/mingw_64/include/QtWidgets/QDialogButtonBox \
+ C:/Qt/6.9.1/mingw_64/include/QtWidgets/qdialogbuttonbox.h \
+ C:/Qt/6.9.1/mingw_64/include/QtCore/QVariantList \
+ C:/Qt/6.9.1/mingw_64/include/QtCore/qvariantlist.h \
+ C:/Qt/6.9.1/mingw_64/include/QtCore/QList \
+ C:/Qt/6.9.1/mingw_64/include/QtCore/qlist.h \
+ C:/Qt/6.9.1/mingw_64/include/QtCore/QVariant \
+ C:/DSSAT48/Tools/GB2CPP/include/MetricsTableWidget.h \
+ C:/Qt/6.9.1/mingw_64/include/QtCore/QAbstractTableModel \
+ C:/Qt/6.9.1/mingw_64/include/QtCore/qabstractitemmodel.h \
  C:/Qt/6.9.1/mingw_64/include/QtWidgets/QHeaderView \
  C:/Qt/6.9.1/mingw_64/include/QtWidgets/qheaderview.h \
+ C:/Qt/6.9.1/mingw_64/include/QtCore/QVariantMap \
+ C:/Qt/6.9.1/mingw_64/include/QtCore/qvariantmap.h \
+ C:/Qt/6.9.1/mingw_64/include/QtCore/QMap \
+ C:/Qt/6.9.1/mingw_64/include/QtCore/QString \
+ C:/Qt/6.9.1/mingw_64/include/QtGui/QFont \
+ C:/Qt/6.9.1/mingw_64/include/QtGui/qfont.h \
  C:/Qt/6.9.1/mingw_64/include/QtCore/QStandardPaths \
  C:/Qt/6.9.1/mingw_64/include/QtCore/qstandardpaths.h \
  C:/Qt/6.9.1/mingw_64/include/QtCore/QTextStream \
  C:/Qt/6.9.1/mingw_64/include/QtCore/qtextstream.h \
+ C:/DSSAT48/Tools/GB2CPP/include/DataTableWidget.h \
  C:/DSSAT48/Tools/GB2CPP/include/PandasTableModel.h \
- C:/Qt/6.9.1/mingw_64/include/QtCore/QAbstractTableModel \
- C:/Qt/6.9.1/mingw_64/include/QtCore/qabstractitemmodel.h \
  C:/DSSAT48/Tools/GB2CPP/include/DataTableWidget.h \
  C:/DSSAT48/Tools/GB2CPP/include/PlotWidget.h \
  C:/Qt/6.9.1/mingw_64/include/QtGui/QResizeEvent \
@@ -546,8 +563,6 @@ CMakeFiles/GB2.dir/src/MainWindow.cpp.obj: \
  C:/Qt/6.9.1/mingw_64/include/QtGui/qpointingdevice.h \
  C:/Qt/6.9.1/mingw_64/include/QtGui/qinputdevice.h \
  C:/Qt/6.9.1/mingw_64/include/QtGui/qscreen.h \
- C:/Qt/6.9.1/mingw_64/include/QtCore/QList \
- C:/Qt/6.9.1/mingw_64/include/QtCore/qlist.h \
  C:/Qt/6.9.1/mingw_64/include/QtCore/QObject \
  C:/Qt/6.9.1/mingw_64/include/QtCore/QRect \
  C:/Qt/6.9.1/mingw_64/include/QtCore/qrect.h \
@@ -575,8 +590,6 @@ CMakeFiles/GB2.dir/src/MainWindow.cpp.obj: \
  C:/Qt/6.9.1/mingw_64/include/QtGui/QPen \
  C:/Qt/6.9.1/mingw_64/include/QtGui/qpen.h \
  C:/Qt/6.9.1/mingw_64/include/QtGui/QFont \
- C:/Qt/6.9.1/mingw_64/include/QtGui/qfont.h \
- C:/Qt/6.9.1/mingw_64/include/QtCore/QVariant \
  C:/Qt/6.9.1/mingw_64/include/QtCharts/QLegend \
  C:/Qt/6.9.1/mingw_64/include/QtCharts/qlegend.h \
  C:/Qt/6.9.1/mingw_64/include/QtWidgets/QGraphicsWidget \
@@ -612,17 +625,21 @@ CMakeFiles/GB2.dir/src/MainWindow.cpp.obj: \
  C:/Qt/6.9.1/mingw_64/include/QtWidgets/QSpinBox \
  C:/Qt/6.9.1/mingw_64/include/QtWidgets/qspinbox.h \
  C:/DSSAT48/Tools/GB2CPP/include/PlotSettingsDialog.h \
- C:/Qt/6.9.1/mingw_64/include/QtWidgets/QDialog \
- C:/Qt/6.9.1/mingw_64/include/QtWidgets/qdialog.h \
  C:/Qt/6.9.1/mingw_64/include/QtWidgets/QDoubleSpinBox \
  C:/Qt/6.9.1/mingw_64/include/QtWidgets/QColorDialog \
  C:/Qt/6.9.1/mingw_64/include/QtWidgets/qcolordialog.h \
  C:/Qt/6.9.1/mingw_64/include/QtWidgets/QSlider \
  C:/Qt/6.9.1/mingw_64/include/QtWidgets/qslider.h \
+ C:/Qt/6.9.1/mingw_64/include/QtCore/QPoint \
+ C:/Qt/6.9.1/mingw_64/include/QtCore/qpoint.h \
  C:/Qt/6.9.1/mingw_64/include/QtCore/QSharedPointer \
  C:/Qt/6.9.1/mingw_64/include/QtCore/qsharedpointer.h \
  C:/Qt/6.9.1/mingw_64/include/QtCore/QPointer \
  C:/Qt/6.9.1/mingw_64/include/QtCore/qpointer.h \
+ C:/DSSAT48/Tools/GB2CPP/include/CDECodesDialog.h \
+ C:/Qt/6.9.1/mingw_64/include/QtWidgets/QTableWidget \
+ C:/Qt/6.9.1/mingw_64/include/QtWidgets/qtablewidget.h \
+ C:/Qt/6.9.1/mingw_64/include/QtWidgets/qtableview.h \
  C:/Qt/6.9.1/mingw_64/include/QtWidgets/QApplication \
  C:/Qt/6.9.1/mingw_64/include/QtWidgets/qapplication.h \
  C:/Qt/6.9.1/mingw_64/include/QtGui/QCloseEvent \
@@ -630,9 +647,8 @@ CMakeFiles/GB2.dir/src/MainWindow.cpp.obj: \
  C:/Qt/6.9.1/mingw_64/include/QtGui/qscreen.h \
  C:/Qt/6.9.1/mingw_64/include/QtCore/QDir \
  C:/Qt/6.9.1/mingw_64/include/QtCore/qdir.h \
- C:/Qt/6.9.1/mingw_64/include/QtWidgets/QTableWidget \
- C:/Qt/6.9.1/mingw_64/include/QtWidgets/qtablewidget.h \
- C:/Qt/6.9.1/mingw_64/include/QtWidgets/qtableview.h \
  C:/Qt/6.9.1/mingw_64/include/QtWidgets/QTableWidgetItem \
+ C:/Qt/6.9.1/mingw_64/include/QtCore/QRegularExpression \
+ C:/Qt/6.9.1/mingw_64/include/QtCore/qregularexpression.h \
  C:/Qt/6.9.1/mingw_64/include/QtCore/QDebug \
  C:/Qt/6.9.1/mingw_64/include/QtCore/qdebug.h

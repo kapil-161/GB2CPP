@@ -6,6 +6,7 @@ GB2_autogen/timestamp: C:/DSSAT48/Tools/GB2CPP/CMakeLists.txt \
   CMakeFiles/3.30.5/CMakeRCCompiler.cmake \
   CMakeFiles/3.30.5/CMakeSystem.cmake \
   GB2_autogen/moc_predefs.h \
+  C:/DSSAT48/Tools/GB2CPP/include/CDECodesDialog.h \
   C:/DSSAT48/Tools/GB2CPP/include/CommandLineHandler.h \
   C:/DSSAT48/Tools/GB2CPP/include/Config.h \
   C:/DSSAT48/Tools/GB2CPP/include/DataProcessor.h \
@@ -20,6 +21,7 @@ GB2_autogen/timestamp: C:/DSSAT48/Tools/GB2CPP/CMakeLists.txt \
   C:/DSSAT48/Tools/GB2CPP/include/SingleInstanceApp.h \
   C:/DSSAT48/Tools/GB2CPP/include/StatusWidget.h \
   C:/DSSAT48/Tools/GB2CPP/include/TableWidget.h \
+  C:/DSSAT48/Tools/GB2CPP/src/CDECodesDialog.cpp \
   C:/DSSAT48/Tools/GB2CPP/src/CommandLineHandler.cpp \
   C:/DSSAT48/Tools/GB2CPP/src/DataProcessor.cpp \
   C:/DSSAT48/Tools/GB2CPP/src/DataTableWidget.cpp \
@@ -66,6 +68,7 @@ GB2_autogen/timestamp: C:/DSSAT48/Tools/GB2CPP/CMakeLists.txt \
   C:/Qt/6.9.1/mingw_64/include/QtCore/QMap \
   C:/Qt/6.9.1/mingw_64/include/QtCore/QMargins \
   C:/Qt/6.9.1/mingw_64/include/QtCore/QObject \
+  C:/Qt/6.9.1/mingw_64/include/QtCore/QPoint \
   C:/Qt/6.9.1/mingw_64/include/QtCore/QPointer \
   C:/Qt/6.9.1/mingw_64/include/QtCore/QRect \
   C:/Qt/6.9.1/mingw_64/include/QtCore/QSharedPointer \
@@ -321,6 +324,7 @@ GB2_autogen/timestamp: C:/DSSAT48/Tools/GB2CPP/CMakeLists.txt \
   C:/Qt/6.9.1/mingw_64/include/QtWidgets/QStatusBar \
   C:/Qt/6.9.1/mingw_64/include/QtWidgets/QTabWidget \
   C:/Qt/6.9.1/mingw_64/include/QtWidgets/QTableView \
+  C:/Qt/6.9.1/mingw_64/include/QtWidgets/QTableWidget \
   C:/Qt/6.9.1/mingw_64/include/QtWidgets/QTextEdit \
   C:/Qt/6.9.1/mingw_64/include/QtWidgets/QVBoxLayout \
   C:/Qt/6.9.1/mingw_64/include/QtWidgets/QWidget \
@@ -370,6 +374,7 @@ GB2_autogen/timestamp: C:/DSSAT48/Tools/GB2CPP/CMakeLists.txt \
   C:/Qt/6.9.1/mingw_64/include/QtWidgets/qstyleoption.h \
   C:/Qt/6.9.1/mingw_64/include/QtWidgets/qtabbar.h \
   C:/Qt/6.9.1/mingw_64/include/QtWidgets/qtableview.h \
+  C:/Qt/6.9.1/mingw_64/include/QtWidgets/qtablewidget.h \
   C:/Qt/6.9.1/mingw_64/include/QtWidgets/qtabwidget.h \
   C:/Qt/6.9.1/mingw_64/include/QtWidgets/qtextedit.h \
   C:/Qt/6.9.1/mingw_64/include/QtWidgets/qtwidgets-config.h \
@@ -959,14 +964,6 @@ C:/Qt/6.9.1/mingw_64/lib/cmake/Qt6OpenGLWidgets/Qt6OpenGLWidgetsConfigVersion.cm
 
 C:/DSSAT48/Tools/GB2CPP/include/CommandLineHandler.h:
 
-C:/Qt/Tools/CMake_64/share/cmake-3.30/Modules/Compiler/Compaq-CXX-DetermineCompiler.cmake:
-
-C:/Qt/6.9.1/mingw_64/include/QtCore/QMargins:
-
-C:/Qt/6.9.1/mingw_64/lib/cmake/Qt6EntryPointPrivate/Qt6EntryPointPrivateConfig.cmake:
-
-C:/Qt/6.9.1/mingw_64/include/QtWidgets/qboxlayout.h:
-
 C:/DSSAT48/Tools/GB2CPP/CMakeLists.txt:
 
 C:/Qt/6.9.1/mingw_64/include/QtWidgets/qspinbox.h:
@@ -993,6 +990,16 @@ C:/Qt/6.9.1/mingw_64/include/QtCharts/QChartGlobal:
 
 GB2_autogen/moc_predefs.h:
 
+C:/Qt/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/bits/stl_multiset.h:
+
+C:/DSSAT48/Tools/GB2CPP/include/CDECodesDialog.h:
+
+C:/DSSAT48/Tools/GB2CPP/include/DataProcessor.h:
+
+C:/Qt/6.9.1/mingw_64/include/QtCore/qtenvironmentvariables.h:
+
+C:/Qt/6.9.1/mingw_64/include/QtGui/qscreen_platform.h:
+
 C:/Qt/6.9.1/mingw_64/include/QtWidgets/QHeaderView:
 
 C:/Qt/6.9.1/mingw_64/include/QtWidgets/QListWidget:
@@ -1002,12 +1009,6 @@ C:/Qt/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/bits/sstr
 C:/Qt/Tools/CMake_64/share/cmake-3.30/Modules/Compiler/IAR-DetermineCompiler.cmake:
 
 C:/DSSAT48/Tools/GB2CPP/include/Config.h:
-
-C:/DSSAT48/Tools/GB2CPP/include/DataProcessor.h:
-
-C:/Qt/6.9.1/mingw_64/include/QtCore/qtenvironmentvariables.h:
-
-C:/Qt/6.9.1/mingw_64/include/QtGui/qscreen_platform.h:
 
 C:/Qt/6.9.1/mingw_64/include/QtCharts/qchart.h:
 
@@ -1073,6 +1074,12 @@ C:/DSSAT48/Tools/GB2CPP/include/TableWidget.h:
 
 C:/DSSAT48/Tools/GB2CPP/src/CommandLineHandler.cpp:
 
+C:/Qt/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/bits/ptr_traits.h:
+
+C:/DSSAT48/Tools/GB2CPP/src/CDECodesDialog.cpp:
+
+C:/Qt/6.9.1/mingw_64/include/QtCore/qtconfigmacros.h:
+
 C:/DSSAT48/Tools/GB2CPP/src/DataTableWidget.cpp:
 
 C:/Qt/6.9.1/mingw_64/lib/cmake/Qt6ChartsPrivate/Qt6ChartsPrivateConfigVersion.cmake:
@@ -1098,6 +1105,8 @@ C:/Qt/6.9.1/mingw_64/include/QtCore/qstringliteral.h:
 C:/Qt/6.9.1/mingw_64/include/QtWidgets/QLineEdit:
 
 C:/DSSAT48/Tools/GB2CPP/src/MetricsTableWidget.cpp:
+
+C:/Qt/6.9.1/mingw_64/include/QtCore/QPoint:
 
 C:/Qt/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/tr1/special_function_util.h:
 
@@ -1150,10 +1159,6 @@ C:/Qt/6.9.1/mingw_64/include/QtWidgets/qsizepolicy.h:
 C:/Qt/6.9.1/mingw_64/include/QtCharts/qabstractseries.h:
 
 C:/Qt/6.9.1/mingw_64/include/QtCharts/QScatterSeries:
-
-C:/Qt/6.9.1/mingw_64/lib/cmake/Qt6OpenGLWidgets/Qt6OpenGLWidgetsVersionlessAliasTargets.cmake:
-
-C:/Qt/6.9.1/mingw_64/include/QtCore/QMap:
 
 C:/Qt/6.9.1/mingw_64/lib/cmake/Qt6Core/Qt6CoreMacros.cmake:
 
@@ -1228,6 +1233,18 @@ C:/Qt/6.9.1/mingw_64/include/QtWidgets/qcheckbox.h:
 C:/Qt/6.9.1/mingw_64/lib/cmake/Qt6/QtPublicPluginHelpers_v2.cmake:
 
 C:/Qt/6.9.1/mingw_64/include/QtCore/QList:
+
+C:/Qt/6.9.1/mingw_64/lib/cmake/Qt6OpenGLWidgets/Qt6OpenGLWidgetsVersionlessAliasTargets.cmake:
+
+C:/Qt/6.9.1/mingw_64/include/QtCore/QMap:
+
+C:/Qt/Tools/CMake_64/share/cmake-3.30/Modules/Compiler/Compaq-CXX-DetermineCompiler.cmake:
+
+C:/Qt/6.9.1/mingw_64/include/QtCore/QMargins:
+
+C:/Qt/6.9.1/mingw_64/lib/cmake/Qt6EntryPointPrivate/Qt6EntryPointPrivateConfig.cmake:
+
+C:/Qt/6.9.1/mingw_64/include/QtWidgets/qboxlayout.h:
 
 C:/Qt/6.9.1/mingw_64/include/QtWidgets/QStatusBar:
 
@@ -1399,8 +1416,6 @@ C:/Qt/6.9.1/mingw_64/include/QtCore/qconfig.h:
 
 C:/Qt/6.9.1/mingw_64/include/QtCore/qchar.h:
 
-C:/Qt/6.9.1/mingw_64/lib/cmake/Qt6Gui/Qt6QWindowsIntegrationPluginConfig.cmake:
-
 C:/Qt/6.9.1/mingw_64/include/QtCore/qcompare.h:
 
 C:/Qt/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/x86_64-w64-mingw32/bits/gthr-default.h:
@@ -1560,8 +1575,6 @@ C:/Qt/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/ext/align
 C:/Qt/6.9.1/mingw_64/lib/cmake/Qt6/QtPublicTestHelpers.cmake:
 
 C:/Qt/6.9.1/mingw_64/include/QtCore/qiodevicebase.h:
-
-C:/Qt/6.9.1/mingw_64/lib/cmake/Qt6Gui/Qt6QWindowsDirect2DIntegrationPluginTargets.cmake:
 
 C:/Qt/6.9.1/mingw_64/include/QtCore/qitemselectionmodel.h:
 
@@ -1745,10 +1758,6 @@ C:/Qt/6.9.1/mingw_64/lib/cmake/Qt6Core/Qt6CoreConfig.cmake:
 
 C:/Qt/6.9.1/mingw_64/include/QtCore/qtconfiginclude.h:
 
-C:/Qt/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/bits/ptr_traits.h:
-
-C:/Qt/6.9.1/mingw_64/include/QtCore/qtconfigmacros.h:
-
 C:/Qt/6.9.1/mingw_64/include/QtWidgets/QScrollArea:
 
 C:/Qt/6.9.1/mingw_64/include/QtCore/qtcore-config.h:
@@ -1763,11 +1772,11 @@ C:/Qt/6.9.1/mingw_64/include/QtCore/qtdeprecationdefinitions.h:
 
 C:/Qt/6.9.1/mingw_64/include/QtCore/qtformat_impl.h:
 
-C:/Qt/6.9.1/mingw_64/include/QtCore/qtimer.h:
+C:/Qt/6.9.1/mingw_64/lib/cmake/Qt6Gui/Qt6QICOPluginConfig.cmake:
 
 C:/Qt/6.9.1/mingw_64/lib/cmake/Qt6Gui/Qt6QWindowsIntegrationPluginTargets.cmake:
 
-C:/Qt/6.9.1/mingw_64/lib/cmake/Qt6Gui/Qt6QICOPluginConfig.cmake:
+C:/Qt/6.9.1/mingw_64/include/QtCore/qtimer.h:
 
 C:/Qt/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/bits/exception_ptr.h:
 
@@ -1835,11 +1844,11 @@ C:/Qt/6.9.1/mingw_64/lib/cmake/Qt6WidgetsPrivate/Qt6WidgetsPrivateConfigVersion.
 
 C:/Qt/6.9.1/mingw_64/include/QtGui/QPen:
 
-C:/Qt/6.9.1/mingw_64/include/QtGui/QResizeEvent:
+C:/Qt/6.9.1/mingw_64/include/QtWidgets/qabstractbutton.h:
 
 C:/Qt/6.9.1/mingw_64/lib/cmake/Qt6Gui/Qt6QWindowsIntegrationPluginTargets-relwithdebinfo.cmake:
 
-C:/Qt/6.9.1/mingw_64/include/QtWidgets/qabstractbutton.h:
+C:/Qt/6.9.1/mingw_64/include/QtGui/QResizeEvent:
 
 C:/Qt/6.9.1/mingw_64/include/QtGui/QStandardItemModel:
 
@@ -2003,6 +2012,8 @@ C:/Qt/6.9.1/mingw_64/include/QtWidgets/QTabWidget:
 
 C:/Qt/6.9.1/mingw_64/include/QtWidgets/QTableView:
 
+C:/Qt/6.9.1/mingw_64/include/QtWidgets/QTableWidget:
+
 C:/Qt/6.9.1/mingw_64/include/QtWidgets/QWidget:
 
 C:/Qt/6.9.1/mingw_64/lib/cmake/Qt6/QtPublicSbomHelpers.cmake:
@@ -2014,6 +2025,8 @@ C:/Qt/6.9.1/mingw_64/lib/cmake/Qt6Gui/Qt6GuiDependencies.cmake:
 C:/Qt/6.9.1/mingw_64/lib/cmake/Qt6/Qt6Dependencies.cmake:
 
 C:/Qt/6.9.1/mingw_64/include/QtWidgets/qabstractitemview.h:
+
+C:/Qt/6.9.1/mingw_64/include/QtWidgets/qtablewidget.h:
 
 C:/Qt/6.9.1/mingw_64/include/QtWidgets/qabstractscrollarea.h:
 
@@ -2295,7 +2308,11 @@ C:/Qt/6.9.1/mingw_64/lib/cmake/Qt6Gui/Qt6QWindowsDirect2DIntegrationPluginConfig
 
 C:/Qt/6.9.1/mingw_64/lib/cmake/Qt6Gui/Qt6QWindowsDirect2DIntegrationPluginTargets-relwithdebinfo.cmake:
 
+C:/Qt/6.9.1/mingw_64/lib/cmake/Qt6Gui/Qt6QWindowsDirect2DIntegrationPluginTargets.cmake:
+
 C:/Qt/6.9.1/mingw_64/lib/cmake/Qt6Gui/Qt6QWindowsIntegrationPluginAdditionalTargetInfo.cmake:
+
+C:/Qt/6.9.1/mingw_64/lib/cmake/Qt6Gui/Qt6QWindowsIntegrationPluginConfig.cmake:
 
 C:/Qt/6.9.1/mingw_64/lib/cmake/Qt6GuiPrivate/Qt6GuiPrivateAdditionalTargetInfo.cmake:
 
@@ -2626,8 +2643,6 @@ C:/Qt/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/ios:
 C:/Qt/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/bits/stl_list.h:
 
 C:/Qt/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/bits/stl_multimap.h:
-
-C:/Qt/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/bits/stl_multiset.h:
 
 C:/Qt/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/bits/stl_numeric.h:
 

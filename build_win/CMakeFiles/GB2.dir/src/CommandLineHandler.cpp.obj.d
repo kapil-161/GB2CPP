@@ -526,16 +526,33 @@ CMakeFiles/GB2.dir/src/CommandLineHandler.cpp.obj: \
  C:/Qt/6.9.1/mingw_64/include/QtCore/qmap.h \
  C:/Qt/6.9.1/mingw_64/include/QtCore/QVector \
  C:/Qt/6.9.1/mingw_64/include/QtCore/qvector.h \
- C:/DSSAT48/Tools/GB2CPP/include/DataTableWidget.h \
+ C:/DSSAT48/Tools/GB2CPP/include/MetricsDialog.h \
+ C:/Qt/6.9.1/mingw_64/include/QtWidgets/QDialog \
+ C:/Qt/6.9.1/mingw_64/include/QtWidgets/qdialog.h \
+ C:/Qt/6.9.1/mingw_64/include/QtWidgets/QDialogButtonBox \
+ C:/Qt/6.9.1/mingw_64/include/QtWidgets/qdialogbuttonbox.h \
+ C:/Qt/6.9.1/mingw_64/include/QtCore/QVariantList \
+ C:/Qt/6.9.1/mingw_64/include/QtCore/qvariantlist.h \
+ C:/Qt/6.9.1/mingw_64/include/QtCore/QList \
+ C:/Qt/6.9.1/mingw_64/include/QtCore/qlist.h \
+ C:/Qt/6.9.1/mingw_64/include/QtCore/QVariant \
+ C:/DSSAT48/Tools/GB2CPP/include/MetricsTableWidget.h \
+ C:/Qt/6.9.1/mingw_64/include/QtCore/QAbstractTableModel \
+ C:/Qt/6.9.1/mingw_64/include/QtCore/qabstractitemmodel.h \
  C:/Qt/6.9.1/mingw_64/include/QtWidgets/QHeaderView \
  C:/Qt/6.9.1/mingw_64/include/QtWidgets/qheaderview.h \
+ C:/Qt/6.9.1/mingw_64/include/QtCore/QVariantMap \
+ C:/Qt/6.9.1/mingw_64/include/QtCore/qvariantmap.h \
+ C:/Qt/6.9.1/mingw_64/include/QtCore/QMap \
+ C:/Qt/6.9.1/mingw_64/include/QtCore/QString \
+ C:/Qt/6.9.1/mingw_64/include/QtGui/QFont \
+ C:/Qt/6.9.1/mingw_64/include/QtGui/qfont.h \
  C:/Qt/6.9.1/mingw_64/include/QtCore/QStandardPaths \
  C:/Qt/6.9.1/mingw_64/include/QtCore/qstandardpaths.h \
  C:/Qt/6.9.1/mingw_64/include/QtCore/QTextStream \
  C:/Qt/6.9.1/mingw_64/include/QtCore/qtextstream.h \
+ C:/DSSAT48/Tools/GB2CPP/include/DataTableWidget.h \
  C:/DSSAT48/Tools/GB2CPP/include/PandasTableModel.h \
- C:/Qt/6.9.1/mingw_64/include/QtCore/QAbstractTableModel \
- C:/Qt/6.9.1/mingw_64/include/QtCore/qabstractitemmodel.h \
  C:/DSSAT48/Tools/GB2CPP/include/DataProcessor.h \
  C:/Qt/6.9.1/mingw_64/include/QtCore/QDebug \
  C:/Qt/6.9.1/mingw_64/include/QtCore/qdebug.h \

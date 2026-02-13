@@ -186,6 +186,30 @@ resources/version.rc.obj:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles\GB2.dir\build.make CMakeFiles/GB2.dir/resources/version.rc.obj
 .PHONY : resources/version.rc.obj
 
+src/CDECodesDialog.obj: src/CDECodesDialog.cpp.obj
+.PHONY : src/CDECodesDialog.obj
+
+# target to build an object file
+src/CDECodesDialog.cpp.obj:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\GB2.dir\build.make CMakeFiles/GB2.dir/src/CDECodesDialog.cpp.obj
+.PHONY : src/CDECodesDialog.cpp.obj
+
+src/CDECodesDialog.i: src/CDECodesDialog.cpp.i
+.PHONY : src/CDECodesDialog.i
+
+# target to preprocess a source file
+src/CDECodesDialog.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\GB2.dir\build.make CMakeFiles/GB2.dir/src/CDECodesDialog.cpp.i
+.PHONY : src/CDECodesDialog.cpp.i
+
+src/CDECodesDialog.s: src/CDECodesDialog.cpp.s
+.PHONY : src/CDECodesDialog.s
+
+# target to generate assembly for a file
+src/CDECodesDialog.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\GB2.dir\build.make CMakeFiles/GB2.dir/src/CDECodesDialog.cpp.s
+.PHONY : src/CDECodesDialog.cpp.s
+
 src/CommandLineHandler.obj: src/CommandLineHandler.cpp.obj
 .PHONY : src/CommandLineHandler.obj
 
@@ -537,6 +561,9 @@ help:
 	@echo ... GB2_autogen/mocs_compilation.i
 	@echo ... GB2_autogen/mocs_compilation.s
 	@echo ... resources/version.obj
+	@echo ... src/CDECodesDialog.obj
+	@echo ... src/CDECodesDialog.i
+	@echo ... src/CDECodesDialog.s
 	@echo ... src/CommandLineHandler.obj
 	@echo ... src/CommandLineHandler.i
 	@echo ... src/CommandLineHandler.s

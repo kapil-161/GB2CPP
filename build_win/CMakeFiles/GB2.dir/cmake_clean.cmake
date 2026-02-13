@@ -5,6 +5,8 @@ file(REMOVE_RECURSE
   "CMakeFiles/GB2.dir/GB2_autogen/mocs_compilation.cpp.obj"
   "CMakeFiles/GB2.dir/GB2_autogen/mocs_compilation.cpp.obj.d"
   "CMakeFiles/GB2.dir/resources/version.rc.obj"
+  "CMakeFiles/GB2.dir/src/CDECodesDialog.cpp.obj"
+  "CMakeFiles/GB2.dir/src/CDECodesDialog.cpp.obj.d"
   "CMakeFiles/GB2.dir/src/CommandLineHandler.cpp.obj"
   "CMakeFiles/GB2.dir/src/CommandLineHandler.cpp.obj.d"
   "CMakeFiles/GB2.dir/src/DataProcessor.cpp.obj"

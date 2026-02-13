@@ -530,6 +530,8 @@ CMakeFiles/GB2.dir/src/PlotSettingsDialog.cpp.obj: \
  C:/Qt/6.9.1/mingw_64/include/QtWidgets/qsplitter.h \
  C:/Qt/6.9.1/mingw_64/include/QtCore/QMap \
  C:/Qt/6.9.1/mingw_64/include/QtCore/qmap.h \
+ C:/Qt/6.9.1/mingw_64/include/QtCore/QPoint \
+ C:/Qt/6.9.1/mingw_64/include/QtCore/qpoint.h \
  C:/Qt/6.9.1/mingw_64/include/QtCore/QVector \
  C:/Qt/6.9.1/mingw_64/include/QtCore/qvector.h \
  C:/Qt/6.9.1/mingw_64/include/QtCore/QSharedPointer \
@@ -593,4 +595,8 @@ CMakeFiles/GB2.dir/src/PlotSettingsDialog.cpp.obj: \
  C:/Qt/6.9.1/mingw_64/include/QtCore/qfileinfo.h \
  C:/Qt/6.9.1/mingw_64/include/QtCore/qtimezone.h \
  C:/Qt/6.9.1/mingw_64/include/QtCore/QStandardPaths \
- C:/Qt/6.9.1/mingw_64/include/QtCore/qstandardpaths.h
+ C:/Qt/6.9.1/mingw_64/include/QtCore/qstandardpaths.h \
+ C:/Qt/6.9.1/mingw_64/include/QtGui/QDesktopServices \
+ C:/Qt/6.9.1/mingw_64/include/QtGui/qdesktopservices.h \
+ C:/Qt/6.9.1/mingw_64/include/QtCore/QUrl \
+ C:/Qt/6.9.1/mingw_64/include/QtCore/qurl.h
