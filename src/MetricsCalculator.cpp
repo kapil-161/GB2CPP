@@ -301,6 +301,7 @@ QVariantMap MetricsCalculator::calculateMetrics(const QVector<double>& simValues
         
         // Calculate metrics
         double mean_obs = mean(obs);
+        double mean_sim = mean(sim);
         int n = obs.size();
         double rmse_value = rmse(obs, sim);
         double nrmse = (mean_obs != 0.0) ? (rmse_value / mean_obs) * 100.0 : 0.0;
@@ -330,6 +331,8 @@ QVariantMap MetricsCalculator::calculateMetrics(const QVector<double>& simValues
         result["MSEs"] = mseSystematic;                  // systematic component
         result["MSEu"] = mseUnsystematic;                // unsystematic component
         result["R²"] = "-";  // Not calculated for time series data
+        result["ObsMean"] = mean_obs;
+        result["SimMean"] = mean_sim;
 
         qDebug() << "[DEBUG] MetricsCalculator::calculateMetrics - RESULT TRT:" << treatmentNumber
                  << "n:" << n << "RMSE:" << rmse_value << "d-stat:" << d_stat;

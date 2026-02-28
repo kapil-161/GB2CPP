@@ -463,7 +463,16 @@ void PlotWidget::setupAxes(const QString &xVar)
         
         // Set appropriate title based on variable info from CDE file
         QPair<QString, QString> xVarInfo = DataProcessor::getVariableInfo(xVar);
-        QString xTitle = xVarInfo.first.isEmpty() ? xVar : xVarInfo.first;
+        QString xTitle;
+        // For DAP/DAS the short label is truncated (e.g. "Days after pl") so prefer
+        // the full description from DATA.CDE (e.g. "Days after planting (#)"),
+        // stripping the DSSAT unit marker at the end.
+        if ((xVar == "DAP" || xVar == "DAS") && !xVarInfo.second.isEmpty()) {
+            xTitle = xVarInfo.second;
+            xTitle = xTitle.remove(" (#)").remove(".").trimmed();
+        } else {
+            xTitle = xVarInfo.first.isEmpty() ? xVar : xVarInfo.first;
+        }
         valueAxis->setTitleText(xTitle);
         
         // Add minor ticks to X value axis
@@ -790,24 +799,25 @@ int PlotWidget::calculateOptimalDateTickCount() const
     
     qDebug() << "PlotWidget::calculateOptimalDateTickCount() - Plot width:" << plotWidth;
     
-    // Base calculation: aim for ~60-80 pixels per tick for good readability
-    double pixelsPerTick = 70.0; // Target pixels between ticks
+    // Base calculation: "MMM dd, yyyy" labels are ~110px wide at typical DPI,
+    // so use 110px per tick to prevent Qt from clipping tick labels.
+    double pixelsPerTick = 110.0;
     int baseTicks = qMax(4, qRound(plotWidth / pixelsPerTick));
-    
+
     // Apply size-based scaling
     int optimalTicks;
     if (plotWidth < 400) {
         // Small plot: fewer ticks to avoid crowding
-        optimalTicks = qBound(4, baseTicks - 2, 8);
+        optimalTicks = qBound(3, baseTicks, 5);
     } else if (plotWidth < 800) {
         // Medium plot: standard tick count
-        optimalTicks = qBound(6, baseTicks, 12);
+        optimalTicks = qBound(4, baseTicks, 8);
     } else if (plotWidth < 1200) {
         // Large plot: more ticks for detail
-        optimalTicks = qBound(8, baseTicks, 16);
+        optimalTicks = qBound(5, baseTicks, 10);
     } else {
         // Very large plot: maximum detail
-        optimalTicks = qBound(10, baseTicks, 20);
+        optimalTicks = qBound(6, baseTicks, 13);
     }
     
     qDebug() << "PlotWidget::calculateOptimalDateTickCount() - Width:" << plotWidth 
@@ -1516,13 +1526,12 @@ void PlotWidget::plotDatasets(const DataTable &simData, const DataTable &obsData
             }
             plotData.variable = yVar;
             plotData.points = it.value();
-            // Use run number as primary treatment ID when present, otherwise use crop__experiment__treatment
-            QString treatmentId = runPart.isEmpty()
-                ? QString("%1__%2__%3").arg(crop).arg(experiment).arg(treatment)
-                : runPart; // Use run number as primary ID when run is present
+            // Always use crop__experiment__treatment as color key so observed and simulated
+            // data for the same treatment share the same color
+            QString treatmentId = QString("%1__%2__%3").arg(crop).arg(experiment).arg(treatment);
             plotData.color = getColorForTreatment(treatmentId, colorIndex);
             // Line style based on variable index, not treatment index
-            plotData.lineStyleIndex = yVars.indexOf(yVar) % 4;
+            plotData.lineStyleIndex = yVars.indexOf(yVar); // modulo applied at render time
             // Marker based on variable index to ensure each variable gets a different marker
             plotData.symbolIndex = yVars.indexOf(yVar);
             colorIndex++;
@@ -1687,7 +1696,7 @@ void PlotWidget::plotDatasets(const DataTable &simData, const DataTable &obsData
                 
                 plotData.color = getColorForTreatment(treatmentId, colorIndex); // Use same treatmentId as simulated data for consistent colors
                 // Line style based on variable index, not treatment index
-                plotData.lineStyleIndex = yVars.indexOf(yVar) % 4;
+                plotData.lineStyleIndex = yVars.indexOf(yVar); // modulo applied at render time
                 // Marker based on variable index to ensure each variable gets a different marker
                 plotData.symbolIndex = yVars.indexOf(yVar);
                 colorIndex++;
@@ -1852,26 +1861,22 @@ void PlotWidget::addSeriesToPlot(const QVector<PlotData> &plotDataList)
             scatterSeries->setColor(sharedPlotData->color);
             scatterSeries->setMarkerSize(sharedPlotData->isObserved ? 8.0 : 6.0);
             
-            // Apply symbol based on symbolIndex - use only unique visual shapes
-            // Map to 6 unique shapes: circle, rectangle, diamond, triangle, star, pentagon
-            // Use variable index directly to ensure each variable gets a different visual marker
-            QStringList uniqueShapes = {"o", "s", "d", "t", "star", "p"}; // 6 unique visual shapes
+            // Apply symbol based on symbolIndex - 6 shapes × 2 fill modes = 12 distinct variants.
+            // Variants 0-5: filled (solid color), variants 6-11: hollow (white fill, color border).
+            QStringList uniqueShapes = {"o", "s", "d", "t", "star", "p"}; // 6 Qt marker shapes
             int shapeIndex = sharedPlotData->symbolIndex % uniqueShapes.size();
+            bool isHollow = (sharedPlotData->symbolIndex / uniqueShapes.size()) % 2 == 1;
             QString originalSymbol = uniqueShapes[shapeIndex];
             QString actualSymbol = getActualRenderedSymbol(originalSymbol);
             scatterSeries->setMarkerShape(getMarkerShape(originalSymbol));
 
-            // Apply pen for symbol outline
-            QPen symbolPen(sharedPlotData->color, 2);
-            if (sharedPlotData->symbolIndex % 2 == 0) { // Alternate pen style for symbols
-                symbolPen.setStyle(Qt::SolidLine);
-            } else {
-                symbolPen.setStyle(Qt::NoPen);
-            }
+            // All symbols get a visible color outline; fill varies for filled vs hollow
+            QPen symbolPen(sharedPlotData->color, 2, Qt::SolidLine);
             scatterSeries->setPen(symbolPen);
 
             // Apply brush for symbol fill
-            scatterSeries->setBrush(sharedPlotData->color);
+            QBrush symbolBrush = isHollow ? QBrush(Qt::white) : QBrush(sharedPlotData->color);
+            scatterSeries->setBrush(symbolBrush);
             
             for (const QPointF &point : sharedPlotData->points) {
                 scatterSeries->append(point);
@@ -1881,7 +1886,7 @@ void PlotWidget::addSeriesToPlot(const QVector<PlotData> &plotDataList)
             
             // Store pen and brush info
             sharedPlotData->pen = symbolPen;
-            sharedPlotData->brush = QBrush(sharedPlotData->color);
+            sharedPlotData->brush = symbolBrush;
             sharedPlotData->symbol = actualSymbol;  // Store the actual rendered symbol
             
         } else {
@@ -1908,13 +1913,43 @@ void PlotWidget::addSeriesToPlot(const QVector<PlotData> &plotDataList)
             
             lineSeries->setColor(sharedPlotData->color);
 
-            // Apply line style based on lineStyleIndex
-            QPen linePen(sharedPlotData->color, 2);
-            switch (sharedPlotData->lineStyleIndex % 4) {
-                case 0: linePen.setStyle(Qt::SolidLine); break;
-                case 1: linePen.setStyle(Qt::DashLine); break;
-                case 2: linePen.setStyle(Qt::DotLine); break;
-                case 3: linePen.setStyle(Qt::DashDotLine); break;
+            // 8 distinct line styles using custom dash patterns (requires setUseOpenGL(false)).
+            // Patterns are QVector<qreal> in pen-width units: {dash, gap, dash, gap, ...}
+            // Cycle lengths are kept short so 2+ full cycles fit in the 50px legend sample,
+            // making the dot count clearly visible even at legend size.
+            QPen linePen(sharedPlotData->color, 2.0);
+            switch (sharedPlotData->lineStyleIndex % 8) {
+                case 0: // Solid ──────────────
+                    linePen.setStyle(Qt::SolidLine);
+                    break;
+                case 1: // Long dash  ━━  ━━  ━━      cycle=18px → 2.8× in 50px
+                    linePen.setStyle(Qt::CustomDashLine);
+                    linePen.setDashPattern({6.0, 3.0});
+                    break;
+                case 2: // Short dash  ─ ─ ─ ─ ─      cycle=12px → 4.2× in 50px
+                    linePen.setStyle(Qt::CustomDashLine);
+                    linePen.setDashPattern({3.0, 3.0});
+                    break;
+                case 3: // Fine dot  · · · · · ·       cycle=8px  → 6.3× in 50px
+                    linePen.setStyle(Qt::CustomDashLine);
+                    linePen.setDashPattern({1.0, 3.0});
+                    break;
+                case 4: // Dash-dot  ─·─·─·            cycle=20px → 2.5× in 50px
+                    linePen.setStyle(Qt::CustomDashLine);
+                    linePen.setDashPattern({5.0, 2.0, 1.0, 2.0});
+                    break;
+                case 5: // Dash-dot-dot  ─··─··         cycle=24px → 2.1× in 50px
+                    linePen.setStyle(Qt::CustomDashLine);
+                    linePen.setDashPattern({5.0, 2.0, 1.0, 2.0, 1.0, 2.0});
+                    break;
+                case 6: // Dot-dot-dash  ··─··─         cycle=24px → 2.1× in 50px
+                    linePen.setStyle(Qt::CustomDashLine);
+                    linePen.setDashPattern({1.0, 2.0, 1.0, 2.0, 5.0, 2.0});
+                    break;
+                case 7: // Long-short dash  ━─━─        cycle=24px → 2.1× in 50px
+                    linePen.setStyle(Qt::CustomDashLine);
+                    linePen.setDashPattern({5.0, 2.0, 2.0, 2.0});
+                    break;
             }
             lineSeries->setPen(linePen);
             
@@ -3062,18 +3097,33 @@ void PlotWidget::updateLegendAdvanced(const QMap<QString, QMap<QString, QVector<
     separator->setFrameShadow(QFrame::Plain);
     m_legendLayout->addWidget(separator);
     
-    // Organize data by variable first (matching Python)
-    QSet<QString> variables;
+    // Organize data by variable first, in the same order as the Y variable list.
+    // Use m_currentYVars to preserve the user's selection order, then append any
+    // remaining variables not in that list (e.g. scatter mode) at the end.
+    QSet<QString> seen;
+    QStringList variables;
+    for (const QString& yVar : m_currentYVars) {
+        bool exists = (legendEntries.contains("Simulated") && legendEntries["Simulated"].contains(yVar))
+                   || (legendEntries.contains("Observed")  && legendEntries["Observed"].contains(yVar));
+        if (exists) {
+            variables.append(yVar);
+            seen.insert(yVar);
+        }
+    }
+    // Append any variables present in data but not in m_currentYVars
     for (const QString& category : {"Simulated", "Observed"}) {
         if (legendEntries.contains(category)) {
             for (const QString& varName : legendEntries[category].keys()) {
-                variables.insert(varName);
+                if (!seen.contains(varName)) {
+                    variables.append(varName);
+                    seen.insert(varName);
+                }
             }
         }
     }
-    
-    qDebug() << "updateLegendAdvanced: Found" << variables.size() << "variables:" << variables.values();
-    
+
+    qDebug() << "updateLegendAdvanced: Found" << variables.size() << "variables:" << variables;
+
     // If no data, show a placeholder message
     if (variables.isEmpty()) {
         QLabel* noDataLabel = new QLabel("<i>No data to display in legend</i>");
@@ -3082,7 +3132,7 @@ void PlotWidget::updateLegendAdvanced(const QMap<QString, QMap<QString, QVector<
         m_legendLayout->addWidget(noDataLabel);
         return;
     }
-    
+
     // Create entries organized by variable and treatment (matching Python)
     for (const QString& varName : variables) {
         QMap<QString, QMap<QString, QVariant>> varTreatments;
@@ -3262,44 +3312,19 @@ void PlotWidget::updateLegendAdvanced(const QMap<QString, QMap<QString, QVector<
         // For scatter plots, this will show the variable name with marker (no duplicate header)
         QStringList sortedKeys = varTreatments.keys();
         
-        // Custom sort: sort by treatment ID (run number when present, numeric) otherwise alphabetically
+        // Custom sort: sort by trt_id (treatment number) numerically
         std::sort(sortedKeys.begin(), sortedKeys.end(), [&varTreatments](const QString& a, const QString& b) {
             QMap<QString, QVariant> dataA = varTreatments[a];
             QMap<QString, QVariant> dataB = varTreatments[b];
-            
-            QString treatmentIdA = dataA["treatment_id"].toString();
-            QString treatmentIdB = dataB["treatment_id"].toString();
-            
-            // Extract run number from treatmentId (e.g., "RUN1" -> 1, "RUN2" -> 2)
-            auto extractRunNumber = [](const QString& treatmentId) -> int {
-                if (treatmentId.startsWith("RUN")) {
-                    QString numStr = treatmentId.mid(3); // After "RUN"
-                    bool ok;
-                    int runNum = numStr.toInt(&ok);
-                    if (ok) {
-                        return runNum;
-                    }
-                }
-                return -1; // Not a run number
-            };
-            
-            int runA = extractRunNumber(treatmentIdA);
-            int runB = extractRunNumber(treatmentIdB);
-            
-            // If both have run numbers, sort numerically
-            if (runA >= 0 && runB >= 0) {
-                return runA < runB;
-            }
-            // If only A has run number, A comes first
-            if (runA >= 0 && runB < 0) {
-                return true;
-            }
-            // If only B has run number, B comes first
-            if (runA < 0 && runB >= 0) {
-                return false;
-            }
-            // If neither has run number, sort alphabetically by treatment ID
-            return treatmentIdA < treatmentIdB;
+
+            bool okA, okB;
+            int trtA = dataA["trt_id"].toString().toInt(&okA);
+            int trtB = dataB["trt_id"].toString().toInt(&okB);
+
+            if (okA && okB) return trtA < trtB;
+            if (okA) return true;
+            if (okB) return false;
+            return dataA["trt_id"].toString() < dataB["trt_id"].toString();
         });
         
         for (const QString& uniqueKey : sortedKeys) {
@@ -3307,9 +3332,7 @@ void PlotWidget::updateLegendAdvanced(const QMap<QString, QMap<QString, QVector<
         }
         
         // Add separator after each variable except the last (matching Python)
-        QStringList sortedVariables = variables.values();
-        sortedVariables.sort();
-        if (varName != sortedVariables.last()) {
+        if (varName != variables.last()) {
             QFrame* separator = new QFrame();
             separator->setFrameShape(QFrame::HLine);
             separator->setFrameShadow(QFrame::Plain);
@@ -3756,7 +3779,7 @@ LegendSampleWidget::LegendSampleWidget(bool hasSymbol, const QPen& pen, const QS
     , m_symbol(symbol)
     , m_brush(brush)
 {
-    setFixedSize(20, 15);
+    setFixedSize(50, 15);
     setToolTip(tooltip);
 }
 

@@ -18,7 +18,7 @@ MetricsTableModel::MetricsTableModel(const QVariantList& data, bool isScatterPlo
         m_headers = {"Experiment", "Crop", "Variable", "n", "R²", "RMSE", "d-stat",
                      "BIAS", "MSEs", "MSEu"};
     } else {
-        m_headers = {"Treatment", "Treatment Name", "Experiment", "Crop", "Variable", "n", "R²", "RMSE", "d-stat"};
+        m_headers = {"Treatment", "Treatment Name", "Experiment", "Crop", "Variable", "n", "Obs. Mean", "Sim. Mean", "R²", "RMSE", "NRMSE", "d-stat"};
     }
     
     // Set up key mapping for flexible data access
@@ -31,7 +31,10 @@ MetricsTableModel::MetricsTableModel(const QVariantList& data, bool isScatterPlo
     m_keyMap["Variable"] = {"VariableName", "Variable", "variable", "var"};
     m_keyMap["n"] = {"n", "N", "samples", "count"};
     m_keyMap["R²"] = {"R²", "R2", "r_squared", "rsquared", "r-squared"};
+    m_keyMap["Obs. Mean"] = {"ObsMean", "obs_mean", "mean_obs"};
+    m_keyMap["Sim. Mean"] = {"SimMean", "sim_mean", "mean_sim"};
     m_keyMap["RMSE"] = {"RMSE", "rmse", "root_mean_square_error"};
+    m_keyMap["NRMSE"] = {"NRMSE", "nrmse", "normalized_rmse"};
     m_keyMap["d-stat"] = {"d-stat", "Willmott's d-stat", "d_stat", "dstat", "willmott_d"};
     m_keyMap["BIAS"] = {"BIAS", "BiasIndex", "Bias Index", "Bias index", "bias_index"};
     m_keyMap["MSEs"] = {"MSEs", "MSE systematic", "MSE_systematic", "MSE_s"};
@@ -83,15 +86,20 @@ QVariant MetricsTableModel::data(const QModelIndex& index, int role) const
             return value.toString().isEmpty() ? "-" : value.toString();
         }
         
-        if (columnName == "n" || columnName == "RMSE" || columnName == "d-stat" ||
+        if (columnName == "n" || columnName == "Obs. Mean" || columnName == "Sim. Mean" ||
+            columnName == "RMSE" || columnName == "NRMSE" || columnName == "d-stat" ||
             columnName == "BIAS" || columnName == "MSEs" || columnName == "MSEu") {
             if (value.canConvert<double>()) {
                 if (columnName == "n") {
                     return QString::number((int)value.toDouble());
                 } else if (columnName == "d-stat") {
                     return QString::number(value.toDouble(), 'f', 4);
+                } else if (columnName == "Obs. Mean" || columnName == "Sim. Mean") {
+                    return QString::number(value.toDouble(), 'f', 3);
                 } else if (columnName == "RMSE") {
                     return QString::number(value.toDouble(), 'f', 3);
+                } else if (columnName == "NRMSE") {
+                    return QString::number(value.toDouble(), 'f', 2) + "%";
                 } else if (columnName == "BIAS") {
                     // Dimensionless bias index (Eq. 7) – show 4 decimals
                     return QString::number(value.toDouble(), 'f', 4);
@@ -379,8 +387,14 @@ void MetricsTableWidget::exportMetrics()
                 possibleKeys = {"n", "N", "samples", "count"};
             } else if (header == "R²") {
                 possibleKeys = {"R²", "R2", "r_squared", "rsquared", "r-squared"};
+            } else if (header == "Obs. Mean") {
+                possibleKeys = {"ObsMean", "obs_mean", "mean_obs"};
+            } else if (header == "Sim. Mean") {
+                possibleKeys = {"SimMean", "sim_mean", "mean_sim"};
             } else if (header == "RMSE") {
-                possibleKeys = {"RMSE", "rmse", "root_mean_square_error", "NRMSE"};
+                possibleKeys = {"RMSE", "rmse", "root_mean_square_error"};
+            } else if (header == "NRMSE") {
+                possibleKeys = {"NRMSE", "nrmse", "normalized_rmse"};
             } else if (header == "d-stat") {
                 possibleKeys = {"d-stat", "Willmott's d-stat", "d_stat", "dstat", "willmott_d"};
             } else if (header == "BIAS") {
@@ -409,7 +423,8 @@ void MetricsTableWidget::exportMetrics()
             } else if (header == "R²") {
                 // R² is not calculated for time series data - always show "-"
                 cellValue = "-";
-            } else if (header == "n" || header == "RMSE" || header == "d-stat" ||
+            } else if (header == "n" || header == "Obs. Mean" || header == "Sim. Mean" ||
+                       header == "RMSE" || header == "NRMSE" || header == "d-stat" ||
                        header == "BIAS" || header == "MSEs" || header == "MSEu") {
                 // These are numeric fields - check if we can convert to number
                 if (value.canConvert<double>()) {
@@ -419,8 +434,12 @@ void MetricsTableWidget::exportMetrics()
                         cellValue = QString::number((int)numValue);
                     } else if (header == "d-stat") {
                         cellValue = QString::number(numValue, 'f', 4);
+                    } else if (header == "Obs. Mean" || header == "Sim. Mean") {
+                        cellValue = QString::number(numValue, 'f', 3);
                     } else if (header == "RMSE") {
                         cellValue = QString::number(numValue, 'f', 3);
+                    } else if (header == "NRMSE") {
+                        cellValue = QString::number(numValue, 'f', 2);
                     } else if (header == "BIAS") {
                         cellValue = QString::number(numValue, 'f', 4);
                     } else if (header == "MSEs" || header == "MSEu") {
