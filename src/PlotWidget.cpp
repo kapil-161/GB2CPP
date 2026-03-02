@@ -1338,6 +1338,9 @@ void PlotWidget::plotDatasets(const DataTable &simData, const DataTable &obsData
     int colorIndex = 0;
     QSet<QString> simulatedTreatmentKeys; // Collect treatment keys (including run info) from simulated data
     
+    // Keep track of which actual sim TRT corresponds to the matchKey for SQ
+    QMap<QString, QString> sqDateToSimTrt;
+    
     qDebug() << "PlotWidget: plotDatasets - Plotting simulated data...";
     // Plot simulated data
     for (const QString &yVar : yVars) {
@@ -1353,7 +1356,6 @@ void PlotWidget::plotDatasets(const DataTable &simData, const DataTable &obsData
         }
         
         qDebug() << "PlotWidget: EXPERIMENT column exists:" << (expColumn != nullptr);
-        
         
         // Group data by experiment and treatment combination
         QMap<QString, QVector<QPointF>> experimentTreatmentData;
@@ -1410,6 +1412,18 @@ void PlotWidget::plotDatasets(const DataTable &simData, const DataTable &obsData
             
             if (DataProcessor::isMissingValue(xVal) || DataProcessor::isMissingValue(yVal)) {
                 continue;
+            }
+            
+            // Map the date for sequence experiments so we can find exactly which TRT this simulated output was from
+            if (crop == "SQ") {
+                const DataColumn* dateColumn = simData.getColumn("DATE");
+                if (dateColumn && row < dateColumn->data.size()) {
+                    QString simDateStr = dateColumn->data[row].toString();
+                    if (!simDateStr.isEmpty()) {
+                        QString sqKey = QString("SQ_ALL_%1_%2").arg(experiment, simDateStr);
+                        sqDateToSimTrt[sqKey] = trt;
+                    }
+                }
             }
             
             double x, y;
@@ -1604,6 +1618,20 @@ void PlotWidget::plotDatasets(const DataTable &simData, const DataTable &obsData
                     QString cropFromData = cropColumn->data[row].toString();
                     if (!cropFromData.isEmpty()) {
                         crop = cropFromData;
+                    }
+                }
+
+                // If it's SQ, remap the generic `trt` ('1') using the date to match the simulated granular TRT
+                if (crop == "SQ") {
+                    const DataColumn* obsDateCol = obsData.getColumn("DATE");
+                    if (obsDateCol && row < obsDateCol->data.size()) {
+                        QString obsDateMask = obsDateCol->data[row].toString();
+                        if (!obsDateMask.isEmpty()) {
+                            QString sqKey = QString("SQ_ALL_%1_%2").arg(experiment, obsDateMask);
+                            if (sqDateToSimTrt.contains(sqKey)) {
+                                trt = sqDateToSimTrt[sqKey];
+                            }
+                        }
                     }
                 }
 
@@ -2100,14 +2128,20 @@ void PlotWidget::calculateMetrics()
             continue;
         }
         
-        // Create key for matching: treatment_experiment_crop_date
+        // Create key for matching: treatment_experiment_crop_date. If Sequence (SQ), ignore TRT.
         auto createMatchKey = [](const QString& trt, const QString& exp, const QString& crop, const QString& date) {
+            if (crop == "SQ") {
+                return QString("SQ_ALL_%1_%2").arg(exp, date);
+            }
             return QString("%1_%2_%3_%4").arg(trt, exp, crop, date);
         };
         
         // Collect simulated data with match keys, split by RUN if present
-        // Map: baseKey (trt_exp_crop_date) -> (runId -> sim value)
+        // Map: baseKey (trt_exp_crop_date or SQ_ALL_exp_date) -> (runId -> sim value)
         QMap<QString, QMap<QString, double>> simDataByBaseKeyToRuns;
+        // Keep track of which actual sim TRT corresponds to the matchKey for SQ
+        QMap<QString, QString> matchKeyToSimTrt;
+        
         for (int row = 0; row < m_simData.rowCount; ++row) {
             if (row >= simYColumn->data.size() || row >= simTrtColumn->data.size() || row >= simDateColumn->data.size()) continue;
             
@@ -2128,6 +2162,11 @@ void PlotWidget::calculateMetrics()
                 QString baseKey = createMatchKey(trt, exp, crop, date);
                 auto &runMap = simDataByBaseKeyToRuns[baseKey];
                 runMap[runId] = yVal.toDouble(); // empty runId means no RUN column
+                
+                // Store the actual simulated TRT for this match key (useful for sequences to recover the sim TRT)
+                if (crop == "SQ") {
+                    matchKeyToSimTrt[baseKey] = trt;
+                }
             }
         }
 
@@ -2154,7 +2193,7 @@ void PlotWidget::calculateMetrics()
         for (int row = 0; row < m_obsData.rowCount; ++row) {
             if (row >= obsYColumn->data.size() || row >= obsTrtColumn->data.size() || row >= obsDateColumn->data.size()) continue;
             
-            QString trt = obsTrtColumn->data[row].toString();
+            QString obsTrt = obsTrtColumn->data[row].toString();
             QString date = obsDateColumn->data[row].toString();
             QString exp = obsExpColumn && row < obsExpColumn->data.size() ? obsExpColumn->data[row].toString() : "";
             QString crop = obsCropColumn && row < obsCropColumn->data.size() ? obsCropColumn->data[row].toString() : "";
@@ -2162,13 +2201,18 @@ void PlotWidget::calculateMetrics()
             
             if (!DataProcessor::isMissingValue(obsVal)) {
                 obsRowsWithVal++;
-                QString matchKey = createMatchKey(trt, exp, crop, date);
+                QString matchKey = createMatchKey(obsTrt, exp, crop, date);
                 
                 // Only add if we have matching simulated data for the same key
                 if (simDataByBaseKeyToRuns.contains(matchKey)) {
                     obsRowsMatched++;
                     const auto &runMap = simDataByBaseKeyToRuns[matchKey];
-                    QString baseGroupKey = QString("%1_%2_%3_%4").arg(trt, yVar, exp, crop);
+                    
+                    // For sequence, observed TRT is "1", but we want to group by the actual Sim TRT
+                    // so it appears in the metrics table under the correct Simulated treatment
+                    QString effectiveTrt = (crop == "SQ" && matchKeyToSimTrt.contains(matchKey)) ? matchKeyToSimTrt[matchKey] : obsTrt;
+                    
+                    QString baseGroupKey = QString("%1_%2_%3_%4").arg(effectiveTrt, yVar, exp, crop);
                     if (runMap.isEmpty()) {
                         // No run separation
                         QString groupKey = baseGroupKey;
@@ -2177,7 +2221,7 @@ void PlotWidget::calculateMetrics()
                         obsByTreatmentVarExpCrop[groupKey].append(obsVal.toDouble());
                         treatmentVarExpCropToExp[groupKey] = exp;
                         treatmentVarExpCropToCrop[groupKey] = crop;
-                        treatmentVarExpCropToTrt[groupKey] = trt;
+                        treatmentVarExpCropToTrt[groupKey] = effectiveTrt;
                         matchedPairs++;
                     } else {
                         for (auto itRun = runMap.constBegin(); itRun != runMap.constEnd(); ++itRun) {
@@ -2188,7 +2232,7 @@ void PlotWidget::calculateMetrics()
                             obsByTreatmentVarExpCrop[groupKey].append(obsVal.toDouble());
                             treatmentVarExpCropToExp[groupKey] = exp;
                             treatmentVarExpCropToCrop[groupKey] = crop;
-                            treatmentVarExpCropToTrt[groupKey] = trt;
+                            treatmentVarExpCropToTrt[groupKey] = effectiveTrt;
                             treatmentVarExpCropToRun[groupKey] = runId;
                             baseGroupToRuns[baseGroupKey].insert(runId);
                             matchedPairs++;
@@ -2635,13 +2679,22 @@ QPixmap PlotWidget::cropToContent(const QPixmap &source)
 void PlotWidget::exportPlotComposite(const QString &filePath, const QString &format, int width, int height, int dpi)
 {
     if (!m_chartView || !m_legendWidget) return;
-    
+
+    // Resize to target dimensions before rendering so the source pixmap is full resolution,
+    // not captured from the small default window size and then upscaled.
+    QSize originalSize = this->size();
+    if (width > 0 && height > 0) {
+        this->resize(width, height);
+    }
+
     // Ensure everything is visible and updated; force chart view repaint so error bars are painted
     this->show();
     this->update();
     m_chartView->update();
     m_chartView->repaint();
-    QApplication::processEvents();
+    // Limit processEvents to 500 ms max — prevents stalling when Qt Charts keeps
+    // queuing repaint events for large datasets (many series/data points).
+    QApplication::processEvents(QEventLoop::AllEvents, 500);
     
     // Render chart to pixmap (QChartView::render() does not include our custom error bars from paintEvent)
     QPixmap chartPixmap(m_chartView->size());
@@ -2689,10 +2742,24 @@ void PlotWidget::exportPlotComposite(const QString &filePath, const QString &for
     }
     
     painter.end();
-    
+
+    // No upscaling needed — already rendered at target size. Only scale if composite
+    // dimensions still differ from target (e.g. legend made it wider/taller).
+    QPixmap outputPixmap;
+    if (width > 0 && height > 0 && (totalWidth != width || maxHeight != height)) {
+        outputPixmap = finalPixmap.scaled(width, height, Qt::KeepAspectRatio, Qt::SmoothTransformation);
+    } else {
+        outputPixmap = finalPixmap;
+    }
+
     // Save the result
-    bool saved = finalPixmap.save(filePath, format.toUtf8().constData());
-    qDebug() << "Simple composite export: Final size" << finalPixmap.size() << "- Success:" << saved;
+    bool saved = outputPixmap.save(filePath, format.toUtf8().constData());
+    qDebug() << "Simple composite export: Final size" << outputPixmap.size() << "- Success:" << saved;
+
+    // Restore original window size
+    if (width > 0 && height > 0) {
+        this->resize(originalSize);
+    }
 }
 
 void PlotWidget::renderLegendContent(QPainter *painter, const QRect &rect)
