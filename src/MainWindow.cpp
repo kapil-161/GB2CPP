@@ -15,6 +15,8 @@
 #include <QRegularExpression>
 #include <QDebug>
 #include <QTimer>
+#include <QFile>
+#include <QTextStream>
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -2455,6 +2457,93 @@ void MainWindow::updateTimeSeriesPlot()
     } else {
         qWarning() << "MainWindow: Plot widget not initialized";
     }
+}
+
+bool MainWindow::selectXVariable(const QString &varName)
+{
+    if (!m_xVariableComboBox) return false;
+
+    for (int i = 0; i < m_xVariableComboBox->count(); ++i) {
+        QString itemData = m_xVariableComboBox->itemData(i, Qt::UserRole).toString();
+        if (itemData.compare(varName, Qt::CaseInsensitive) == 0) {
+            m_xVariableComboBox->setCurrentIndex(i);
+            return true;
+        }
+    }
+    return false;
+}
+
+int MainWindow::selectYVariables(const QStringList &varNames)
+{
+    if (!m_yVariableComboBox) return 0;
+
+    m_yVariableComboBox->clearSelection();
+
+    int count = 0;
+    for (int i = 0; i < m_yVariableComboBox->count(); ++i) {
+        QListWidgetItem *item = m_yVariableComboBox->item(i);
+        if (!item) continue;
+        QString itemData = item->data(Qt::UserRole).toString();
+        for (const QString &varName : varNames) {
+            if (itemData.compare(varName, Qt::CaseInsensitive) == 0) {
+                item->setSelected(true);
+                ++count;
+                break;
+            }
+        }
+    }
+    return count;
+}
+
+bool MainWindow::saveMetricsToFile(const QString &filePath)
+{
+    if (m_currentMetrics.isEmpty()) return false;
+
+    QFile file(filePath);
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
+        qWarning() << "MainWindow::saveMetricsToFile: cannot open" << filePath;
+        return false;
+    }
+
+    QTextStream out(&file);
+    out.setEncoding(QStringConverter::Utf8);
+
+    // UTF-8 BOM
+    out << "\xEF\xBB\xBF";
+
+    // Header
+    out << "Treatment,Treatment Name,Experiment,Crop,Variable,n,RMSE,d-stat\n";
+
+    for (const QVariant &item : m_currentMetrics) {
+        QVariantMap row = item.toMap();
+
+        auto getVal = [&](const QStringList &keys) -> QString {
+            for (const QString &k : keys) {
+                if (row.contains(k)) return row[k].toString();
+            }
+            return QString();
+        };
+
+        QString treatment    = getVal({"Treatment", "treatment", "trt", "TRT"});
+        QString treatmentName = getVal({"TreatmentName", "Treatment Name", "treatment_name", "trt_name"});
+        QString experiment   = getVal({"Experiment", "experiment", "exp", "EXP"});
+        QString crop         = getVal({"CropName", "Crop", "crop", "CROP"});
+        QString variable     = getVal({"VariableName", "Variable", "variable", "var"});
+        int     n            = (int)getVal({"n", "N", "samples", "count"}).toDouble();
+        double  rmse         = getVal({"RMSE", "rmse"}).toDouble();
+        double  dstat        = getVal({"d-stat", "Willmott's d-stat", "d_stat", "dstat", "willmott_d"}).toDouble();
+
+        out << treatment << ","
+            << treatmentName << ","
+            << experiment << ","
+            << crop << ","
+            << variable << ","
+            << n << ","
+            << QString::number(rmse,  'f', 3) << ","
+            << QString::number(dstat, 'f', 4) << "\n";
+    }
+
+    return true;
 }
 
 void MainWindow::onDataViewFileTypeChanged()

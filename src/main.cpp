@@ -365,10 +365,10 @@ int main(int argc, char *argv[])
             // Hide file selection UI before window is shown to prevent any visible change
             window.hideFileSelectionUI(true);
         }
-        
+
         // Center window on screen
         centerWindow(&window);
-        
+
         // Show window
         window.show();
         

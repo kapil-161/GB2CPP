@@ -49,13 +49,19 @@ public:
     void loadVariables();
     void updateTimeSeriesPlot();
     void hideFileSelectionUI(bool hide = true);  // Hide crop and file selection UI for command line mode
-    
+
+    // Headless plot support
+    bool selectXVariable(const QString &varName);
+    int  selectYVariables(const QStringList &varNames);
+    bool saveMetricsToFile(const QString &filePath);
+
     // Public accessors for command line handler
     QComboBox* getFolderSelector() const { return m_fileComboBox; }
     QListWidget* getFileListWidget() const { return m_fileListWidget; }
     QComboBox* getXVariableSelector() const { return m_xVariableComboBox; }
     QListWidget* getYVariableSelector() const { return m_yVariableComboBox; }
     QTabWidget* getTabWidget() const { return m_tabWidget; }
+    PlotWidget* getPlotWidget() const { return m_plotWidget; }
 
 protected:
     void closeEvent(QCloseEvent *event) override;

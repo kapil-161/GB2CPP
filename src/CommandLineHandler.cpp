@@ -1,6 +1,8 @@
 #include "CommandLineHandler.h"
 #include "MainWindow.h"
 #include "DataProcessor.h"
+#include "PlotWidget.h"
+#include <QApplication>
 #include <QDebug>
 #include <QDir>
 #include <QTimer>
@@ -16,43 +18,72 @@ CommandLineHandler::CommandLineHandler(QObject *parent)
 CommandLineArgs CommandLineHandler::parseCommandLineArgs(const QStringList &args)
 {
     CommandLineArgs result;
-    
+
     try {
         if (args.size() < 2) {
             qDebug() << "No command line arguments provided";
             return result;
         }
-        
-        // Join all arguments after the first one (in case paths have spaces)
-        QStringList paramList = args.mid(1);
-        QString paramString = paramList.join(" ");
-        
-        // Remove trailing period and quotes if present
-        paramString = paramString.remove(QRegularExpression("[.\"']+$"));
-        paramString = paramString.remove(QRegularExpression("^[\"']+"));
-        
-        // Split by comma
-        QStringList params;
-        for (const QString &param : paramString.split(',')) {
-            QString cleaned = param.trimmed();
-            cleaned = cleaned.remove(QRegularExpression("^[\"']+"));
-            cleaned = cleaned.remove(QRegularExpression("[\"']+$"));
-            if (!cleaned.isEmpty()) {
-                params.append(cleaned);
+
+        // First pass: strip --xvar, --yvar, --save, --metrics flags; collect positional tokens
+        QStringList positional;
+        QStringList tokens = args.mid(1);
+        for (int i = 0; i < tokens.size(); ++i) {
+            const QString &tok = tokens[i];
+            if (tok == "--xvar" && i + 1 < tokens.size()) {
+                result.xVar = tokens[++i];
+            } else if (tok == "--yvar" && i + 1 < tokens.size()) {
+                result.yVars = tokens[++i].split(',', Qt::SkipEmptyParts);
+            } else if (tok == "--save" && i + 1 < tokens.size()) {
+                result.savePlotPath = tokens[++i];
+                result.headlessMode = true;
+            } else if (tok == "--metrics" && i + 1 < tokens.size()) {
+                result.saveMetricsPath = tokens[++i];
+            } else {
+                positional.append(tok);
             }
         }
-        
+
+        // Second pass: parse positional args — support both comma-separated (DSSAT) and
+        // space-separated (terminal) formats
+        QString paramString = positional.join(" ");
+        paramString = paramString.remove(QRegularExpression("[.\"']+$"));
+        paramString = paramString.remove(QRegularExpression("^[\"']+"));
+
+        QStringList params;
+        if (paramString.contains(',')) {
+            // Comma-separated format (DSSAT invocation)
+            for (const QString &param : paramString.split(',')) {
+                QString cleaned = param.trimmed();
+                cleaned = cleaned.remove(QRegularExpression("^[\"']+"));
+                cleaned = cleaned.remove(QRegularExpression("[\"']+$"));
+                if (!cleaned.isEmpty()) {
+                    params.append(cleaned);
+                }
+            }
+        } else {
+            // Space-separated format (terminal invocation)
+            for (const QString &param : positional) {
+                QString cleaned = param.trimmed();
+                cleaned = cleaned.remove(QRegularExpression("^[\"']+"));
+                cleaned = cleaned.remove(QRegularExpression("[\"']+$"));
+                if (!cleaned.isEmpty()) {
+                    params.append(cleaned);
+                }
+            }
+        }
+
         if (params.size() < 2) {
             qWarning() << "Insufficient parameters:" << params;
             return result;
         }
-        
+
         result.dssatBase = params[0];
         result.cropDir = params[1];
-        
+
         // Extract crop name from crop directory by finding the crop folder
         result.cropName = extractCropNameFromPath(result.cropDir);
-        
+
         // Get output files if provided
         if (params.size() > 2) {
             for (int i = 2; i < params.size(); ++i) {
@@ -62,19 +93,24 @@ CommandLineArgs CommandLineHandler::parseCommandLineArgs(const QStringList &args
                 }
             }
         }
-        
+
         result.isValid = true;
-        
+
         qDebug() << "Parsed command line args:";
         qDebug() << "  DSSAT Base:" << result.dssatBase;
         qDebug() << "  Crop Dir:" << result.cropDir;
         qDebug() << "  Crop Name:" << result.cropName;
         qDebug() << "  Output Files:" << result.outputFiles;
-        
+        qDebug() << "  xVar:" << result.xVar;
+        qDebug() << "  yVars:" << result.yVars;
+        qDebug() << "  savePlotPath:" << result.savePlotPath;
+        qDebug() << "  saveMetricsPath:" << result.saveMetricsPath;
+        qDebug() << "  headlessMode:" << result.headlessMode;
+
     } catch (const std::exception &e) {
         qCritical() << "Error parsing command line arguments:" << e.what();
     }
-    
+
     return result;
 }
 
@@ -145,14 +181,21 @@ void CommandLineHandler::selectOutputFiles()
         if (selectedCount > 0) {
             QString message = QString("Loaded %1 with %2 output files")
                                 .arg(m_args.cropName).arg(selectedCount);
-            QMessageBox::information(m_mainWindow, "Success", message);
-            
+            if (!m_args.headlessMode) {
+                QMessageBox::information(m_mainWindow, "Success", message);
+            }
+
             // Load the first tab content
             QTimer::singleShot(100, this, &CommandLineHandler::loadInitialContent);
         } else {
             QString message = QString("No valid output files found from: %1")
                                 .arg(m_args.outputFiles.join(", "));
-            QMessageBox::warning(m_mainWindow, "Warning", message);
+            if (m_args.headlessMode) {
+                qCritical() << "CommandLineHandler (headless):" << message;
+                QApplication::quit();
+            } else {
+                QMessageBox::warning(m_mainWindow, "Warning", message);
+            }
         }
         
     } catch (const std::exception &e) {
@@ -175,9 +218,10 @@ void CommandLineHandler::loadInitialContent()
             if (currentTab == 0) {  // Time series tab
                 // Load variables but don't auto-plot
                 m_mainWindow->loadVariables();
-                
-                // Don't automatically select Y variable or update plot
-                // User needs to manually select Y variable and click plot button
+
+                if (m_args.headlessMode) {
+                    QTimer::singleShot(300, this, &CommandLineHandler::headlessAutoPlot);
+                }
             }
             
             qDebug() << "Loaded initial content for tab" << currentTab;
@@ -240,4 +284,57 @@ QString CommandLineHandler::extractCropNameFromPath(const QString &cropDirPath)
     qWarning() << "CommandLineHandler: No matching crop directory found for:" << cropDirPath
                << "using fallback directory name:" << fallbackName;
     return fallbackName;
+}
+
+void CommandLineHandler::headlessAutoPlot()
+{
+    if (!m_mainWindow) {
+        QApplication::quit();
+        return;
+    }
+
+    PlotWidget *plot = m_mainWindow->getPlotWidget();
+    if (!plot) {
+        qCritical() << "CommandLineHandler (headless): no PlotWidget";
+        QApplication::quit();
+        return;
+    }
+
+    // Select X variable
+    if (!m_args.xVar.isEmpty()) {
+        if (!m_mainWindow->selectXVariable(m_args.xVar)) {
+            qWarning() << "CommandLineHandler (headless): xvar not found:" << m_args.xVar;
+        }
+    }
+
+    // Select Y variables
+    if (!m_args.yVars.isEmpty()) {
+        int n = m_mainWindow->selectYVariables(m_args.yVars);
+        if (n == 0) {
+            qWarning() << "CommandLineHandler (headless): no yvar matched:" << m_args.yVars;
+        }
+    }
+
+    // Trigger plot update
+    m_mainWindow->updateTimeSeriesPlot();
+
+    // After 5000 ms: export plot and/or save metrics, then quit.
+    // Large files (many runs/treatments) need more rendering time than small datasets.
+    QTimer::singleShot(5000, this, [this]() {
+        PlotWidget *plot = m_mainWindow->getPlotWidget();
+        if (plot && !m_args.savePlotPath.isEmpty()) {
+            plot->exportPlotComposite(m_args.savePlotPath, "PNG", 1200, 800, 96);
+            qDebug() << "CommandLineHandler (headless): plot saved to" << m_args.savePlotPath;
+        }
+        if (!m_args.saveMetricsPath.isEmpty()) {
+            if (!m_mainWindow->saveMetricsToFile(m_args.saveMetricsPath)) {
+                qWarning() << "CommandLineHandler (headless): failed to save metrics to"
+                           << m_args.saveMetricsPath;
+            } else {
+                qDebug() << "CommandLineHandler (headless): metrics saved to"
+                         << m_args.saveMetricsPath;
+            }
+        }
+        QApplication::quit();
+    });
 }

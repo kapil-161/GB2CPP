@@ -14,6 +14,13 @@ struct CommandLineArgs {
     QString cropName;
     QStringList outputFiles;
     bool isValid = false;
+
+    // Headless plot mode (set by --xvar, --yvar, --save, --metrics flags)
+    QString xVar;               // --xvar DAS
+    QStringList yVars;          // --yvar LAID,TOPMD
+    QString savePlotPath;       // --save plot.png
+    QString saveMetricsPath;    // --metrics metrics.csv
+    bool headlessMode = false;  // true when --save is present
 };
 
 class CommandLineHandler : public QObject
@@ -30,6 +37,7 @@ private slots:
     void applyCommandLineArgsToUI();
     void selectOutputFiles();
     void loadInitialContent();
+    void headlessAutoPlot();
 
 private:
     MainWindow *m_mainWindow;
