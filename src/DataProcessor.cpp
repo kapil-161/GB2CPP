@@ -735,26 +735,7 @@ bool DataProcessor::readOsuFile(const QString &filePath, DataTable &table)
     }
     
     
-    // Debug: Print detailed parsing information
-    emit errorOccurred("=== OSU PARSING DEBUG (Python approach) ===");
-    emit errorOccurred(QString("Header line: %1").arg(headerLine.left(100)));
-    emit errorOccurred(QString("Headers found: %1").arg(headers.join(", ")));
-    emit errorOccurred(QString("TNAM index: %1, start: %2, end: %3").arg(tnamIdx).arg(tnamStart).arg(tnamEnd));
-    
-    // Debug first few data rows
-    if (lines.size() > headerIdx + 1) {
-        QString firstDataLine = lines[headerIdx + 1];
-        emit errorOccurred(QString("First data: %1").arg(firstDataLine.left(100)));
-        
-        if (tnamStart >= 0 && tnamEnd >= 0) {
-            QString tnamValue = firstDataLine.mid(tnamStart, tnamEnd - tnamStart).trimmed();
-            emit errorOccurred(QString("TNAM extracted: [%1]").arg(tnamValue));
-        }
-    }
-    
-    emit errorOccurred(QString("Final columns: %1").arg(table.columnNames.size()));
-    emit errorOccurred(QString("Rows: %1").arg(table.rowCount));
-    emit errorOccurred("=== END OSU DEBUG ===");
+    qDebug() << "OSU parsed:" << table.rowCount << "rows," << table.columnNames.size() << "columns from" << filePath;
     
     emit dataProcessed(QString("Successfully loaded %1 rows from OSU file %2").arg(table.rowCount).arg(filePath));
     return true;

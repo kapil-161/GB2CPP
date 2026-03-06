@@ -25,6 +25,9 @@
 #include <QScrollArea>
 #include <QListWidget>
 #include <QSplitter>
+#include <QTreeWidget>
+#include <QTreeWidgetItem>
+#include <QStackedWidget>
 #include <QMap>
 #include <QPoint>
 #include <QVector>
@@ -71,6 +74,10 @@ public:
 
 protected:
     void paintEvent(QPaintEvent *event) override;
+
+private:
+    void paintTickMarks(QPainter *painter);
+    void paintCustomMarkers(QPainter *painter);
 
 private:
     QMap<QAbstractSeries*, QVector<ErrorBarData>> m_errorBars;
@@ -175,7 +182,13 @@ public:
     void setPlotTitle(const QString &title);
     void setAxisTitles(const QString &xTitle, const QString &yTitle);
     void setXAxisButtonsVisible(bool visible);  // Show/hide DAS, DAP, DATE buttons
-    
+
+    // Treatment pre-selection panel (shown in white area before first plot)
+    void setAvailableTreatments(const QStringList &treatments,
+        const QMap<QString, QMap<QString, QString>> &treatmentNames = QMap<QString, QMap<QString, QString>>());
+    QStringList getSelectedTreatments() const;
+    void showTreatmentSelection();  // Switch legend area to treatment panel (e.g. on variable change)
+
     // Simple legend functionality (matching Python)
     
 protected:
@@ -193,7 +206,6 @@ private slots:
     void onXAxisButtonClicked();
     void onSettingsButtonClicked();
     void applyPlotSettings(const PlotSettings &settings);
-
 private:
     // Core plotting functions (matching Python structure)
     // DataTable loadSimulationData(const QString &selectedFolder, const QStringList &selectedOutFiles); // Removed
@@ -215,7 +227,8 @@ private:
     void addSeriesToPlot(const QVector<PlotData> &plotDataList);
     void updateScalingLabel(const QStringList &yVars);
     void updatePlotWithScaling();
-    
+    void setupPreplotPanel();
+
     void updateLegend(const QVector<PlotData> &plotDataList);
     void updateLegendAdvanced(const QMap<QString, QMap<QString, QVector<QSharedPointer<PlotData>>>>& legendEntries);
     void clearLegend();
@@ -273,6 +286,9 @@ private:
     QHBoxLayout *m_mainLayout;
     QWidget *m_leftContainer;
     QVBoxLayout *m_leftLayout;
+    QStackedWidget *m_legendStack;         // page 0 = treatment pre-selection, page 1 = legend
+    QWidget *m_preplotPanel;              // treatment selection shown in legend area before first plot
+    QListWidget *m_treatmentSelectList;   // checkboxes for treatment pre-selection
     QChart *m_chart;
     ErrorBarChartView *m_chartView;
     
@@ -284,12 +300,12 @@ private:
     QPushButton *m_dapButton;
     QPushButton *m_settingsButton;
     QLabel *m_scalingLabel;
-    
+
     // Legend area
     QScrollArea *m_legendScrollArea;
     QWidget *m_legendWidget;
     QVBoxLayout *m_legendLayout;
-    
+
     // Simple legend (matching Python)
     
     // Data storage (matching Python structure)

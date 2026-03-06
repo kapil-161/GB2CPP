@@ -132,10 +132,157 @@ void ErrorBarChartView::paintEvent(QPaintEvent *event)
 {
     QChartView::paintEvent(event);
 
-    if (m_errorBars.isEmpty() || !chart()) return;
+    if (m_errorBars.isEmpty() && !chart()) return;
 
     QPainter painter(this->viewport());
-    paintErrorBars(&painter, QPoint(0, 0));
+    
+    // Draw tick marks
+    paintTickMarks(&painter);
+
+    // Draw custom markers (e.g., inverted triangle)
+    paintCustomMarkers(&painter);
+
+    if (!m_errorBars.isEmpty()) {
+        paintErrorBars(&painter, QPoint(0, 0));
+    }
+}
+
+void ErrorBarChartView::paintTickMarks(QPainter *painter)
+{
+    if (!chart()) return;
+    
+    painter->save();
+    
+    QRectF plotArea = chart()->plotArea();
+    QList<QAbstractAxis*> axes = chart()->axes();
+    
+    const int tickLength = 6;
+    const int minorTickLength = 3;
+    
+    for (QAbstractAxis *axis : axes) {
+        if (!axis->isVisible()) continue;
+        
+        QColor axisColor = Qt::black; // default
+        if (auto pAxis = qobject_cast<QValueAxis*>(axis)) {
+            axisColor = pAxis->linePenColor();
+            if (!pAxis->isLineVisible()) continue;
+        } else if (auto dAxis = qobject_cast<QDateTimeAxis*>(axis)) {
+            axisColor = dAxis->linePenColor();
+            if (!dAxis->isLineVisible()) continue;
+        }
+        
+        painter->setPen(QPen(axisColor, 1));
+        
+        if (axis->alignment() == Qt::AlignBottom) {
+            double min = 0, max = 0;
+            int tickCount = 0;
+            int minorTickCount = 0;
+            if (auto valAxis = qobject_cast<QValueAxis*>(axis)) {
+                min = valAxis->min();
+                max = valAxis->max();
+                tickCount = valAxis->tickCount();
+                minorTickCount = valAxis->minorTickCount();
+            } else if (auto dateAxis = qobject_cast<QDateTimeAxis*>(axis)) {
+                min = dateAxis->min().toMSecsSinceEpoch();
+                max = dateAxis->max().toMSecsSinceEpoch();
+                tickCount = dateAxis->tickCount();
+            }
+            if (tickCount > 1) {
+                double y = plotArea.bottom();
+                for (int i = 0; i < tickCount; ++i) {
+                    double ratio = (double)i / (tickCount - 1);
+                    double x = plotArea.left() + ratio * plotArea.width();
+                    painter->drawLine(QPointF(x, y), QPointF(x, y + tickLength));
+                    
+                    if (i < tickCount - 1 && minorTickCount > 0) {
+                        for (int j = 1; j <= minorTickCount; ++j) {
+                            double minorRatio = ratio + ((double)j / (minorTickCount + 1)) / (tickCount - 1);
+                            double minorX = plotArea.left() + minorRatio * plotArea.width();
+                            painter->drawLine(QPointF(minorX, y), QPointF(minorX, y + minorTickLength));
+                        }
+                    }
+                }
+            }
+        } else if (axis->alignment() == Qt::AlignLeft) {
+            double min = 0, max = 0;
+            int tickCount = 0;
+            int minorTickCount = 0;
+            if (auto valAxis = qobject_cast<QValueAxis*>(axis)) {
+                min = valAxis->min();
+                max = valAxis->max();
+                tickCount = valAxis->tickCount();
+                minorTickCount = valAxis->minorTickCount();
+            }
+            if (tickCount > 1) {
+                double x = plotArea.left();
+                for (int i = 0; i < tickCount; ++i) {
+                    double ratio = (double)i / (tickCount - 1);
+                    double y = plotArea.bottom() - ratio * plotArea.height();
+                    painter->drawLine(QPointF(x - tickLength, y), QPointF(x, y));
+                    
+                    if (i < tickCount - 1 && minorTickCount > 0) {
+                        for (int j = 1; j <= minorTickCount; ++j) {
+                            double minorRatio = ratio + ((double)j / (minorTickCount + 1)) / (tickCount - 1);
+                            double minorY = plotArea.bottom() - minorRatio * plotArea.height();
+                            painter->drawLine(QPointF(x - minorTickLength, minorY), QPointF(x, minorY));
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    painter->restore();
+}
+
+void ErrorBarChartView::paintCustomMarkers(QPainter *painter)
+{
+    if (!chart()) return;
+    
+    painter->save();
+    painter->setRenderHint(QPainter::Antialiasing, true);
+    
+    QRectF plotArea = chart()->plotArea();
+    
+    for (QAbstractSeries *series : chart()->series()) {
+        if (!series->isVisible()) continue;
+        
+        QScatterSeries *scatterSeries = qobject_cast<QScatterSeries*>(series);
+        if (!scatterSeries) continue;
+        
+        QString customShape = scatterSeries->property("custom_shape").toString();
+        if (customShape != "v") continue; // currently only handling inverted triangle custom shape
+        
+        QPen seriesPen = scatterSeries->property("custom_pen").value<QPen>();
+        QBrush seriesBrush = scatterSeries->property("custom_brush").value<QBrush>();
+        double symbolSize = scatterSeries->property("custom_size").toDouble();
+        if (symbolSize <= 0) symbolSize = 6.0;
+        
+        painter->setPen(seriesPen);
+        painter->setBrush(seriesBrush);
+        
+        // Ensure marker size isn't too large
+        symbolSize = qMin(symbolSize, 20.0);
+        
+        for (const QPointF &point : scatterSeries->points()) {
+            QPointF p = chart()->mapToPosition(point, series);
+            
+            // Only draw inside plot area bounds approximately
+            if (p.x() >= plotArea.left() - symbolSize && 
+                p.x() <= plotArea.right() + symbolSize && 
+                p.y() >= plotArea.top() - symbolSize && 
+                p.y() <= plotArea.bottom() + symbolSize) {
+                
+                QPolygonF triangle;
+                triangle << QPointF(p.x() - symbolSize/2, p.y() - symbolSize/2)
+                         << QPointF(p.x() + symbolSize/2, p.y() - symbolSize/2)
+                         << QPointF(p.x(), p.y() + symbolSize/2);
+                painter->drawPolygon(triangle);
+            }
+        }
+    }
+    
+    painter->restore();
 }
 
 PlotWidget::PlotWidget(QWidget *parent)
@@ -143,6 +290,9 @@ PlotWidget::PlotWidget(QWidget *parent)
     , m_mainLayout(nullptr)
     , m_leftContainer(nullptr)
     , m_leftLayout(nullptr)
+    , m_legendStack(nullptr)
+    , m_preplotPanel(nullptr)
+    , m_treatmentSelectList(nullptr)
     , m_chart(nullptr)
     , m_chartView(nullptr)
     , m_bottomContainer(nullptr)
@@ -177,7 +327,7 @@ PlotWidget::PlotWidget(QWidget *parent)
         QColor("#8A2BE2"), QColor("#DC143C"), QColor("#00CED1"), QColor("#FF4500")
     };
 
-    m_markerSymbols = {"o", "s", "d", "t", "+", "x", "p", "h", "star"};
+    m_markerSymbols = {"o", "s", "d", "t", "v"};
     
     // Initialize optimization variables
     m_autoFitPending = false;
@@ -238,7 +388,11 @@ void PlotWidget::testScalingFunctionality()
 
 void PlotWidget::setupUI()
 {
-    
+    setAutoFillBackground(true);
+    QPalette pal = palette();
+    pal.setColor(QPalette::Window, Qt::white);
+    setPalette(pal);
+
     m_mainLayout = new QHBoxLayout(this);
     m_mainLayout->setContentsMargins(0, 0, 0, 0);
     
@@ -290,7 +444,7 @@ void PlotWidget::setupUI()
     m_settingsButton->setStyleSheet(settingsStyle);
     m_settingsButton->setToolTip("Plot Settings");
     m_settingsButton->setFixedSize(24, 24);
-    
+
     // Make buttons checkable to show active state
     m_dasButton->setCheckable(true);
     m_dapButton->setCheckable(true);
@@ -305,7 +459,7 @@ void PlotWidget::setupUI()
     // Add some space before settings button
     m_bottomLayout->addSpacing(20);
     m_bottomLayout->addWidget(m_settingsButton);
-    
+
     // Connect button signals
     connect(m_dasButton, &QPushButton::clicked, this, &PlotWidget::onDasButtonClicked);
     connect(m_dapButton, &QPushButton::clicked, this, &PlotWidget::onDapButtonClicked);
@@ -325,38 +479,47 @@ void PlotWidget::setupUI()
     m_bottomLayout->addWidget(m_scalingLabel, 1);
     
     
-    // Add a placeholder widget for the chart (will be replaced in setupChart)
+    // Chart placeholder (replaced in setupChart)
     QWidget* chartPlaceholder = new QWidget();
     chartPlaceholder->setStyleSheet("background-color: #f0f0f0; border: 1px dashed #ccc;");
     chartPlaceholder->setMinimumHeight(200);
     m_leftLayout->addWidget(chartPlaceholder, 1);
     m_leftLayout->addWidget(m_bottomContainer, 0);
-    
+
     m_mainLayout->addWidget(m_leftContainer, 80);
-    
+
     // Legend scroll area (simple, matching Python)
     m_legendScrollArea = new QScrollArea();
     m_legendScrollArea->setWidgetResizable(true);
     m_legendScrollArea->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     m_legendScrollArea->setFrameShape(QFrame::NoFrame);
     m_legendScrollArea->setFixedWidth(200);
-    
+
     // Legend container
     m_legendWidget = new QWidget();
     m_legendLayout = new QVBoxLayout(m_legendWidget);
     m_legendLayout->setSpacing(2);
     m_legendLayout->setContentsMargins(5, 0, 5, 0);
     m_legendLayout->setAlignment(Qt::AlignTop);
-    
+
     // Outer legend widget with stretch
     QWidget *legendOuterWidget = new QWidget();
     QVBoxLayout *legendOuterLayout = new QVBoxLayout(legendOuterWidget);
     legendOuterLayout->setContentsMargins(0, 0, 0, 0);
     legendOuterLayout->addWidget(m_legendWidget, 0, Qt::AlignTop);
     legendOuterLayout->addStretch(1);
-    
+
     m_legendScrollArea->setWidget(legendOuterWidget);
-    m_mainLayout->addWidget(m_legendScrollArea, 20);
+
+    // Legend stack: page 0 = treatment pre-selection, page 1 = legend
+    setupPreplotPanel();
+    m_legendStack = new QStackedWidget();
+    m_legendStack->setFixedWidth(200);
+    m_legendStack->addWidget(m_preplotPanel);       // page 0 — shown before first plot
+    m_legendStack->addWidget(m_legendScrollArea);   // page 1 — shown after plotting
+    m_legendStack->setCurrentIndex(0);
+    m_mainLayout->addWidget(m_legendStack, 20);
+
 }
 
 void PlotWidget::setupChart()
@@ -418,13 +581,17 @@ void PlotWidget::styleChart()
     yAxis->setGridLineVisible(m_showGrid);
     xAxis->setLabelsVisible(true);
     yAxis->setLabelsVisible(true);
-    
+    xAxis->setLinePen(QPen(Qt::black));
+    yAxis->setLinePen(QPen(Qt::black));
+    xAxis->setLabelsBrush(QBrush(Qt::black));
+    yAxis->setLabelsBrush(QBrush(Qt::black));
+
     // Add minor ticks
     xAxis->setMinorTickCount(4);
     yAxis->setMinorTickCount(4);
     xAxis->setMinorGridLineVisible(true);
     yAxis->setMinorGridLineVisible(true);
-    
+
     m_chart->addAxis(xAxis, Qt::AlignBottom);
     m_chart->addAxis(yAxis, Qt::AlignLeft);
     
@@ -486,25 +653,7 @@ void PlotWidget::setupAxes(const QString &xVar)
     // Create Y-axis (always value axis)
     QValueAxis *yAxis = new QValueAxis();
     
-    // Set Y-axis title based on current Y variables
-    QString yTitle = "Y Variable";
-    if (!m_currentYVars.isEmpty()) {
-        QStringList yLabels;
-        for (const QString &yVar : m_currentYVars) {
-            QPair<QString, QString> yVarInfo = DataProcessor::getVariableInfo(yVar);
-            QString baseLabel = yVarInfo.first.isEmpty() ? yVar : yVarInfo.first;
-            // Include scaling factor if available
-            if (m_scaleFactors.contains("default") && m_scaleFactors["default"].contains(yVar)) {
-                const auto& info = m_scaleFactors["default"][yVar];
-                if (info.scaleFactor != 1.0) {
-                    baseLabel += QString(" (x%1)").arg(info.scaleFactor, 0, 'g', 3);
-                }
-            }
-            yLabels.append(baseLabel);
-        }
-        yTitle = yLabels.join(", ");
-    }
-    yAxis->setTitleText(yTitle);
+    yAxis->setTitleText("");
     
     // Add minor ticks to Y axis
     yAxis->setMinorTickCount(4);
@@ -515,7 +664,11 @@ void PlotWidget::setupAxes(const QString &xVar)
     yAxis->setGridLineVisible(m_showGrid);
     xAxis->setLabelsVisible(true);
     yAxis->setLabelsVisible(true);
-    
+    xAxis->setLinePen(QPen(Qt::black));
+    yAxis->setLinePen(QPen(Qt::black));
+    xAxis->setLabelsBrush(QBrush(Qt::black));
+    yAxis->setLabelsBrush(QBrush(Qt::black));
+
     // Add axes to chart
     m_chart->addAxis(xAxis, Qt::AlignBottom);
     m_chart->addAxis(yAxis, Qt::AlignLeft);
@@ -861,8 +1014,10 @@ void PlotWidget::plotTimeSeries(
     setXAxisButtonsVisible(true);
     
     try {
-        
-        clear();
+        clear();  // also resets legend stack to page 0
+
+        // Switch legend area to show the legend (page 1)
+        if (m_legendStack) m_legendStack->setCurrentIndex(1);
 
         m_simData = simData;
         m_obsData = obsData;
@@ -905,6 +1060,26 @@ void PlotWidget::plotTimeSeries(
                 m_plotSettings.availableExperiments = newExpTrts.keys();
                 m_plotSettings.availableYVars = yVars;
                 m_plotSettings.lastYVars = yVars;
+
+                // Build treatment display names
+                m_plotSettings.treatmentDisplayNames.clear();
+                for (auto it = newExpTrts.constBegin(); it != newExpTrts.constEnd(); ++it) {
+                    for (const QString &trtId : it.value())
+                        m_plotSettings.treatmentDisplayNames[it.key() + "::" + trtId] =
+                            getTreatmentDisplayName(trtId, it.key());
+                }
+
+                // Build Y variable display names
+                for (const QString &yVar : yVars) {
+                    if (!m_plotSettings.yVarDisplayNames.contains(yVar)) {
+                        QPair<QString, QString> vi = DataProcessor::getVariableInfo(yVar);
+                        if (vi.first.isEmpty() && yVar.length() > 1)
+                            vi = DataProcessor::getVariableInfo(yVar.left(yVar.length() - 1));
+                        m_plotSettings.yVarDisplayNames[yVar] = vi.first.isEmpty() ? yVar : vi.first;
+                    }
+                }
+
+                // Refresh the panel tree if it is currently visible
             }
         }
 
@@ -1359,16 +1534,19 @@ void PlotWidget::plotDatasets(const DataTable &simData, const DataTable &obsData
         
         // Group data by experiment and treatment combination
         QMap<QString, QVector<QPointF>> experimentTreatmentData;
-        
+
+        // Detect summary OSU files (seasonal/yearly rows, no time-series DAS/DAP).
+        // For these files the RUN column enumerates one row per year — do NOT split by RUN.
+        bool isSummaryOsu = simData.columnNames.contains("WYEAR") &&
+                            !simData.columnNames.contains("DAS") &&
+                            !simData.columnNames.contains("DAP");
+
         for (int row = 0; row < simData.rowCount; ++row) {
             if (row >= xColumn->data.size() || row >= yColumn->data.size() || row >= trtColumn->data.size()) {
                 continue;
             }
-            
+
             QString trt = trtColumn->data[row].toString();
-            if (!treatments.isEmpty() && !treatments.contains("All") && !treatments.contains(trt)) {
-                continue;
-            }
 
             // Get experiment for this row, or use selectedExperiment as fallback
             QString experiment = selectedExperiment;
@@ -1377,6 +1555,13 @@ void PlotWidget::plotDatasets(const DataTable &simData, const DataTable &obsData
                 if (!expFromData.isEmpty()) {
                     experiment = expFromData;
                 }
+            }
+
+            // Treatment filter: match plain trt or compound exp::trt key
+            if (!treatments.isEmpty() && !treatments.contains("All")
+                && !treatments.contains(trt)
+                && !treatments.contains(experiment + "::" + trt)) {
+                continue;
             }
 
             // Per-variable filter: skip if this var::exp::trt is excluded
@@ -1403,7 +1588,9 @@ void PlotWidget::plotDatasets(const DataTable &simData, const DataTable &obsData
                     runStr = QString("RUN%1").arg(rv);
                 }
             }
-            QString expTrtKey = runStr.isEmpty()
+            // For summary OSU files each row is one year; don't split by RUN or every
+            // year becomes its own single-point series and no line is drawn.
+            QString expTrtKey = (runStr.isEmpty() || isSummaryOsu)
                 ? QString("%1__%2__%3").arg(crop).arg(experiment).arg(trt)
                 : QString("%1__%2__%3__%4").arg(crop).arg(experiment).arg(trt).arg(runStr);
             
@@ -1765,26 +1952,20 @@ QScatterSeries::MarkerShape PlotWidget::getMarkerShape(const QString &symbol) co
     if (symbol == "s") return QScatterSeries::MarkerShapeRectangle;        // 1 - Rectangle
     if (symbol == "d") return QScatterSeries::MarkerShapeRotatedRectangle; // 2 - Diamond
     if (symbol == "t") return QScatterSeries::MarkerShapeTriangle;         // 3 - Triangle
-    if (symbol == "+") return QScatterSeries::MarkerShapeStar;             // 4 - Star
-    if (symbol == "x") return QScatterSeries::MarkerShapePentagon;         // 5 - Pentagon
-    if (symbol == "p") return QScatterSeries::MarkerShapePentagon;         // 5 - Pentagon
-    if (symbol == "h") return QScatterSeries::MarkerShapeCircle;           // 0 - Circle (cycle)
-    if (symbol == "star") return QScatterSeries::MarkerShapeStar;          // 4 - Star
+    if (symbol == "v") return QScatterSeries::MarkerShapeRectangle;        // Placeholder for custom rendering
+    
+    return QScatterSeries::MarkerShapeCircle;
     return QScatterSeries::MarkerShapeCircle; // Default
 }
 
 QString PlotWidget::getActualRenderedSymbol(const QString &originalSymbol) const
 {
     // Return symbols that match the Qt Charts MarkerShape mapping
-    if (originalSymbol == "o") return "o";      // Circle
-    if (originalSymbol == "s") return "s";      // Rectangle
-    if (originalSymbol == "d") return "d";      // RotatedRectangle (use diamond in legend)
-    if (originalSymbol == "t") return "t";      // Triangle
-    if (originalSymbol == "+") return "star";   // Star (use star symbol in legend)
-    if (originalSymbol == "x") return "p";      // Pentagon
-    if (originalSymbol == "p") return "p";      // Pentagon
-    if (originalSymbol == "h") return "o";      // Circle (cycles back)
-    if (originalSymbol == "star") return "star"; // Star
+    if (originalSymbol == "o") return "o";
+    if (originalSymbol == "s") return "s";
+    if (originalSymbol == "d") return "d";
+    if (originalSymbol == "t") return "t";
+    if (originalSymbol == "v") return "v";
     
     return "o"; // Default to circle
 }
@@ -1887,24 +2068,33 @@ void PlotWidget::addSeriesToPlot(const QVector<PlotData> &plotDataList)
             scatterSeries->setName(seriesName);
             
             scatterSeries->setColor(sharedPlotData->color);
-            scatterSeries->setMarkerSize(sharedPlotData->isObserved ? 8.0 : 6.0);
+            scatterSeries->setMarkerSize(6.0);
             
-            // Apply symbol based on symbolIndex - 6 shapes × 2 fill modes = 12 distinct variants.
-            // Variants 0-5: filled (solid color), variants 6-11: hollow (white fill, color border).
-            QStringList uniqueShapes = {"o", "s", "d", "t", "star", "p"}; // 6 Qt marker shapes
+            // Apply symbol based on symbolIndex - 5 shapes × 2 fill modes = 10 distinct variants.
+            // Variants 0-4: filled (solid color), variants 5-9: hollow (white fill, color border).
+            QStringList uniqueShapes = {"o", "s", "d", "t", "v"}; // 5 Qt marker shapes (v is custom)
             int shapeIndex = sharedPlotData->symbolIndex % uniqueShapes.size();
             bool isHollow = (sharedPlotData->symbolIndex / uniqueShapes.size()) % 2 == 1;
             QString originalSymbol = uniqueShapes[shapeIndex];
             QString actualSymbol = getActualRenderedSymbol(originalSymbol);
-            scatterSeries->setMarkerShape(getMarkerShape(originalSymbol));
 
-            // All symbols get a visible color outline; fill varies for filled vs hollow
             QPen symbolPen(sharedPlotData->color, 2, Qt::SolidLine);
-            scatterSeries->setPen(symbolPen);
-
-            // Apply brush for symbol fill
             QBrush symbolBrush = isHollow ? QBrush(Qt::white) : QBrush(sharedPlotData->color);
-            scatterSeries->setBrush(symbolBrush);
+
+            if (originalSymbol == "v") {
+                // For custom inverted triangle shape
+                scatterSeries->setMarkerShape(QScatterSeries::MarkerShapeRectangle);
+                scatterSeries->setPen(Qt::NoPen);
+                scatterSeries->setBrush(Qt::NoBrush);
+                scatterSeries->setProperty("custom_shape", "v");
+                scatterSeries->setProperty("custom_pen", QVariant::fromValue(symbolPen));
+                scatterSeries->setProperty("custom_brush", QVariant::fromValue(symbolBrush));
+                scatterSeries->setProperty("custom_size", 6.0);
+            } else {
+                scatterSeries->setMarkerShape(getMarkerShape(originalSymbol));
+                scatterSeries->setPen(symbolPen);
+                scatterSeries->setBrush(symbolBrush);
+            }
             
             for (const QPointF &point : sharedPlotData->points) {
                 scatterSeries->append(point);
@@ -2271,8 +2461,10 @@ void PlotWidget::calculateMetrics()
             QString cropName = treatmentVarExpCropToCrop[groupKey];
             QString runId = treatmentVarExpCropToRun.value(groupKey);
             
-            // Check if this treatment should be processed
-            if (!m_currentTreatments.contains("All") && !m_currentTreatments.contains(trt)) {
+            // Check if this treatment should be processed (empty = show all)
+            if (!m_currentTreatments.isEmpty() && !m_currentTreatments.contains("All")
+                && !m_currentTreatments.contains(trt)
+                && !m_currentTreatments.contains(experimentName + "::" + trt)) {
                 continue;
             }
             // Per-variable filter
@@ -2465,6 +2657,9 @@ void PlotWidget::clear()
     // Reset scatter mode and show buttons (they'll be hidden again if scatter mode is set)
     m_isScatterMode = false;
     setXAxisButtonsVisible(true);
+
+    // Show treatment selection panel in legend area when plot is cleared
+    if (m_legendStack) m_legendStack->setCurrentIndex(0);
 }
 
 // Optimization: Cached date parsing to avoid re-parsing same dates
@@ -2818,9 +3013,34 @@ void PlotWidget::renderLegendContent(QPainter *painter, const QRect &rect)
             painter->setBrush(plotData->brush);
             
             if (plotData->isObserved) {
-                // Draw symbol for observed data
-                QRect symbolRect(x, y - symbolSize/2, symbolSize, symbolSize);
-                painter->drawEllipse(symbolRect);
+                // Draw correct symbol for observed data
+                QPointF center(x + symbolSize/2.0, y);
+                if (plotData->symbol == "o") {
+                    painter->drawEllipse(center, symbolSize/2.0, symbolSize/2.0);
+                } else if (plotData->symbol == "s") {
+                    painter->drawRect(x, y - symbolSize/2.0, symbolSize, symbolSize);
+                } else if (plotData->symbol == "t") {
+                    QPolygonF triangle;
+                    triangle << QPointF(center.x(), center.y() - symbolSize/2.0)
+                             << QPointF(center.x() + symbolSize/2.0, center.y() + symbolSize/2.0)
+                             << QPointF(center.x() - symbolSize/2.0, center.y() + symbolSize/2.0);
+                    painter->drawPolygon(triangle);
+                } else if (plotData->symbol == "d" || plotData->symbol == "diamond") {
+                    QPolygonF diamond;
+                    diamond << QPointF(center.x(), center.y() - symbolSize/2.0)
+                            << QPointF(center.x() + symbolSize/2.0, center.y())
+                            << QPointF(center.x(), center.y() + symbolSize/2.0)
+                            << QPointF(center.x() - symbolSize/2.0, center.y());
+                    painter->drawPolygon(diamond);
+                } else if (plotData->symbol == "v") {
+                    QPolygonF invertedTriangle;
+                    invertedTriangle << QPointF(center.x() - symbolSize/2.0, center.y() - symbolSize/2.0)
+                                     << QPointF(center.x() + symbolSize/2.0, center.y() - symbolSize/2.0)
+                                     << QPointF(center.x(), center.y() + symbolSize/2.0);
+                    painter->drawPolygon(invertedTriangle);
+                } else {
+                    painter->drawEllipse(center, symbolSize/2.0, symbolSize/2.0);
+                }
             } else {
                 // Draw line for simulated data
                 painter->drawLine(x, y, x + symbolSize * 2, y);
@@ -2961,23 +3181,7 @@ void PlotWidget::setAxisLabels(const QString &xVar, const QStringList &yVars, co
     QPair<QString, QString> xVarInfo = DataProcessor::getVariableInfo(xVar);
     QString xLabel = xVarInfo.first.isEmpty() ? xVar : xVarInfo.first;
 
-    QStringList yLabels;
-    for (const QString &yVar : yVars) {
-        QPair<QString, QString> yVarInfo = DataProcessor::getVariableInfo(yVar);
-        QString baseLabel = yVarInfo.first.isEmpty() ? yVar : yVarInfo.first;
-
-        // Append scaling factor to label if scaled
-        if (m_scaleFactors.contains("default") && m_scaleFactors["default"].contains(yVar)) {
-            const auto& info = m_scaleFactors["default"][yVar];
-            if (info.scaleFactor != 1.0) {
-                baseLabel += QString(" (x%1)").arg(info.scaleFactor, 0, 'g', 3);
-            }
-        }
-        yLabels.append(baseLabel);
-    }
-    QString yLabel = yLabels.join(", ");
-    
-    setAxisTitles(xLabel, yLabel);
+    setAxisTitles(xLabel, "");
 }
 
 QColor PlotWidget::getColorForTreatment(const QString &treatment, int index)
@@ -3880,7 +4084,7 @@ void LegendSampleWidget::paintEvent(QPaintEvent* event)
                      << QPointF(center.x() + symbolSize/2, center.y() + symbolSize/2)
                      << QPointF(center.x() - symbolSize/2, center.y() + symbolSize/2);
             painter.drawPolygon(triangle);
-        } else if (m_symbol == "d") {
+        } else if (m_symbol == "diamond" || m_symbol == "d") {
             // Diamond - matches QScatterSeries::MarkerShapeRotatedRectangle
             QPolygonF diamond;
             diamond << QPointF(center.x(), center.y() - symbolSize/2)
@@ -3888,25 +4092,13 @@ void LegendSampleWidget::paintEvent(QPaintEvent* event)
                     << QPointF(center.x(), center.y() + symbolSize/2)
                     << QPointF(center.x() - symbolSize/2, center.y());
             painter.drawPolygon(diamond);
-        } else if (m_symbol == "p") {
-            // Pentagon - matches QScatterSeries::MarkerShapePentagon
-            QPolygonF pentagon;
-            for (int i = 0; i < 5; ++i) {
-                double angle = 2 * M_PI * i / 5 - M_PI / 2; // Start from top
-                pentagon << QPointF(center.x() + symbolSize/2 * cos(angle), 
-                                  center.y() + symbolSize/2 * sin(angle));
-            }
-            painter.drawPolygon(pentagon);
-        } else if (m_symbol == "star") {
-            // Star - matches QScatterSeries::MarkerShapeStar
-            QPolygonF star;
-            for (int i = 0; i < 10; ++i) {
-                double angle = 2 * M_PI * i / 10 - M_PI / 2; // Start from top
-                double radius = (i % 2 == 0) ? symbolSize/2 : symbolSize/4;
-                star << QPointF(center.x() + radius * cos(angle), 
-                              center.y() + radius * sin(angle));
-            }
-            painter.drawPolygon(star);
+        } else if (m_symbol == "v") {
+            // Inverted Triangle
+            QPolygonF invertedTriangle;
+            invertedTriangle << QPointF(center.x() - symbolSize/2, center.y() - symbolSize/2)
+                             << QPointF(center.x() + symbolSize/2, center.y() - symbolSize/2)
+                             << QPointF(center.x(), center.y() + symbolSize/2);
+            painter.drawPolygon(invertedTriangle);
         } else {
             // Default circle for unknown symbols
             painter.drawEllipse(center, symbolSize/2, symbolSize/2);
@@ -4252,6 +4444,151 @@ void PlotWidget::onDateButtonClicked()
     setXAxisVariable("DATE");
 }
 
+void PlotWidget::setupPreplotPanel()
+{
+    m_preplotPanel = new QWidget();
+    m_preplotPanel->setStyleSheet("background-color: white;");
+
+    QVBoxLayout *layout = new QVBoxLayout(m_preplotPanel);
+    layout->setContentsMargins(5, 6, 5, 6);
+    layout->setSpacing(4);
+
+    // Header — matches legend section header style
+    QLabel *titleLabel = new QLabel("Treatments");
+    titleLabel->setStyleSheet(
+        "font-size: 10px; font-weight: bold; color: #555555; "
+        "padding: 2px 0px; border-bottom: 1px solid #dddddd;"
+    );
+    titleLabel->setAlignment(Qt::AlignLeft);
+    layout->addWidget(titleLabel);
+
+    // All / None buttons — compact, like legend action buttons
+    QHBoxLayout *btnRow = new QHBoxLayout();
+    btnRow->setSpacing(4);
+    btnRow->setContentsMargins(0, 2, 0, 2);
+    QPushButton *allBtn  = new QPushButton("All");
+    QPushButton *noneBtn = new QPushButton("None");
+    QString btnStyle =
+        "QPushButton { padding: 2px 8px; border: 1px solid #cccccc; "
+        "border-radius: 3px; background: #f5f5f5; font-size: 10px; color: #333333; }"
+        "QPushButton:hover { background: #e0e0e0; }";
+    allBtn->setStyleSheet(btnStyle);
+    noneBtn->setStyleSheet(btnStyle);
+    allBtn->setFixedHeight(20);
+    noneBtn->setFixedHeight(20);
+    btnRow->addWidget(allBtn);
+    btnRow->addWidget(noneBtn);
+    btnRow->addStretch();
+    layout->addLayout(btnRow);
+
+    // Treatment checklist — matches legend list style
+    m_treatmentSelectList = new QListWidget();
+    m_treatmentSelectList->setFrameShape(QFrame::NoFrame);
+    m_treatmentSelectList->setStyleSheet(
+        "QListWidget { background: white; border: none; }"
+        "QListWidget::item { padding: 3px 2px; font-size: 10px; color: #333333; }"
+        "QListWidget::item:hover { background: #f0f4ff; }"
+    );
+    m_treatmentSelectList->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    layout->addWidget(m_treatmentSelectList, 1);
+
+    // Hint at bottom
+    QLabel *hintLabel = new QLabel("Click Refresh Plot to apply.");
+    hintLabel->setStyleSheet("font-size: 9px; color: #999999; padding: 2px 0px;");
+    hintLabel->setWordWrap(true);
+    layout->addWidget(hintLabel);
+
+    connect(allBtn, &QPushButton::clicked, this, [this]() {
+        for (int i = 0; i < m_treatmentSelectList->count(); ++i)
+            m_treatmentSelectList->item(i)->setCheckState(Qt::Checked);
+    });
+    connect(noneBtn, &QPushButton::clicked, this, [this]() {
+        for (int i = 0; i < m_treatmentSelectList->count(); ++i)
+            m_treatmentSelectList->item(i)->setCheckState(Qt::Unchecked);
+    });
+}
+
+void PlotWidget::setAvailableTreatments(const QStringList &treatments,
+    const QMap<QString, QMap<QString, QString>> &treatmentNames)
+{
+    if (!m_treatmentSelectList) return;
+
+    m_treatmentSelectList->blockSignals(true);
+    m_treatmentSelectList->clear();
+
+    for (const QString &key : treatments) {
+        // Parse compound "exp::trt" keys (used when multiple experiments are loaded)
+        QString expPrefix, trtId;
+        if (key.contains("::")) {
+            expPrefix = key.section("::", 0, 0);
+            trtId     = key.section("::", 1);
+        } else {
+            trtId = key;
+        }
+
+        // Find display name: prefer exact experiment match, then any experiment
+        QString displayName;
+        if (!expPrefix.isEmpty() && treatmentNames.contains(expPrefix))
+            displayName = treatmentNames[expPrefix].value(trtId);
+        if (displayName.isEmpty()) {
+            for (auto it = treatmentNames.constBegin(); it != treatmentNames.constEnd(); ++it) {
+                if (it.value().contains(trtId)) {
+                    displayName = it.value().value(trtId);
+                    break;
+                }
+            }
+        }
+
+        QString label;
+        if (!expPrefix.isEmpty())
+            label = displayName.isEmpty()
+                ? QString("%1 · %2").arg(trtId, expPrefix)
+                : QString("%1 - %2 · %3").arg(trtId, displayName, expPrefix);
+        else
+            label = displayName.isEmpty() ? trtId : QString("%1 - %2").arg(trtId, displayName);
+
+        QListWidgetItem *item = new QListWidgetItem(label);
+        item->setData(Qt::UserRole, key);
+        item->setFlags(item->flags() | Qt::ItemIsUserCheckable);
+        item->setCheckState(Qt::Checked);
+        m_treatmentSelectList->addItem(item);
+    }
+
+    m_treatmentSelectList->blockSignals(false);
+
+    // Switch legend area to show treatment pre-selection
+    if (m_legendStack)
+        m_legendStack->setCurrentIndex(0);
+}
+
+QStringList PlotWidget::getSelectedTreatments() const
+{
+    if (!m_treatmentSelectList) return QStringList();
+
+    QStringList selected;
+    int total = m_treatmentSelectList->count();
+    for (int i = 0; i < total; ++i) {
+        QListWidgetItem *item = m_treatmentSelectList->item(i);
+        if (item && item->checkState() == Qt::Checked)
+            selected.append(item->data(Qt::UserRole).toString());
+    }
+
+    // If list empty or all checked, return empty = show all
+    if (total == 0 || selected.count() == total)
+        return QStringList();
+    // If none checked, return sentinel — filter will match nothing
+    if (selected.isEmpty())
+        return QStringList() << "__NO_SELECTION__";
+    return selected;
+}
+
+void PlotWidget::showTreatmentSelection()
+{
+    // Only switch if there are treatments to show
+    if (m_legendStack && m_treatmentSelectList && m_treatmentSelectList->count() > 0)
+        m_legendStack->setCurrentIndex(0);
+}
+
 void PlotWidget::onSettingsButtonClicked()
 {
     qDebug() << "PlotWidget: Settings button clicked";
@@ -4353,24 +4690,7 @@ void PlotWidget::applyPlotSettings(const PlotSettings &settings)
     if (!m_isScatterMode) {
         QString xTitle = settings.xAxisTitle.isEmpty() ? m_currentXVar : settings.xAxisTitle;
 
-        QString defaultYTitle = "Y Variable";
-        if (!m_currentYVars.isEmpty()) {
-            QStringList yLabels;
-            for (const QString &yVar : m_currentYVars) {
-                QPair<QString, QString> yVarInfo = DataProcessor::getVariableInfo(yVar);
-                QString baseLabel = yVarInfo.first.isEmpty() ? yVar : yVarInfo.first;
-                if (m_scaleFactors.contains("default") && m_scaleFactors["default"].contains(yVar)) {
-                    const auto& info = m_scaleFactors["default"][yVar];
-                    if (info.scaleFactor != 1.0) {
-                        baseLabel += QString(" (x%1)").arg(info.scaleFactor, 0, 'g', 3);
-                    }
-                }
-                yLabels.append(baseLabel);
-            }
-            defaultYTitle = yLabels.join(", ");
-        }
-
-        QString yTitle = settings.yAxisTitle.isEmpty() ? defaultYTitle : settings.yAxisTitle;
+        QString yTitle = settings.yAxisTitle;
         setAxisTitles(xTitle, yTitle);
     }
     
@@ -4400,6 +4720,10 @@ void PlotWidget::applyPlotSettings(const PlotSettings &settings)
         QFont labelFont(settings.fontFamily, settings.axisLabelFontSize);
         labelFont.setBold(settings.boldAxisLabels);
         axis->setTitleFont(labelFont);
+
+        // Axis line, ticks, and labels are always black
+        axis->setLinePen(QPen(Qt::black));
+        axis->setLabelsBrush(QBrush(Qt::black));
 
         if (auto valueAxis = qobject_cast<QValueAxis*>(axis)) {
             valueAxis->setMinorTickCount(settings.minorTickCount);
@@ -4621,14 +4945,15 @@ void PlotWidget::plotScatter(
             // Apply treatment filter
             if (trtCol && i < trtCol->data.size()) {
                 QString trt = trtCol->data.value(i).toString();
-                if (!m_currentTreatments.contains("All") && !m_currentTreatments.contains(trt)) {
-                    continue;
-                }
                 // Per-variable filter: resolve experiment for this row
                 QString rowExp = m_selectedExperiment;
                 if (excodeCol && i < excodeCol->data.size()) {
                     QString e = excodeCol->data.value(i).toString();
                     if (!e.isEmpty()) rowExp = e;
+                }
+                if (!m_currentTreatments.contains("All") && !m_currentTreatments.contains(trt)
+                    && !m_currentTreatments.contains(rowExp + "::" + trt)) {
+                    continue;
                 }
                 if (m_plotSettings.excludedSeriesKeys.contains(yVar + "::" + rowExp + "::" + trt)) {
                     continue;
@@ -4823,7 +5148,11 @@ void PlotWidget::plotScatter(
         // Set axis ranges
         xAxis->setRange(minVal, maxVal);
         yAxis->setRange(minVal, maxVal);
-        
+        xAxis->setLinePen(QPen(Qt::black));
+        yAxis->setLinePen(QPen(Qt::black));
+        xAxis->setLabelsBrush(QBrush(Qt::black));
+        yAxis->setLabelsBrush(QBrush(Qt::black));
+
         // Add axes to chart (using non-deprecated method)
         m_chart->addAxis(xAxis, Qt::AlignBottom);
         m_chart->addAxis(yAxis, Qt::AlignLeft);

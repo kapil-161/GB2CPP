@@ -683,6 +683,9 @@ void MainWindow::onYVariableChanged()
         return;
     }
 
+    // Show treatment selection panel so user can review before refreshing
+    if (m_plotWidget) m_plotWidget->showTreatmentSelection();
+
     // Show prompt message based on current tab
     if (m_tabWidget && m_tabWidget->currentIndex() == 0) {
         m_statusWidget->showInfo("Y variable selection changed. Click 'Refresh Plot' to update the time series plot");
@@ -1126,7 +1129,10 @@ void MainWindow::updateVariableComboBoxes()
     }
 
     // Variables to exclude from Y variable list (these are typically X-axis or grouping variables)
-    QStringList yVariableExclusions = {"YEAR", "RUN","CR","FILEX", "EXPERIMENT", "DAS", "DAP", "DOY", "DATE", "TRT", "CROP", "TNAME"};
+    QStringList yVariableExclusions = {"YEAR", "WYEAR", "HYEAR", "RUNNO", "RUN", "CR", "FILEX",
+                                       "EXPERIMENT", "DAS", "DAP", "DOY", "DATE", "TRT", "CROP", "TNAME",
+                                       "R#", "O#", "P#", "MODEL", "XLAT", "LONG", "ELEV", "WSTA", "FNAM",
+                                       "SOIL_ID", "EXNAME"};
 
     QStringList commonVariables;
     QStringList simOnlyVariables;
@@ -1198,8 +1204,18 @@ void MainWindow::updateVariableComboBoxes()
         }
     }
 
-    // Set default selections if available - prioritize DATE over DAP
-    if (m_currentData.columnNames.contains("DATE")) {
+    // Set default x-variable.
+    // OSU/summary files have WYEAR but no DAS/DAP — prefer WYEAR for seasonal/sequence data.
+    // Regular time-series files have DAS/DAP/DATE — prefer DATE then DAP.
+    bool isSummaryFile = m_currentData.columnNames.contains("WYEAR") &&
+                         !m_currentData.columnNames.contains("DAS") &&
+                         !m_currentData.columnNames.contains("DAP");
+    if (isSummaryFile) {
+        int index = m_xVariableComboBox->findData("WYEAR");
+        if (index != -1) {
+            m_xVariableComboBox->setCurrentIndex(index);
+        }
+    } else if (m_currentData.columnNames.contains("DATE")) {
         int index = m_xVariableComboBox->findData("DATE");
         if (index != -1) {
             m_xVariableComboBox->setCurrentIndex(index);
@@ -1222,26 +1238,64 @@ void MainWindow::updateTreatmentComboBox()
 {
     m_treatmentComboBox->clear();
     m_treatmentComboBox->addItem("All");
-    
+
+    QStringList sortedTreatments;
+
     // Look for treatment columns
     QStringList treatmentCols = {"TRT", "TRNO", "TR"};
     for (const QString &colName : treatmentCols) {
         if (m_currentData.columnNames.contains(colName)) {
             const DataColumn *col = m_currentData.getColumn(colName);
+            const DataColumn *expCol = m_currentData.getColumn("EXPERIMENT");
             if (col) {
-                QSet<QString> uniqueValues;
-                for (const QVariant &value : col->data) {
-                    if (!DataProcessor::isMissingValue(value)) {
-                        uniqueValues.insert(value.toString());
+                // Determine if multiple experiments are present
+                bool multiExp = false;
+                if (expCol) {
+                    QSet<QString> uniqueExps;
+                    for (const QVariant &v : expCol->data) {
+                        QString e = v.toString().trimmed();
+                        if (!e.isEmpty() && e != "DEFAULT") uniqueExps.insert(e);
+                    }
+                    multiExp = uniqueExps.size() > 1;
+                }
+
+                // Collect unique (exp, trt) pairs
+                struct TrtEntry { QString key, exp, trt; };
+                QList<TrtEntry> entries;
+                QSet<QString> seenKeys;
+                for (int i = 0; i < col->data.size(); ++i) {
+                    if (DataProcessor::isMissingValue(col->data[i])) continue;
+                    QString trt = col->data[i].toString();
+                    QString exp;
+                    if (expCol && i < expCol->data.size())
+                        exp = expCol->data[i].toString().trimmed();
+                    QString key = (multiExp && !exp.isEmpty()) ? (exp + "::" + trt) : trt;
+                    if (!seenKeys.contains(key)) {
+                        seenKeys.insert(key);
+                        entries.append({key, exp, trt});
                     }
                 }
-                for (const QString &value : uniqueValues) {
-                    m_treatmentComboBox->addItem(value);
+
+                // Sort by exp then trt numerically
+                std::sort(entries.begin(), entries.end(), [](const TrtEntry &a, const TrtEntry &b) {
+                    if (a.exp != b.exp) return a.exp < b.exp;
+                    bool aOk, bOk;
+                    int ai = a.trt.toInt(&aOk), bi = b.trt.toInt(&bOk);
+                    return (aOk && bOk) ? (ai < bi) : (a.trt < b.trt);
+                });
+
+                for (const TrtEntry &e : entries) {
+                    sortedTreatments.append(e.key);
+                    m_treatmentComboBox->addItem(e.key);
                 }
             }
             break;
         }
     }
+
+    // Populate the pre-plot treatment selection panel
+    if (m_plotWidget)
+        m_plotWidget->setAvailableTreatments(sortedTreatments, m_treatmentNames);
 }
 
 void MainWindow::updateScatterPlot()
@@ -1398,8 +1452,9 @@ void MainWindow::updatePlot()
     }
     
     QString yVar = yVars.first();  // Use first selected for now
-    QString treatment = m_treatmentComboBox ? m_treatmentComboBox->currentText() : "All";
-    
+
+    // Get treatment filter from the pre-plot selection panel (empty = show all)
+    QStringList treatments = m_plotWidget ? m_plotWidget->getSelectedTreatments() : QStringList();
 
     // Use PlotWidget for plotting (matches Python PyQtGraph structure)
     if (m_plotWidget) {
@@ -1409,7 +1464,7 @@ void MainWindow::updatePlot()
         for (QListWidgetItem* item : selectedItems) {
             selectedFiles.append(item->text());
         }
-        
+
         // Clear data table if no files are selected
         if (selectedFiles.isEmpty()) {
             qDebug() << "MainWindow::updatePlot() - No files selected, clearing data table";
@@ -1418,24 +1473,23 @@ void MainWindow::updatePlot()
             }
             return; // Exit early since there's no data to plot
         }
-        
-        
+
         // Debug observed data before plotting
         qDebug() << "MainWindow::updatePlot() - Observed data status:";
         qDebug() << "  Observed data rows:" << m_currentObsData.rowCount;
         qDebug() << "  Observed data columns:" << m_currentObsData.columnNames;
         qDebug() << "  X variable:" << xVar;
         qDebug() << "  Y variables:" << yVars;
-        qDebug() << "  Treatment:" << treatment;
+        qDebug() << "  Treatments filter:" << treatments;
         qDebug() << "  Selected experiment:" << m_selectedExperiment;
-        
+
         // Call the enhanced plotTimeSeries method
         m_plotWidget->plotTimeSeries(
             m_currentData,
             m_selectedFolder,
             selectedFiles,
             m_selectedExperiment,
-            QStringList() << treatment,
+            treatments,
             xVar,
             yVars,
             m_currentObsData,
@@ -1703,8 +1757,9 @@ void MainWindow::onFileSelectionChanged()
         // Clear and update variable combo boxes
         updateVariableComboBoxes();
 
-        // Clear the plot
+        // Clear the plot and treatment list (treatments come from selected outfiles)
         if (m_plotWidget) {
+            m_plotWidget->setAvailableTreatments(QStringList());
             m_plotWidget->clear();
         }
         

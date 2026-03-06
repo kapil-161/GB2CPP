@@ -15,8 +15,6 @@
 #include <QLabel>
 #include <QSlider>
 #include <QLineEdit>
-#include <QTreeWidget>
-#include <QTreeWidgetItem>
 #include <QSet>
 
 // Forward declaration
@@ -94,7 +92,6 @@ private slots:
     void onResetDefaults();
     void onPreviewSettings();
     void onExportPlot();
-    void onTreeItemChanged(QTreeWidgetItem *item, int column);
 
 private:
     void setupUI();
@@ -147,11 +144,6 @@ private:
     QSpinBox *m_legendFontSizeSpinBox;
     QCheckBox *m_boldTitleCheckBox;
     QCheckBox *m_boldAxisLabelsCheckBox;
-
-    // Treatment filter controls
-    QTreeWidget *m_treatmentTreeWidget;
-    QPushButton *m_selectAllButton;
-    QPushButton *m_deselectAllButton;
 
     // Buttons
     QPushButton *m_resetButton;
