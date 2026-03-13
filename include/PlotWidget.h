@@ -72,6 +72,11 @@ public:
     /** Draw error bars onto the given painter. Use viewportOffset when painting on full chart-view-sized pixmap (e.g. export). */
     void paintErrorBars(QPainter *painter, const QPoint &viewportOffset = QPoint(0, 0));
 
+    // Box plot median markers (red asterisks drawn via custom painter)
+    void setBoxPlotMedians(const QVector<QPointF> &medians, int nCategories, double yMin, double yMax);
+    void clearBoxPlotMedians();
+    void paintBoxPlotMedians(QPainter *painter);
+
 protected:
     void paintEvent(QPaintEvent *event) override;
 
@@ -81,6 +86,10 @@ private:
 
 private:
     QMap<QAbstractSeries*, QVector<ErrorBarData>> m_errorBars;
+    QVector<QPointF> m_boxPlotMedians;  // (category index, median value)
+    int    m_bpNCats = 0;
+    double m_bpYMin  = 0.0;
+    double m_bpYMax  = 0.0;
 };
 
 struct LegendTreatmentData {
@@ -182,6 +191,7 @@ public:
     void setPlotTitle(const QString &title);
     void setAxisTitles(const QString &xTitle, const QString &yTitle);
     void setXAxisButtonsVisible(bool visible);  // Show/hide DAS, DAP, DATE buttons
+    void setBoxPlotButtonVisible(bool visible); // Show/hide Box Plot toggle button
 
     // Treatment pre-selection panel (shown in white area before first plot)
     void setAvailableTreatments(const QStringList &treatments,
@@ -201,11 +211,16 @@ signals:
     void metricsCalculated(const QVector<QMap<QString, QVariant>> &metrics);
     void xVariableChanged(const QString &xVariable);
 
+public slots:
+    void onSettingsButtonClicked();
+
 private slots:
     void onPlotSettingsChanged();
     void onXAxisButtonClicked();
-    void onSettingsButtonClicked();
     void applyPlotSettings(const PlotSettings &settings);
+    void saveSettings() const;
+    void loadSettings();
+    void onBoxPlotButtonClicked();
 private:
     // Core plotting functions (matching Python structure)
     // DataTable loadSimulationData(const QString &selectedFolder, const QStringList &selectedOutFiles); // Removed
@@ -219,8 +234,10 @@ private:
     
     // Plotting functions
     void plotDatasets(const DataTable &simData, const DataTable &obsData,
-                     const QString &xVar, const QStringList &yVars, 
+                     const QString &xVar, const QStringList &yVars,
                      const QStringList &treatments, const QString &selectedExperiment);
+    void plotOsuBoxPlot(const DataTable &simData, const QStringList &yVars,
+                        const QStringList &treatments, const QString &selectedExperiment);
     QVector<ErrorBarData> aggregateReplicates(const QVector<QPointF> &points, const QString &xVar, double xTolerance = 0.01);
     void setupUI();
     void setupChart();
@@ -299,6 +316,8 @@ private:
     QPushButton *m_dasButton;
     QPushButton *m_dapButton;
     QPushButton *m_settingsButton;
+    QPushButton *m_boxPlotButton;
+    QPushButton *m_treatmentsButton;
     QLabel *m_scalingLabel;
 
     // Legend area
@@ -334,6 +353,7 @@ private:
     PlotSettings m_plotSettings;
     int m_maxLegendEntries;
     bool m_isScatterMode;
+    bool m_isBoxPlotMode;
     
     // Data processor reference
     DataProcessor *m_dataProcessor;

@@ -1,3 +1,4 @@
+#include <QSettings>
 #include <QSharedPointer>
 #include <QStandardPaths>
 #include <QVector>
@@ -16,6 +17,9 @@
 #include <QDebug>
 #include <QDateTime>
 #include <QtCharts/QDateTimeAxis>
+#include <QtCharts/QStackedBarSeries>
+#include <QtCharts/QBarSet>
+#include <QtCharts/QBarCategoryAxis>
 #include <QPixmap>
 #include <QPainter>
 #include <QFileInfo>
@@ -44,7 +48,59 @@ ErrorBarChartView::ErrorBarChartView(QChart *chart, QWidget *parent)
 void ErrorBarChartView::setErrorBarData(const QMap<QAbstractSeries*, QVector<ErrorBarData>> &errorBars)
 {
     m_errorBars = errorBars;
-    update();  // Trigger repaint
+    update();
+}
+
+void ErrorBarChartView::setBoxPlotMedians(const QVector<QPointF> &medians, int nCategories, double yMin, double yMax)
+{
+    m_boxPlotMedians = medians;
+    m_bpNCats = nCategories;
+    m_bpYMin  = yMin;
+    m_bpYMax  = yMax;
+    update();
+}
+
+void ErrorBarChartView::clearBoxPlotMedians()
+{
+    m_boxPlotMedians.clear();
+    m_bpNCats = 0;
+    update();
+}
+
+void ErrorBarChartView::paintBoxPlotMedians(QPainter *painter)
+{
+    if (m_boxPlotMedians.isEmpty() || m_bpNCats <= 0 || !chart()) return;
+    double yRange = m_bpYMax - m_bpYMin;
+    if (qFuzzyIsNull(yRange)) return;
+
+    painter->save();
+    painter->setRenderHint(QPainter::Antialiasing, true);
+    painter->setPen(QPen(Qt::red, 2.0));
+
+    QRectF plotArea = chart()->plotArea();
+
+    for (const QPointF &pt : m_boxPlotMedians) {
+        int catIndex = static_cast<int>(pt.x());
+        double value = pt.y();
+
+        // X: center of bar category i out of m_bpNCats
+        double x = plotArea.left() + (catIndex + 0.5) / m_bpNCats * plotArea.width();
+
+        // Y: linear map from [yMin, yMax] -> [bottom, top] of plot area
+        double yRatio = (value - m_bpYMin) / yRange;
+        double y = plotArea.top() + (1.0 - yRatio) * plotArea.height();
+
+        // Draw a 6-arm asterisk (like the DSSAT red * marker)
+        const double r = 7.0;
+        // Horizontal arm
+        painter->drawLine(QPointF(x - r, y), QPointF(x + r, y));
+        // Two diagonal arms at ±60°
+        double dx = r * 0.5;          // cos(60°) = 0.5
+        double dy = r * 0.866025;     // sin(60°) ≈ 0.866
+        painter->drawLine(QPointF(x - dx, y - dy), QPointF(x + dx, y + dy));
+        painter->drawLine(QPointF(x + dx, y - dy), QPointF(x - dx, y + dy));
+    }
+    painter->restore();
 }
 
 void ErrorBarChartView::paintErrorBars(QPainter *painter, const QPoint &viewportOffset)
@@ -144,6 +200,9 @@ void ErrorBarChartView::paintEvent(QPaintEvent *event)
 
     if (!m_errorBars.isEmpty()) {
         paintErrorBars(&painter, QPoint(0, 0));
+    }
+    if (!m_boxPlotMedians.isEmpty()) {
+        paintBoxPlotMedians(&painter);
     }
 }
 
@@ -301,6 +360,8 @@ PlotWidget::PlotWidget(QWidget *parent)
     , m_dasButton(nullptr)
     , m_dapButton(nullptr)
     , m_settingsButton(nullptr)
+    , m_boxPlotButton(nullptr)
+    , m_treatmentsButton(nullptr)
     , m_scalingLabel(nullptr)
     , m_legendScrollArea(nullptr)
     , m_legendWidget(nullptr)
@@ -311,6 +372,7 @@ PlotWidget::PlotWidget(QWidget *parent)
     , m_dataProcessor(new DataProcessor(this))
     , m_currentXVar("DAP")
     , m_isScatterMode(false)
+    , m_isBoxPlotMode(false)
 {
     qDebug() << "PlotWidget::PlotWidget() - CONSTRUCTOR CALLED";
     
@@ -337,6 +399,9 @@ PlotWidget::PlotWidget(QWidget *parent)
     connect(m_autoFitTimer, &QTimer::timeout, this, &PlotWidget::autoFitAxes);
     
     setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+
+    // Restore persisted plot settings from previous session
+    loadSettings();
 }
 
 PlotWidget::~PlotWidget()
@@ -455,16 +520,29 @@ void PlotWidget::setupUI()
     m_bottomLayout->addWidget(m_dasButton);
     m_bottomLayout->addWidget(m_dapButton);
     m_bottomLayout->addWidget(m_dateButton);
-    
-    // Add some space before settings button
-    m_bottomLayout->addSpacing(20);
-    m_bottomLayout->addWidget(m_settingsButton);
+
+    // Box Plot toggle button (visible only for OSU seasonal/summary files)
+    m_boxPlotButton = new QPushButton("Box Plot");
+    m_boxPlotButton->setCheckable(true);
+    m_boxPlotButton->setChecked(false);
+    m_boxPlotButton->setVisible(false);
+    m_boxPlotButton->setStyleSheet(buttonStyle);
+    m_bottomLayout->addSpacing(10);
+    m_bottomLayout->addWidget(m_boxPlotButton);
+
+    // Treatments button — opens treatment selection/review panel
+    m_treatmentsButton = new QPushButton("Treatments");
+    m_treatmentsButton->setStyleSheet(buttonStyle);
+    m_treatmentsButton->setToolTip("Show treatment selection panel");
+    m_bottomLayout->addSpacing(6);
+    m_bottomLayout->addWidget(m_treatmentsButton);
 
     // Connect button signals
     connect(m_dasButton, &QPushButton::clicked, this, &PlotWidget::onDasButtonClicked);
     connect(m_dapButton, &QPushButton::clicked, this, &PlotWidget::onDapButtonClicked);
     connect(m_dateButton, &QPushButton::clicked, this, &PlotWidget::onDateButtonClicked);
-    connect(m_settingsButton, &QPushButton::clicked, this, &PlotWidget::onSettingsButtonClicked);
+    connect(m_boxPlotButton, &QPushButton::clicked, this, &PlotWidget::onBoxPlotButtonClicked);
+    connect(m_treatmentsButton, &QPushButton::clicked, this, &PlotWidget::showTreatmentSelection);
     
     // Add spacer
     m_bottomLayout->addSpacing(20);
@@ -1009,10 +1087,18 @@ void PlotWidget::plotTimeSeries(
     const QMap<QString, QMap<QString, QString>> &treatmentNames)
 {
     m_isScatterMode = false;
-    
+
     // Show DAS, DAP, DATE buttons for time series plots (they're applicable)
     setXAxisButtonsVisible(true);
-    
+
+    // Show Box Plot toggle only for OSU seasonal summary files
+    {
+        bool isSummaryOsu = simData.columnNames.contains("WYEAR") &&
+                            !simData.columnNames.contains("DAS") &&
+                            !simData.columnNames.contains("DAP");
+        setBoxPlotButtonVisible(isSummaryOsu);
+    }
+
     try {
         clear();  // also resets legend stack to page 0
 
@@ -1780,9 +1866,6 @@ void PlotWidget::plotDatasets(const DataTable &simData, const DataTable &obsData
                 }
                 
                 QString trt = trtColumn->data[row].toString();
-                if (!treatments.isEmpty() && !treatments.contains("All") && !treatments.contains(trt)) {
-                    continue;
-                }
 
                 // Get experiment for this row, or use selectedExperiment as fallback
                 QString experiment = selectedExperiment;
@@ -1791,6 +1874,13 @@ void PlotWidget::plotDatasets(const DataTable &simData, const DataTable &obsData
                     if (!expFromData.isEmpty()) {
                         experiment = expFromData;
                     }
+                }
+
+                // Treatment filter: match plain trt OR compound exp::trt (same as sim loop)
+                if (!treatments.isEmpty() && !treatments.contains("All")
+                    && !treatments.contains(trt)
+                    && !treatments.contains(experiment + "::" + trt)) {
+                    continue;
                 }
 
                 // Per-variable filter: skip if this var::exp::trt is excluded
@@ -2634,8 +2724,9 @@ void PlotWidget::clearChart()
     // Clear error bars when chart is cleared
     if (m_chartView) {
         m_chartView->setErrorBarData(QMap<QAbstractSeries*, QVector<ErrorBarData>>());
+        m_chartView->clearBoxPlotMedians();
     }
-    
+
     // Clear axis labels when chart is cleared
     setAxisTitles("", "");
 }
@@ -3090,6 +3181,20 @@ void PlotWidget::setXAxisButtonsVisible(bool visible)
     if (m_dasButton) m_dasButton->setVisible(visible);
     if (m_dapButton) m_dapButton->setVisible(visible);
     if (m_dateButton) m_dateButton->setVisible(visible);
+    // Box plot button is only for OSU summary files; hide whenever x-buttons are hidden
+    if (!visible && m_boxPlotButton) m_boxPlotButton->setVisible(false);
+}
+
+void PlotWidget::setBoxPlotButtonVisible(bool visible)
+{
+    if (m_boxPlotButton) m_boxPlotButton->setVisible(visible);
+    if (!visible && m_isBoxPlotMode) {
+        m_isBoxPlotMode = false;
+        if (m_boxPlotButton) {
+            m_boxPlotButton->setChecked(false);
+            m_boxPlotButton->setText("Box Plot");
+        }
+    }
 }
 
 void PlotWidget::setPlotTitle(const QString &title)
@@ -3278,14 +3383,22 @@ void PlotWidget::updatePlotWithScaling()
     // Clear the chart first to ensure fresh plotting
     if (m_chart) {
         m_chart->removeAllSeries();
+        // Also remove axes so box plot ↔ line plot switching doesn't stack old axes
+        for (auto *axis : m_chart->axes())
+            m_chart->removeAxis(axis);
     }
-    
-    // Clear error bars when updating plot
+
+    // Clear error bars and median markers when updating plot
     if (m_chartView) {
         m_chartView->setErrorBarData(QMap<QAbstractSeries*, QVector<ErrorBarData>>());
+        m_chartView->clearBoxPlotMedians();
     }
     
-    plotDatasets(scaledSimData, scaledObsData, m_currentXVar, m_currentYVars, m_currentTreatments, m_selectedExperiment);
+    if (m_isBoxPlotMode) {
+        plotOsuBoxPlot(scaledSimData, m_currentYVars, m_currentTreatments, m_selectedExperiment);
+    } else {
+        plotDatasets(scaledSimData, scaledObsData, m_currentXVar, m_currentYVars, m_currentTreatments, m_selectedExperiment);
+    }
     qDebug() << "PlotWidget::updatePlotWithScaling() - Datasets plotted";
 
     // Update the scaling label
@@ -4425,6 +4538,287 @@ QString PlotWidget::getTreatmentDisplayName(const QString &trtId, const QString 
     return result;
 }
 
+void PlotWidget::onBoxPlotButtonClicked()
+{
+    m_isBoxPlotMode = m_boxPlotButton ? m_boxPlotButton->isChecked() : false;
+    if (m_boxPlotButton)
+        m_boxPlotButton->setText(m_isBoxPlotMode ? "Line Plot" : "Box Plot");
+    if (m_chartView) m_chartView->clearBoxPlotMedians();
+    updatePlotWithScaling();
+}
+
+// ---------------------------------------------------------------------------
+// OSU seasonal box plot
+// ---------------------------------------------------------------------------
+void PlotWidget::plotOsuBoxPlot(const DataTable &simData, const QStringList &yVars,
+                                 const QStringList &treatments, const QString &selectedExperiment)
+{
+    if (!m_chart || yVars.isEmpty()) return;
+
+    // Only one Y variable at a time for box plots (first selected)
+    const QString &yVar = yVars.first();
+
+    const DataColumn *trtColumn  = simData.getColumn("TRT");
+    const DataColumn *yColumn    = simData.getColumn(yVar);
+    const DataColumn *expColumn  = simData.getColumn("EXPERIMENT");
+    const DataColumn *tnameCol   = simData.getColumn("TNAME");
+
+    if (!trtColumn || !yColumn) {
+        qWarning() << "PlotOsuBoxPlot: missing TRT or" << yVar << "column";
+        return;
+    }
+
+    // Determine if multiple experiments or multiple crops are present
+    // (sequence OSU files have TRT=1 always but vary by CROP code)
+    const DataColumn *cropColumn = simData.getColumn("CROP");
+
+    QSet<QString> expSet, cropSet;
+    for (int row = 0; row < simData.rowCount; ++row) {
+        if (expColumn && row < expColumn->data.size()) {
+            QString e = expColumn->data[row].toString();
+            if (!e.isEmpty()) expSet.insert(e);
+        }
+        if (cropColumn && row < cropColumn->data.size()) {
+            QString c = cropColumn->data[row].toString();
+            if (!c.isEmpty()) cropSet.insert(c);
+        }
+    }
+    if (expSet.isEmpty()) expSet.insert(selectedExperiment);
+    bool multiExp  = expSet.size() > 1;
+    bool multiCrop = cropSet.size() > 1;   // sequence file: crop varies, trt is always 1
+
+    // Collect Y values keyed by a compound identifier that mirrors plotDatasets:
+    //   sequence:  crop::exp::trt   (crop is the primary differentiator)
+    //   multi-exp: exp::trt
+    //   single:    trt
+    QMap<QString, QVector<double>> trtValues;
+    QMap<QString, QString>         keyToLabel;
+
+    for (int row = 0; row < simData.rowCount; ++row) {
+        if (row >= trtColumn->data.size() || row >= yColumn->data.size()) continue;
+
+        QString trt = trtColumn->data[row].toString();
+
+        QString experiment = selectedExperiment;
+        if (expColumn && row < expColumn->data.size()) {
+            QString e = expColumn->data[row].toString();
+            if (!e.isEmpty()) experiment = e;
+        }
+
+        QString crop = "XX";
+        if (cropColumn && row < cropColumn->data.size()) {
+            QString c = cropColumn->data[row].toString();
+            if (!c.isEmpty()) crop = c;
+        }
+
+        // Treatment filter: accept plain trt OR compound exp::trt
+        // For sequence (multiCrop) the treatment panel shows trt=1 entries, so this still works
+        if (!treatments.isEmpty() && !treatments.contains("All")
+            && !treatments.contains(trt)
+            && !treatments.contains(experiment + "::" + trt)) {
+            continue;
+        }
+
+        QVariant yVal = yColumn->data[row];
+        if (DataProcessor::isMissingValue(yVal)) continue;
+        bool ok;
+        double y = yVal.toDouble(&ok);
+        if (!ok) continue;
+
+        // Build group key matching plotDatasets logic
+        QString key;
+        if (multiCrop)
+            key = crop + "::" + experiment + "::" + trt;   // sequence
+        else if (multiExp)
+            key = experiment + "::" + trt;                  // multi-experiment seasonal
+        else
+            key = trt;                                       // single experiment seasonal
+
+        trtValues[key].append(y);
+
+        if (!keyToLabel.contains(key)) {
+            QString tname;
+            if (tnameCol && row < tnameCol->data.size())
+                tname = tnameCol->data[row].toString();
+
+            if (multiCrop) {
+                // For sequence: label is the crop code (and exp if multi-exp)
+                keyToLabel[key] = multiExp
+                    ? QString("%1·%2").arg(crop, experiment)
+                    : crop;
+            } else if (multiExp) {
+                keyToLabel[key] = tname.isEmpty()
+                    ? QString("%1·%2").arg(trt, experiment)
+                    : QString("%1·%2").arg(trt, tname);
+            } else {
+                keyToLabel[key] = tname.isEmpty() ? trt
+                    : QString("%1-%2").arg(trt, tname);
+            }
+        }
+    }
+
+    if (trtValues.isEmpty()) return;
+
+    // Sort keys: crop→exp→trt for sequence, exp→trt for multi-exp, numeric trt for single
+    QStringList trtKeys = trtValues.keys();
+    std::sort(trtKeys.begin(), trtKeys.end(), [&](const QString &a, const QString &b) {
+        QStringList pa = a.split("::"), pb = b.split("::");
+        // Compare segment by segment; numeric segments compared as integers
+        int n = qMax(pa.size(), pb.size());
+        for (int i = 0; i < n; ++i) {
+            QString sa = (i < pa.size()) ? pa[i] : QString();
+            QString sb = (i < pb.size()) ? pb[i] : QString();
+            if (sa == sb) continue;
+            bool aOk, bOk;
+            int ai = sa.toInt(&aOk), bi = sb.toInt(&bOk);
+            return (aOk && bOk) ? ai < bi : sa < sb;
+        }
+        return false;
+    });
+
+    // Category labels for the bar chart x-axis
+    QStringList categories;
+    for (const QString &k : trtKeys)
+        categories.append(keyToLabel.value(k, k));
+
+    // Quantile helper
+    auto quantile = [](QVector<double> &sorted, double p) -> double {
+        int n = sorted.size();
+        if (n == 0) return 0.0;
+        if (n == 1) return sorted[0];
+        double pos = p * (n - 1);
+        int lo = static_cast<int>(pos);
+        int hi = lo + 1;
+        if (hi >= n) return sorted[n - 1];
+        return sorted[lo] + (pos - lo) * (sorted[hi] - sorted[lo]);
+    };
+
+    // Compute quartiles
+    struct BoxStats { double q0, q1, q2, q3, q4; };
+    QVector<BoxStats>  stats;
+    QVector<QPointF>   medians;   // (category index, median)
+    double globalMin =  std::numeric_limits<double>::max();
+    double globalMax = -std::numeric_limits<double>::max();
+
+    for (int i = 0; i < trtKeys.size(); ++i) {
+        QVector<double> vals = trtValues[trtKeys[i]];
+        std::sort(vals.begin(), vals.end());
+        BoxStats s;
+        s.q0 = vals.first();
+        s.q1 = quantile(vals, 0.25);
+        s.q2 = quantile(vals, 0.50);
+        s.q3 = quantile(vals, 0.75);
+        s.q4 = vals.last();
+        stats.append(s);
+        medians.append(QPointF(i, s.q2));
+        globalMin = std::min(globalMin, s.q0);
+        globalMax = std::max(globalMax, s.q4);
+    }
+
+    // Build stacked bar sets
+    // transparent base (offset from 0 to min), then green/yellow/blue bands
+    auto *baseSet  = new QBarSet("");
+    auto *lowSet   = new QBarSet("0 - 25 Perc.");
+    auto *midSet   = new QBarSet("25 - 75 Perc.");
+    auto *highSet  = new QBarSet("75 - 100 Perc.");
+
+    baseSet->setColor(Qt::transparent);
+    baseSet->setBorderColor(Qt::transparent);
+    lowSet->setColor(QColor(34, 139, 34));
+    lowSet->setBorderColor(QColor(20, 100, 20));
+    midSet->setColor(QColor(255, 210, 0));
+    midSet->setBorderColor(QColor(180, 150, 0));
+    highSet->setColor(QColor(30, 100, 200));
+    highSet->setBorderColor(QColor(20, 70, 160));
+
+    for (const BoxStats &s : stats) {
+        *baseSet  << s.q0;
+        *lowSet   << (s.q1 - s.q0);
+        *midSet   << (s.q3 - s.q1);
+        *highSet  << (s.q4 - s.q3);
+    }
+
+    auto *stackedSeries = new QStackedBarSeries();
+    stackedSeries->append(baseSet);
+    stackedSeries->append(lowSet);
+    stackedSeries->append(midSet);
+    stackedSeries->append(highSet);
+    stackedSeries->setLabelsVisible(false);
+
+    m_chart->removeAllSeries();
+
+    // Remove any axes left from a previous plot before adding bar chart axes
+    for (auto *axis : m_chart->axes())
+        m_chart->removeAxis(axis);
+
+    m_chart->addSeries(stackedSeries);
+
+    // X axis
+    auto *xAxis = new QBarCategoryAxis();
+    xAxis->setCategories(categories);
+    xAxis->setTitleText("Treatment");
+    m_chart->addAxis(xAxis, Qt::AlignBottom);
+    stackedSeries->attachAxis(xAxis);
+
+    // Y axis
+    double yPad = (globalMax - globalMin) * 0.05;
+    double yMin = globalMin - yPad;
+    double yMax = globalMax + yPad;
+
+    auto *yAxis = new QValueAxis();
+    yAxis->setMin(yMin);
+    yAxis->setMax(yMax);
+    yAxis->setTickCount(8);
+    QPair<QString, QString> varInfo = DataProcessor::getVariableInfo(yVar);
+    QString yLabel = varInfo.first.isEmpty() ? yVar : varInfo.first;
+    if (!varInfo.second.isEmpty()) yLabel += " (" + varInfo.second + ")";
+    yAxis->setTitleText(yLabel);
+    m_chart->addAxis(yAxis, Qt::AlignLeft);
+    stackedSeries->attachAxis(yAxis);
+
+    // Chart title
+    m_chart->setTitle(QString("Box Plot of %1").arg(yLabel));
+
+    // Pass median positions to custom painter
+    if (m_chartView)
+        m_chartView->setBoxPlotMedians(medians, trtKeys.size(), yMin, yMax);
+
+    // Update legend panel to show quartile key
+    clearLegend();
+    struct QLegEntry { QColor color; QString label; bool asterisk; };
+    const QVector<QLegEntry> qleg = {
+        { QColor(34, 139, 34),  "0 - 25 Perc.",  false },
+        { QColor(255, 210, 0),  "25 - 75 Perc.", false },
+        { QColor(30, 100, 200), "75 - 100 Perc.",false },
+        { Qt::red,              "50th Perc.",     true  },
+    };
+    for (const QLegEntry &e : qleg) {
+        QWidget *row = new QWidget();
+        QHBoxLayout *rl = new QHBoxLayout(row);
+        rl->setContentsMargins(4, 3, 4, 3);
+        rl->setSpacing(6);
+        if (e.asterisk) {
+            QLabel *sym = new QLabel("✱");
+            sym->setStyleSheet(QString("color: %1; font-size: 14px; font-weight: bold;").arg(e.color.name()));
+            sym->setFixedWidth(20);
+            rl->addWidget(sym);
+        } else {
+            QLabel *swatch = new QLabel();
+            swatch->setFixedSize(20, 14);
+            swatch->setStyleSheet(QString("background-color: %1; border: 1px solid #666;").arg(e.color.name()));
+            rl->addWidget(swatch);
+        }
+        QLabel *lbl = new QLabel(e.label);
+        lbl->setFont(QFont("Arial", 9));
+        rl->addWidget(lbl);
+        rl->addStretch();
+        m_legendLayout->addWidget(row);
+    }
+    m_legendLayout->addStretch();
+
+    if (m_legendStack) m_legendStack->setCurrentIndex(1);
+}
+
 // X-axis button handlers
 void PlotWidget::onDasButtonClicked()
 {
@@ -4655,6 +5049,7 @@ void PlotWidget::onSettingsButtonClicked()
 
         applyPlotSettings(newSettings);
         m_plotSettings = newSettings;
+        saveSettings();
 
         // Re-plot if filter or error bar settings changed
         bool needsReplot = (filterChanged || errorBarChanged) && m_simData.rowCount > 0;
@@ -4798,6 +5193,105 @@ void PlotWidget::applyPlotSettings(const PlotSettings &settings)
     m_plotSettings = settings;
 
     qDebug() << "PlotWidget: Plot settings applied successfully";
+}
+
+void PlotWidget::saveSettings() const
+{
+    QSettings s("DSSAT", "GB2");
+    s.beginGroup("PlotSettings");
+
+    // Grid
+    s.setValue("showGrid",       m_plotSettings.showGrid);
+    s.setValue("showMinorGrid",  m_plotSettings.showMinorGrid);
+    s.setValue("minorTickCount", m_plotSettings.minorTickCount);
+
+    // Legend
+    s.setValue("showLegend", m_plotSettings.showLegend);
+
+    // Error bars
+    s.setValue("showErrorBars", m_plotSettings.showErrorBars);
+    s.setValue("errorBarType",  m_plotSettings.errorBarType);
+
+    // Lines & markers
+    s.setValue("lineWidth",  m_plotSettings.lineWidth);
+    s.setValue("markerSize", m_plotSettings.markerSize);
+
+    // Axes
+    s.setValue("showAxisLabels",   m_plotSettings.showAxisLabels);
+    s.setValue("showAxisTitles",   m_plotSettings.showAxisTitles);
+    s.setValue("xAxisTitle",       m_plotSettings.xAxisTitle);
+    s.setValue("yAxisTitle",       m_plotSettings.yAxisTitle);
+    s.setValue("xAxisTickCount",   m_plotSettings.xAxisTickCount);
+    s.setValue("xAxisTickSpacing", m_plotSettings.xAxisTickSpacing);
+
+    // Appearance
+    s.setValue("plotTitle",        m_plotSettings.plotTitle);
+    s.setValue("backgroundColor",  m_plotSettings.backgroundColor.name());
+    s.setValue("plotAreaColor",    m_plotSettings.plotAreaColor.name());
+
+    // Export
+    s.setValue("exportWidth",  m_plotSettings.exportWidth);
+    s.setValue("exportHeight", m_plotSettings.exportHeight);
+    s.setValue("exportDpi",    m_plotSettings.exportDpi);
+
+    // Fonts
+    s.setValue("fontFamily",        m_plotSettings.fontFamily);
+    s.setValue("titleFontSize",     m_plotSettings.titleFontSize);
+    s.setValue("axisLabelFontSize", m_plotSettings.axisLabelFontSize);
+    s.setValue("axisTickFontSize",  m_plotSettings.axisTickFontSize);
+    s.setValue("legendFontSize",    m_plotSettings.legendFontSize);
+    s.setValue("boldTitle",         m_plotSettings.boldTitle);
+    s.setValue("boldAxisLabels",    m_plotSettings.boldAxisLabels);
+
+    s.endGroup();
+}
+
+void PlotWidget::loadSettings()
+{
+    QSettings s("DSSAT", "GB2");
+    if (!s.childGroups().contains("PlotSettings")) return;   // nothing saved yet
+
+    s.beginGroup("PlotSettings");
+
+    m_plotSettings.showGrid       = s.value("showGrid",       m_plotSettings.showGrid).toBool();
+    m_plotSettings.showMinorGrid  = s.value("showMinorGrid",  m_plotSettings.showMinorGrid).toBool();
+    m_plotSettings.minorTickCount = s.value("minorTickCount", m_plotSettings.minorTickCount).toInt();
+
+    m_plotSettings.showLegend = s.value("showLegend", m_plotSettings.showLegend).toBool();
+
+    m_plotSettings.showErrorBars = s.value("showErrorBars", m_plotSettings.showErrorBars).toBool();
+    m_plotSettings.errorBarType  = s.value("errorBarType",  m_plotSettings.errorBarType).toString();
+
+    m_plotSettings.lineWidth  = s.value("lineWidth",  m_plotSettings.lineWidth).toInt();
+    m_plotSettings.markerSize = s.value("markerSize", m_plotSettings.markerSize).toInt();
+
+    m_plotSettings.showAxisLabels   = s.value("showAxisLabels",   m_plotSettings.showAxisLabels).toBool();
+    m_plotSettings.showAxisTitles   = s.value("showAxisTitles",   m_plotSettings.showAxisTitles).toBool();
+    m_plotSettings.xAxisTitle       = s.value("xAxisTitle",       m_plotSettings.xAxisTitle).toString();
+    m_plotSettings.yAxisTitle       = s.value("yAxisTitle",       m_plotSettings.yAxisTitle).toString();
+    m_plotSettings.xAxisTickCount   = s.value("xAxisTickCount",   m_plotSettings.xAxisTickCount).toInt();
+    m_plotSettings.xAxisTickSpacing = s.value("xAxisTickSpacing", m_plotSettings.xAxisTickSpacing).toDouble();
+
+    m_plotSettings.plotTitle     = s.value("plotTitle",     m_plotSettings.plotTitle).toString();
+    m_plotSettings.backgroundColor = QColor(s.value("backgroundColor", m_plotSettings.backgroundColor.name()).toString());
+    m_plotSettings.plotAreaColor   = QColor(s.value("plotAreaColor",   m_plotSettings.plotAreaColor.name()).toString());
+
+    m_plotSettings.exportWidth  = s.value("exportWidth",  m_plotSettings.exportWidth).toInt();
+    m_plotSettings.exportHeight = s.value("exportHeight", m_plotSettings.exportHeight).toInt();
+    m_plotSettings.exportDpi    = s.value("exportDpi",    m_plotSettings.exportDpi).toInt();
+
+    m_plotSettings.fontFamily        = s.value("fontFamily",        m_plotSettings.fontFamily).toString();
+    m_plotSettings.titleFontSize     = s.value("titleFontSize",     m_plotSettings.titleFontSize).toInt();
+    m_plotSettings.axisLabelFontSize = s.value("axisLabelFontSize", m_plotSettings.axisLabelFontSize).toInt();
+    m_plotSettings.axisTickFontSize  = s.value("axisTickFontSize",  m_plotSettings.axisTickFontSize).toInt();
+    m_plotSettings.legendFontSize    = s.value("legendFontSize",    m_plotSettings.legendFontSize).toInt();
+    m_plotSettings.boldTitle         = s.value("boldTitle",         m_plotSettings.boldTitle).toBool();
+    m_plotSettings.boldAxisLabels    = s.value("boldAxisLabels",    m_plotSettings.boldAxisLabels).toBool();
+
+    s.endGroup();
+
+    // Apply loaded settings to the chart appearance
+    applyPlotSettings(m_plotSettings);
 }
 
 void PlotWidget::setXAxisVariable(const QString &xVar)

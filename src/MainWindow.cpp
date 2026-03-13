@@ -135,6 +135,14 @@ void MainWindow::setupMenuBar()
 
     QAction *aboutAction = helpMenu->addAction("&About");
     connect(aboutAction, &QAction::triggered, this, &MainWindow::onAbout);
+
+    // Plot Settings — direct menu entry after Help
+    QAction *plotSettingsAction = menuBar->addAction("Plot &Settings");
+    plotSettingsAction->setShortcut(QKeySequence("Ctrl+,"));
+    connect(plotSettingsAction, &QAction::triggered, this, [this]() {
+        if (m_plotWidget) m_plotWidget->onSettingsButtonClicked();
+    });
+
 }
 
 void MainWindow::setupMainWidget()
