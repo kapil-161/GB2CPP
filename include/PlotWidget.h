@@ -178,6 +178,7 @@ public:
                    const QString &treatment = QString(), const QString &plotType = "Line");
     void clear();
     void clearChart();  // Clear chart without clearing data
+    QString getPlotCSV() const;
     void exportPlot(const QString &filePath, const QString &format = "PNG");
     void exportPlot(const QString &filePath, const QString &format, int width, int height, int dpi);
     void exportPlotComposite(const QString &filePath, const QString &format, int width, int height, int dpi);
@@ -192,6 +193,7 @@ public:
     void setAxisTitles(const QString &xTitle, const QString &yTitle);
     void setXAxisButtonsVisible(bool visible);  // Show/hide DAS, DAP, DATE buttons
     void setBoxPlotButtonVisible(bool visible); // Show/hide Box Plot toggle button
+    void setPreplotPanelVisible(bool visible);  // Show/hide treatment pre-selection panel and button
 
     // Treatment pre-selection panel (shown in white area before first plot)
     void setAvailableTreatments(const QStringList &treatments,
@@ -346,6 +348,7 @@ private:
     // Plot settings
     bool m_showLegend;
     bool m_showGrid;
+    bool m_preplotPanelEnabled;
     QString m_currentPlotType;
     QVector<QColor> m_plotColors;
     QVector<QString> m_markerSymbols;

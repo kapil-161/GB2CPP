@@ -1,4 +1,5 @@
 #include <QSettings>
+#include <QTextStream>
 #include <QSharedPointer>
 #include <QStandardPaths>
 #include <QVector>
@@ -368,6 +369,7 @@ PlotWidget::PlotWidget(QWidget *parent)
     , m_legendLayout(nullptr)
     , m_showLegend(true)
     , m_showGrid(true)
+    , m_preplotPanelEnabled(true)
     , m_currentPlotType("Line")
     , m_dataProcessor(new DataProcessor(this))
     , m_currentXVar("DAP")
@@ -2750,7 +2752,7 @@ void PlotWidget::clear()
     setXAxisButtonsVisible(true);
 
     // Show treatment selection panel in legend area when plot is cleared
-    if (m_legendStack) m_legendStack->setCurrentIndex(0);
+    if (m_legendStack && m_preplotPanelEnabled) m_legendStack->setCurrentIndex(0);
 }
 
 // Optimization: Cached date parsing to avoid re-parsing same dates
@@ -2790,6 +2792,114 @@ bool PlotWidget::parseDateCached(const QString &dateStr, double &timestamp, bool
         qDebug() << "PlotWidget: Failed to parse observed DATE string:" << dateStr;
     }
     return false;
+}
+
+QString PlotWidget::getPlotCSV() const
+{
+    if (m_plotDataList.isEmpty())
+        return {};
+
+    // Collect all unique x-values (in order) across all series
+    QVector<double> xValues;
+    QSet<double> xSeen;
+    for (const auto &pd : m_plotDataList) {
+        for (const QPointF &pt : pd->points) {
+            if (!xSeen.contains(pt.x())) {
+                xSeen.insert(pt.x());
+                xValues.append(pt.x());
+            }
+        }
+    }
+    std::sort(xValues.begin(), xValues.end());
+
+    // Build column names: XVAR, CROP, EXPERIMENT, TREATMENT, <var>, <var>_OBS, ...
+    // Group series by (crop, experiment, treatment) key
+    // Columns: xVar | crop | experiment | treatment | var1_SIM | var1_OBS | var2_SIM | ...
+    // We collect unique variables from sim and obs series separately
+    QStringList simVars, obsVars;
+    for (const auto &pd : m_plotDataList) {
+        if (pd->isObserved) {
+            if (!obsVars.contains(pd->variable)) obsVars << pd->variable;
+        } else {
+            if (!simVars.contains(pd->variable)) simVars << pd->variable;
+        }
+    }
+
+    // Build header
+    QStringList header;
+    header << m_currentXVar << "CROP" << "EXPERIMENT" << "TREATMENT";
+    for (const QString &v : simVars) {
+        header << v;
+        if (obsVars.contains(v))
+            header << v + "_OBS";
+    }
+    // Append any obs-only variables
+    for (const QString &v : obsVars) {
+        if (!simVars.contains(v))
+            header << v + "_OBS";
+    }
+
+    // Collect all unique (crop, experiment, treatment) groups
+    QVector<std::tuple<QString,QString,QString>> groups;
+    QSet<QString> groupSeen;
+    for (const auto &pd : m_plotDataList) {
+        QString key = pd->crop + "|" + pd->experiment + "|" + pd->treatment;
+        if (!groupSeen.contains(key)) {
+            groupSeen.insert(key);
+            groups.append({pd->crop, pd->experiment, pd->treatment});
+        }
+    }
+
+    // Index: (crop|exp|trt|var|isObs) -> QMap<double x, double y>
+    QMap<QString, QMap<double,double>> index;
+    for (const auto &pd : m_plotDataList) {
+        QString key = pd->crop + "|" + pd->experiment + "|" + pd->treatment
+                      + "|" + pd->variable + "|" + (pd->isObserved ? "1" : "0");
+        for (const QPointF &pt : pd->points)
+            index[key][pt.x()] = pt.y();
+    }
+
+    QString csv;
+    QTextStream out(&csv);
+    out << header.join(",") << "\n";
+
+    for (const auto &[crop, exp, trt] : groups) {
+        for (double x : xValues) {
+            // Check if this group has any data at this x
+            bool hasAny = false;
+            auto checkKey = [&](const QString &v, bool obs) {
+                QString k = crop+"|"+exp+"|"+trt+"|"+v+"|"+(obs?"1":"0");
+                return index.contains(k) && index[k].contains(x);
+            };
+            for (const QString &v : simVars) if (checkKey(v,false)||checkKey(v,true)) { hasAny=true; break; }
+            if (!hasAny) for (const QString &v : obsVars) if (checkKey(v,true)) { hasAny=true; break; }
+            if (!hasAny) continue;
+
+            QStringList row;
+            row << QString::number(x) << crop << exp << trt;
+
+            for (const QString &v : simVars) {
+                QString sk = crop+"|"+exp+"|"+trt+"|"+v+"|0";
+                row << (index.contains(sk) && index[sk].contains(x)
+                        ? QString::number(index[sk][x]) : "");
+                if (obsVars.contains(v)) {
+                    QString ok = crop+"|"+exp+"|"+trt+"|"+v+"|1";
+                    row << (index.contains(ok) && index[ok].contains(x)
+                            ? QString::number(index[ok][x]) : "");
+                }
+            }
+            for (const QString &v : obsVars) {
+                if (!simVars.contains(v)) {
+                    QString ok = crop+"|"+exp+"|"+trt+"|"+v+"|1";
+                    row << (index.contains(ok) && index[ok].contains(x)
+                            ? QString::number(index[ok][x]) : "");
+                }
+            }
+            out << row.join(",") << "\n";
+        }
+    }
+
+    return csv;
 }
 
 void PlotWidget::exportPlot(const QString &filePath, const QString &format)
@@ -3195,6 +3305,13 @@ void PlotWidget::setBoxPlotButtonVisible(bool visible)
             m_boxPlotButton->setText("Box Plot");
         }
     }
+}
+
+void PlotWidget::setPreplotPanelVisible(bool visible)
+{
+    m_preplotPanelEnabled = visible;
+    if (m_treatmentsButton) m_treatmentsButton->setVisible(visible);
+    if (m_legendStack) m_legendStack->setVisible(visible);
 }
 
 void PlotWidget::setPlotTitle(const QString &title)
@@ -4951,7 +5068,7 @@ void PlotWidget::setAvailableTreatments(const QStringList &treatments,
     m_treatmentSelectList->blockSignals(false);
 
     // Switch legend area to show treatment pre-selection
-    if (m_legendStack)
+    if (m_legendStack && m_preplotPanelEnabled)
         m_legendStack->setCurrentIndex(0);
 }
 
@@ -4979,7 +5096,7 @@ QStringList PlotWidget::getSelectedTreatments() const
 void PlotWidget::showTreatmentSelection()
 {
     // Only switch if there are treatments to show
-    if (m_legendStack && m_treatmentSelectList && m_treatmentSelectList->count() > 0)
+    if (m_legendStack && m_preplotPanelEnabled && m_treatmentSelectList && m_treatmentSelectList->count() > 0)
         m_legendStack->setCurrentIndex(0);
 }
 

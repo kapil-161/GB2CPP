@@ -50,6 +50,9 @@ public:
     void setMetrics(const QVariantList& metricsData, bool isScatterPlot = false);
     void clear();
 
+public slots:
+    void copyMetrics();
+
 private slots:
     void exportMetrics();
 
@@ -60,6 +63,7 @@ private:
     QLabel* m_titleLabel;
     QLabel* m_descriptionLabel;
     QTableView* m_tableView;
+    QPushButton* m_copyButton;
     QPushButton* m_exportButton;
     
     QVariantList m_metricsData;

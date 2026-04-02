@@ -70,8 +70,10 @@ protected:
 private slots:
     void onOpenFile();
     void onSaveData();
+    void onSavePlotData();
     void onExportPlot();
     void onCopyPlot();
+    void onCopyMetrics();
     void onAbout();
     void onCDECodesReference();
     void onDataFileChanged();

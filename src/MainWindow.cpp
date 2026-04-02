@@ -109,6 +109,10 @@ void MainWindow::setupMenuBar()
     QAction *saveAction = fileMenu->addAction("&Save Data...");
     saveAction->setShortcut(QKeySequence::Save);
     connect(saveAction, &QAction::triggered, this, &MainWindow::onSaveData);
+
+    QAction *savePlotAction = fileMenu->addAction("Save &Plot Data...");
+    savePlotAction->setShortcut(QKeySequence("Ctrl+Shift+S"));
+    connect(savePlotAction, &QAction::triggered, this, &MainWindow::onSavePlotData);
     
     fileMenu->addSeparator();
     
@@ -119,7 +123,11 @@ void MainWindow::setupMenuBar()
     QAction *copyPlotAction = fileMenu->addAction("&Copy Plot");
     copyPlotAction->setShortcut(QKeySequence("Ctrl+Shift+C"));  // Use Ctrl+Shift+C to avoid conflict with standard copy
     connect(copyPlotAction, &QAction::triggered, this, &MainWindow::onCopyPlot);
-    
+
+    QAction *copyMetricsAction = fileMenu->addAction("Copy &Metrics");
+    copyMetricsAction->setShortcut(QKeySequence("Ctrl+Shift+M"));
+    connect(copyMetricsAction, &QAction::triggered, this, &MainWindow::onCopyMetrics);
+
     fileMenu->addSeparator();
 
     QAction *exitAction = fileMenu->addAction("E&xit");
@@ -417,6 +425,7 @@ void MainWindow::setupDataPanel()
     
     // Use PlotWidget for scatter plots (same widget, different mode)
     m_scatterPlotWidget = new PlotWidget();
+    m_scatterPlotWidget->setPreplotPanelVisible(false);
     scatterPlotLayout->addWidget(m_scatterPlotWidget);
     
     m_tabWidget->addTab(scatterPlotWidget, "Scatter Plot");
@@ -577,18 +586,101 @@ void MainWindow::onSaveData()
         m_statusWidget->showWarning("No data to save");
         return;
     }
-    
+
     QString fileName = QFileDialog::getSaveFileName(
         this,
         "Save Data",
         QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation),
         "CSV Files (*.csv);;Text Files (*.txt);;All Files (*)"
     );
-    
-    if (!fileName.isEmpty()) {
-        // Implement data saving logic here
-        m_statusWidget->showSuccess("Data saved successfully");
+
+    if (fileName.isEmpty())
+        return;
+
+    // Helper: write a DataTable to a file path, returns error string or empty on success
+    auto writeCSV = [](const QString &path, const DataTable &table) -> QString {
+        QFile file(path);
+        if (!file.open(QIODevice::WriteOnly | QIODevice::Text))
+            return "Failed to open file for writing: " + path;
+
+        QTextStream out(&file);
+        out << table.columnNames.join(",") << "\n";
+
+        for (int row = 0; row < table.rowCount; ++row) {
+            QStringList rowValues;
+            for (const QString &colName : table.columnNames) {
+                QString str = table.getValue(row, colName).toString();
+                if (str.contains(',') || str.contains('"') || str.contains('\n'))
+                    str = "\"" + str.replace("\"", "\"\"") + "\"";
+                rowValues << str;
+            }
+            out << rowValues.join(",") << "\n";
+        }
+        file.close();
+        return {};
+    };
+
+    // Build suffixed paths: strip extension, append suffix, re-add extension
+    QFileInfo fi(fileName);
+    QString base = fi.path() + "/" + fi.completeBaseName();
+    QString ext  = fi.suffix().isEmpty() ? "csv" : fi.suffix();
+
+    QString simPath = base + "_simulated." + ext;
+    QString obsPath = base + "_observed."  + ext;
+
+    QString simError = writeCSV(simPath, m_currentData);
+    if (!simError.isEmpty()) {
+        m_statusWidget->showError(simError);
+        return;
     }
+
+    if (m_currentObsData.rowCount > 0) {
+        QString obsError = writeCSV(obsPath, m_currentObsData);
+        if (!obsError.isEmpty()) {
+            m_statusWidget->showError(obsError);
+            return;
+        }
+        m_statusWidget->showSuccess("Saved: " + QFileInfo(simPath).fileName() +
+                                    " and " + QFileInfo(obsPath).fileName());
+    } else {
+        m_statusWidget->showSuccess("Saved: " + QFileInfo(simPath).fileName());
+    }
+}
+
+void MainWindow::onSavePlotData()
+{
+    if (!m_plotWidget) {
+        m_statusWidget->showWarning("No plot widget available");
+        return;
+    }
+
+    QString csv = m_plotWidget->getPlotCSV();
+    if (csv.isEmpty()) {
+        m_statusWidget->showWarning("No plot data to save — generate a plot first");
+        return;
+    }
+
+    QString fileName = QFileDialog::getSaveFileName(
+        this,
+        "Save Plot Data",
+        QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation),
+        "CSV Files (*.csv);;Text Files (*.txt);;All Files (*)"
+    );
+
+    if (fileName.isEmpty())
+        return;
+
+    QFile file(fileName);
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
+        m_statusWidget->showError("Failed to open file for writing: " + fileName);
+        return;
+    }
+
+    QTextStream out(&file);
+    out << csv;
+    file.close();
+
+    m_statusWidget->showSuccess("Plot data saved: " + QFileInfo(fileName).fileName());
 }
 
 void MainWindow::onExportPlot()
@@ -613,6 +705,23 @@ void MainWindow::onCopyPlot()
         m_plotWidget->copyPlotToClipboard();
         m_statusWidget->showSuccess("Plot copied to clipboard");
     }
+}
+
+void MainWindow::onCopyMetrics()
+{
+    if (m_currentMetrics.isEmpty()) {
+        showWarning("No metrics data available to copy.");
+        return;
+    }
+
+    bool isScatterPlot = (m_tabWidget && m_tabWidget->currentIndex() == 2);
+    // Use a temporary MetricsTableWidget to copy — reuses its model and copy logic
+    MetricsTableWidget *tmp = new MetricsTableWidget(this);
+    tmp->setMetrics(m_currentMetrics, isScatterPlot);
+    tmp->copyMetrics();
+    tmp->deleteLater();
+
+    m_statusWidget->showSuccess("Metrics copied to clipboard");
 }
 
 

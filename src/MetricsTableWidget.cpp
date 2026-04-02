@@ -7,6 +7,9 @@
 #include <QPushButton>
 #include <QDesktopServices>
 #include <QUrl>
+#include <QClipboard>
+#include <QApplication>
+#include <QHBoxLayout>
 
 // MetricsTableModel Implementation
 MetricsTableModel::MetricsTableModel(const QVariantList& data, bool isScatterPlot, QObject* parent)
@@ -216,6 +219,7 @@ MetricsTableWidget::MetricsTableWidget(QWidget* parent)
     , m_titleLabel(nullptr)
     , m_descriptionLabel(nullptr)
     , m_tableView(nullptr)
+    , m_copyButton(nullptr)
     , m_exportButton(nullptr)
 {
     setupUI();
@@ -243,10 +247,19 @@ void MetricsTableWidget::setupUI()
     m_tableView->verticalHeader()->setVisible(false);
     m_layout->addWidget(m_tableView);
     
-    // Export button
+    // Button row
+    QHBoxLayout* buttonLayout = new QHBoxLayout();
+    m_copyButton = new QPushButton("Copy Metrics");
+    m_copyButton->setToolTip("Copy metrics table to clipboard (tab-separated)");
+    connect(m_copyButton, &QPushButton::clicked, this, &MetricsTableWidget::copyMetrics);
+    buttonLayout->addWidget(m_copyButton);
+
     m_exportButton = new QPushButton("Export Metrics");
     connect(m_exportButton, &QPushButton::clicked, this, &MetricsTableWidget::exportMetrics);
-    m_layout->addWidget(m_exportButton);
+    buttonLayout->addWidget(m_exportButton);
+
+    buttonLayout->addStretch();
+    m_layout->addLayout(buttonLayout);
 }
 
 void MetricsTableWidget::setMetrics(const QVariantList& metricsData, bool isScatterPlot)
@@ -282,6 +295,35 @@ void MetricsTableWidget::clear()
 {
     m_metricsData.clear();
     m_tableView->setModel(nullptr);
+}
+
+void MetricsTableWidget::copyMetrics()
+{
+    MetricsTableModel* model = qobject_cast<MetricsTableModel*>(m_tableView->model());
+    if (!model || model->rowCount() == 0) {
+        qWarning() << "No metrics data to copy";
+        return;
+    }
+
+    QStringList lines;
+
+    // Header row
+    QStringList headers;
+    for (int col = 0; col < model->columnCount(); ++col) {
+        headers << model->headerData(col, Qt::Horizontal, Qt::DisplayRole).toString();
+    }
+    lines << headers.join("\t");
+
+    // Data rows
+    for (int row = 0; row < model->rowCount(); ++row) {
+        QStringList rowValues;
+        for (int col = 0; col < model->columnCount(); ++col) {
+            rowValues << model->data(model->index(row, col), Qt::DisplayRole).toString();
+        }
+        lines << rowValues.join("\t");
+    }
+
+    QApplication::clipboard()->setText(lines.join("\n"));
 }
 
 void MetricsTableWidget::exportMetrics()
