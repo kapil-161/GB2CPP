@@ -1,6 +1,43 @@
 cmake_minimum_required(VERSION 3.16)
 project(GB2_CPP VERSION 1.0.0 LANGUAGES CXX)
 
+# ---------------------------------------------------------------------------
+# Auto-version from git: commit count + short hash  →  2.0.<count>-<hash>
+# ---------------------------------------------------------------------------
+find_package(Git QUIET)
+if(Git_FOUND OR GIT_FOUND)
+    execute_process(
+        COMMAND ${GIT_EXECUTABLE} rev-list --count HEAD
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+        OUTPUT_VARIABLE GIT_COMMIT_COUNT
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+        ERROR_QUIET
+    )
+    execute_process(
+        COMMAND ${GIT_EXECUTABLE} rev-parse --short HEAD
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+        OUTPUT_VARIABLE GIT_SHORT_HASH
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+        ERROR_QUIET
+    )
+endif()
+if(NOT GIT_COMMIT_COUNT OR GIT_COMMIT_COUNT STREQUAL "")
+    set(GIT_COMMIT_COUNT "0")
+endif()
+if(NOT GIT_SHORT_HASH OR GIT_SHORT_HASH STREQUAL "")
+    set(GIT_SHORT_HASH "unknown")
+endif()
+set(GB2_VERSION "2.0.${GIT_COMMIT_COUNT}")
+set(GB2_VERSION_FULL "2.0.${GIT_COMMIT_COUNT}-${GIT_SHORT_HASH}")
+message(STATUS "GB2 version: ${GB2_VERSION_FULL}")
+
+# Write include/version_generated.h (re-generated every configure)
+configure_file(
+    ${CMAKE_SOURCE_DIR}/include/version_generated.h.in
+    ${CMAKE_SOURCE_DIR}/include/version_generated.h
+    @ONLY
+)
+
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
