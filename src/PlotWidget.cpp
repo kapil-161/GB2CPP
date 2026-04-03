@@ -52,55 +52,98 @@ void ErrorBarChartView::setErrorBarData(const QMap<QAbstractSeries*, QVector<Err
     update();
 }
 
-void ErrorBarChartView::setBoxPlotMedians(const QVector<QPointF> &medians, int nCategories, double yMin, double yMax)
+void ErrorBarChartView::setBoxPlotData(const QVector<BoxPlotStats> &stats, double yMin, double yMax)
 {
-    m_boxPlotMedians = medians;
-    m_bpNCats = nCategories;
-    m_bpYMin  = yMin;
-    m_bpYMax  = yMax;
+    m_boxStats = stats;
+    m_bpYMin   = yMin;
+    m_bpYMax   = yMax;
     update();
 }
 
 void ErrorBarChartView::clearBoxPlotMedians()
 {
-    m_boxPlotMedians.clear();
-    m_bpNCats = 0;
+    m_boxStats.clear();
     update();
 }
 
 void ErrorBarChartView::paintBoxPlotMedians(QPainter *painter)
 {
-    if (m_boxPlotMedians.isEmpty() || m_bpNCats <= 0 || !chart()) return;
+    if (m_boxStats.isEmpty() || !chart()) return;
     double yRange = m_bpYMax - m_bpYMin;
     if (qFuzzyIsNull(yRange)) return;
 
     painter->save();
     painter->setRenderHint(QPainter::Antialiasing, true);
-    painter->setPen(QPen(Qt::red, 2.0));
 
     QRectF plotArea = chart()->plotArea();
+    int nCats = m_boxStats.size();
 
-    for (const QPointF &pt : m_boxPlotMedians) {
-        int catIndex = static_cast<int>(pt.x());
-        double value = pt.y();
+    // Each category occupies an equal slot; box takes 50% of slot width
+    double slotW  = plotArea.width() / nCats;
+    double boxHalf = slotW * 0.25;   // box half-width = 50% of slot
+    double capHalf = slotW * 0.12;   // whisker cap half-width
 
-        // X: center of bar category i out of m_bpNCats
-        double x = plotArea.left() + (catIndex + 0.5) / m_bpNCats * plotArea.width();
+    auto yToPixel = [&](double val) -> double {
+        double ratio = (val - m_bpYMin) / yRange;
+        return plotArea.top() + (1.0 - ratio) * plotArea.height();
+    };
 
-        // Y: linear map from [yMin, yMax] -> [bottom, top] of plot area
-        double yRatio = (value - m_bpYMin) / yRange;
-        double y = plotArea.top() + (1.0 - yRatio) * plotArea.height();
+    const QColor boxFill(70, 130, 180, 180);     // steel blue, semi-transparent
+    const QColor boxBorder(45, 90, 130);
+    const QColor whiskerColor(60, 60, 60);
+    const QColor medianColor(255, 255, 255);
+    const QColor outlierColor(220, 60, 60);
 
-        // Draw a 6-arm asterisk (like the DSSAT red * marker)
-        const double r = 7.0;
-        // Horizontal arm
-        painter->drawLine(QPointF(x - r, y), QPointF(x + r, y));
-        // Two diagonal arms at ±60°
-        double dx = r * 0.5;          // cos(60°) = 0.5
-        double dy = r * 0.866025;     // sin(60°) ≈ 0.866
-        painter->drawLine(QPointF(x - dx, y - dy), QPointF(x + dx, y + dy));
-        painter->drawLine(QPointF(x + dx, y - dy), QPointF(x - dx, y + dy));
+    for (int i = 0; i < nCats; ++i) {
+        const BoxPlotStats &s = m_boxStats[i];
+        double cx   = plotArea.left() + (i + 0.5) * slotW;  // center x of category
+        double yQ0  = yToPixel(s.q0);
+        double yQ1  = yToPixel(s.q1);
+        double yQ2  = yToPixel(s.q2);
+        double yQ3  = yToPixel(s.q3);
+        double yQ4  = yToPixel(s.q4);
+
+        // --- Whisker: vertical spine Q0 → Q1 (lower) and Q3 → Q4 (upper) ---
+        QPen whiskerPen(whiskerColor, 1.5, Qt::SolidLine, Qt::FlatCap);
+        painter->setPen(whiskerPen);
+        painter->setBrush(Qt::NoBrush);
+
+        // Lower whisker (Q1 down to Q0)
+        painter->drawLine(QPointF(cx, yQ1), QPointF(cx, yQ0));
+        // Lower cap
+        painter->drawLine(QPointF(cx - capHalf, yQ0), QPointF(cx + capHalf, yQ0));
+
+        // Upper whisker (Q3 up to Q4)
+        painter->drawLine(QPointF(cx, yQ3), QPointF(cx, yQ4));
+        // Upper cap
+        painter->drawLine(QPointF(cx - capHalf, yQ4), QPointF(cx + capHalf, yQ4));
+
+        // --- IQR Box (Q1 to Q3) ---
+        QRectF boxRect(cx - boxHalf, yQ3, boxHalf * 2.0, yQ1 - yQ3);
+        painter->setPen(QPen(boxBorder, 1.5));
+        painter->setBrush(QBrush(boxFill));
+        painter->drawRect(boxRect);
+
+        // --- Median line ---
+        painter->setPen(QPen(medianColor, 2.5, Qt::SolidLine, Qt::FlatCap));
+        painter->drawLine(QPointF(cx - boxHalf, yQ2), QPointF(cx + boxHalf, yQ2));
+
+        // --- Outlier dot: if n=1 (all quartiles equal), show as single point ---
+        if (qFuzzyCompare(s.q0, s.q4)) {
+            painter->setPen(QPen(outlierColor, 1.0));
+            painter->setBrush(QBrush(outlierColor));
+            painter->drawEllipse(QPointF(cx, yQ2), 4.0, 4.0);
+        }
+
+        // --- X category label centered below the plot area ---
+        if (!s.label.isEmpty()) {
+            painter->setPen(QPen(QColor(60, 60, 60)));
+            painter->setFont(QFont("Arial", 9));
+            QRectF labelRect(cx - slotW * 0.5, plotArea.bottom() + 4, slotW, 32);
+            painter->drawText(labelRect, Qt::AlignHCenter | Qt::AlignTop, s.label);
+        }
     }
+
     painter->restore();
 }
 
@@ -202,7 +245,7 @@ void ErrorBarChartView::paintEvent(QPaintEvent *event)
     if (!m_errorBars.isEmpty()) {
         paintErrorBars(&painter, QPoint(0, 0));
     }
-    if (!m_boxPlotMedians.isEmpty()) {
+    if (!m_boxStats.isEmpty()) {
         paintBoxPlotMedians(&painter);
     }
 }
@@ -4608,9 +4651,9 @@ QString PlotWidget::getTreatmentDisplayName(const QString &trtId, const QString 
         tname = m_treatmentNames["default"].value(trtId);
     }
     
-    // Final fallback
+    // If no name found, use treatment number only
     if (tname.isEmpty()) {
-        tname = QString("Treatment %1").arg(trtId);
+        tname = trtId;
     }
     
     // Detect multiple crops by checking current plot data
@@ -4812,8 +4855,7 @@ void PlotWidget::plotOsuBoxPlot(const DataTable &simData, const QStringList &yVa
 
     // Compute quartiles
     struct BoxStats { double q0, q1, q2, q3, q4; };
-    QVector<BoxStats>  stats;
-    QVector<QPointF>   medians;   // (category index, median)
+    QVector<BoxStats> stats;
     double globalMin =  std::numeric_limits<double>::max();
     double globalMax = -std::numeric_limits<double>::max();
 
@@ -4827,106 +4869,116 @@ void PlotWidget::plotOsuBoxPlot(const DataTable &simData, const QStringList &yVa
         s.q3 = quantile(vals, 0.75);
         s.q4 = vals.last();
         stats.append(s);
-        medians.append(QPointF(i, s.q2));
         globalMin = std::min(globalMin, s.q0);
         globalMax = std::max(globalMax, s.q4);
     }
 
-    // Build stacked bar sets
-    // transparent base (offset from 0 to min), then green/yellow/blue bands
-    auto *baseSet  = new QBarSet("");
-    auto *lowSet   = new QBarSet("0 - 25 Perc.");
-    auto *midSet   = new QBarSet("25 - 75 Perc.");
-    auto *highSet  = new QBarSet("75 - 100 Perc.");
-
-    baseSet->setColor(Qt::transparent);
-    baseSet->setBorderColor(Qt::transparent);
-    lowSet->setColor(QColor(34, 139, 34));
-    lowSet->setBorderColor(QColor(20, 100, 20));
-    midSet->setColor(QColor(255, 210, 0));
-    midSet->setBorderColor(QColor(180, 150, 0));
-    highSet->setColor(QColor(30, 100, 200));
-    highSet->setBorderColor(QColor(20, 70, 160));
-
-    for (const BoxStats &s : stats) {
-        *baseSet  << s.q0;
-        *lowSet   << (s.q1 - s.q0);
-        *midSet   << (s.q3 - s.q1);
-        *highSet  << (s.q4 - s.q3);
-    }
-
-    auto *stackedSeries = new QStackedBarSeries();
-    stackedSeries->append(baseSet);
-    stackedSeries->append(lowSet);
-    stackedSeries->append(midSet);
-    stackedSeries->append(highSet);
-    stackedSeries->setLabelsVisible(false);
-
     m_chart->removeAllSeries();
-
-    // Remove any axes left from a previous plot before adding bar chart axes
     for (auto *axis : m_chart->axes())
         m_chart->removeAxis(axis);
 
-    m_chart->addSeries(stackedSeries);
+    // Use an invisible scatter series as axis anchor (Qt Charts needs ≥1 series on axes)
+    auto *dummySeries = new QScatterSeries();
+    dummySeries->setOpacity(0.0);
+    // X range: 0..nCats so each category occupies exactly one unit, no padding
+    dummySeries->append(0, globalMin);
+    dummySeries->append(trtKeys.size(), globalMax);
+    m_chart->addSeries(dummySeries);
 
-    // X axis
-    auto *xAxis = new QBarCategoryAxis();
-    xAxis->setCategories(categories);
+    // X axis — value axis so we control slot positions precisely (no QBarCategoryAxis padding)
+    auto *xAxis = new QValueAxis();
+    xAxis->setRange(0, trtKeys.size());
+    xAxis->setTickCount(trtKeys.size() + 1);
+    xAxis->setLabelsVisible(false);     // hide numeric labels — painter draws category names
+    xAxis->setGridLineVisible(false);
+    xAxis->setMinorGridLineVisible(false);
     xAxis->setTitleText("Treatment");
+    xAxis->setLinePen(QPen(QColor(180, 180, 180)));
+    xAxis->setLabelsFont(QFont("Arial", 9));
+    xAxis->setTitleFont(QFont("Arial", 9, QFont::Bold));
     m_chart->addAxis(xAxis, Qt::AlignBottom);
-    stackedSeries->attachAxis(xAxis);
 
     // Y axis
-    double yPad = (globalMax - globalMin) * 0.05;
-    double yMin = globalMin - yPad;
+    double yPad = (globalMax - globalMin) * 0.08;
+    double yMin = (globalMin >= 0.0) ? 0.0 : globalMin - yPad;
     double yMax = globalMax + yPad;
+
+    double tickInterval = calculateNiceYInterval(yMax);
+    double alignedMax   = std::ceil(yMax / tickInterval) * tickInterval;
+    if (alignedMax <= globalMax) alignedMax += tickInterval;
 
     auto *yAxis = new QValueAxis();
     yAxis->setMin(yMin);
-    yAxis->setMax(yMax);
-    yAxis->setTickCount(8);
+    yAxis->setMax(alignedMax);
+    yAxis->setTickInterval(tickInterval);
+    int tickCount = qRound(alignedMax / tickInterval) + 1;
+    if (tickCount < 8) tickCount = 8;
+    yAxis->setTickCount(tickCount);
+    yAxis->setLabelFormat("%.0f");
+    yAxis->setGridLineColor(QColor(220, 220, 220));
+    yAxis->setGridLineVisible(true);
+    yAxis->setMinorGridLineVisible(false);
+    yAxis->setLinePen(QPen(QColor(180, 180, 180)));
+    yAxis->setLabelsFont(QFont("Arial", 9));
+    m_chart->addAxis(yAxis, Qt::AlignLeft);
+
+    dummySeries->attachAxis(xAxis);
+    dummySeries->attachAxis(yAxis);
+
+    // Chart title
     QPair<QString, QString> varInfo = DataProcessor::getVariableInfo(yVar);
     QString yLabel = varInfo.first.isEmpty() ? yVar : varInfo.first;
     if (!varInfo.second.isEmpty()) yLabel += " (" + varInfo.second + ")";
-    yAxis->setTitleText(yLabel);
-    m_chart->addAxis(yAxis, Qt::AlignLeft);
-    stackedSeries->attachAxis(yAxis);
+    m_chart->setTitle("");
+    // Extra bottom margin so painter-drawn category labels aren't clipped by the widget edge
+    m_chart->setMargins(QMargins(0, 0, 0, 20));
 
-    // Chart title
-    m_chart->setTitle(QString("Box Plot of %1").arg(yLabel));
-
-    // Pass median positions to custom painter
+    // Build painter stats vector
+    QVector<ErrorBarChartView::BoxPlotStats> bpStats;
+    for (int i = 0; i < trtKeys.size(); ++i) {
+        ErrorBarChartView::BoxPlotStats bp;
+        bp.q0    = stats[i].q0;
+        bp.q1    = stats[i].q1;
+        bp.q2    = stats[i].q2;
+        bp.q3    = stats[i].q3;
+        bp.q4    = stats[i].q4;
+        bp.label = categories[i];
+        bpStats.append(bp);
+    }
     if (m_chartView)
-        m_chartView->setBoxPlotMedians(medians, trtKeys.size(), yMin, yMax);
+        m_chartView->setBoxPlotData(bpStats, yMin, alignedMax);
 
-    // Update legend panel to show quartile key
+    // Legend panel
     clearLegend();
-    struct QLegEntry { QColor color; QString label; bool asterisk; };
-    const QVector<QLegEntry> qleg = {
-        { QColor(34, 139, 34),  "0 - 25 Perc.",  false },
-        { QColor(255, 210, 0),  "25 - 75 Perc.", false },
-        { QColor(30, 100, 200), "75 - 100 Perc.",false },
-        { Qt::red,              "50th Perc.",     true  },
+    QLabel *legHeader = new QLabel("Box Plot Key");
+    legHeader->setStyleSheet("font-size: 10px; font-weight: bold; color: #444; "
+                             "padding: 4px 0px 4px 4px; border-bottom: 1px solid #ddd;");
+    m_legendLayout->addWidget(legHeader);
+
+    struct LegRow { QString css; QString label; };
+    const QColor boxFill(70, 130, 180, 180);
+    const QColor boxBorder(45, 90, 130);
+    const QVector<LegRow> rows = {
+        { QString("background:#3c3c3c; border:none; min-height:2px; max-height:2px;"), "Whisker (Min/Max)" },
+        { QString("background-color:rgba(%1,%2,%3,%4); border:1px solid %5;")
+              .arg(boxFill.red()).arg(boxFill.green()).arg(boxFill.blue()).arg(boxFill.alpha())
+              .arg(boxBorder.name()),                                                   "IQR Box (25–75%)" },
+        { QString("background:white; border:2px solid #2d5a82; min-height:2px; max-height:2px;"), "Median" },
+        { QString("background:#dc3c3c; border-radius:3px; min-width:6px; max-width:6px; "
+                  "min-height:6px; max-height:6px;"),                                  "Single data point" },
     };
-    for (const QLegEntry &e : qleg) {
+    for (const LegRow &r : rows) {
         QWidget *row = new QWidget();
         QHBoxLayout *rl = new QHBoxLayout(row);
-        rl->setContentsMargins(4, 3, 4, 3);
-        rl->setSpacing(6);
-        if (e.asterisk) {
-            QLabel *sym = new QLabel("✱");
-            sym->setStyleSheet(QString("color: %1; font-size: 14px; font-weight: bold;").arg(e.color.name()));
-            sym->setFixedWidth(20);
-            rl->addWidget(sym);
-        } else {
-            QLabel *swatch = new QLabel();
-            swatch->setFixedSize(20, 14);
-            swatch->setStyleSheet(QString("background-color: %1; border: 1px solid #666;").arg(e.color.name()));
-            rl->addWidget(swatch);
-        }
-        QLabel *lbl = new QLabel(e.label);
+        rl->setContentsMargins(4, 4, 4, 4);
+        rl->setSpacing(8);
+        QLabel *sw = new QLabel();
+        sw->setFixedSize(22, 14);
+        sw->setStyleSheet(r.css);
+        rl->addWidget(sw);
+        QLabel *lbl = new QLabel(r.label);
         lbl->setFont(QFont("Arial", 9));
+        lbl->setStyleSheet("color:#333;");
         rl->addWidget(lbl);
         rl->addStretch();
         m_legendLayout->addWidget(row);
@@ -5684,81 +5736,92 @@ void PlotWidget::plotScatter(
         QPen refPen(Qt::black, 2, Qt::DashLine);
         referenceLine->setPen(refPen);
         
-        // Find min and max values for reference line
-        double minVal = std::numeric_limits<double>::max();
-        double maxVal = std::numeric_limits<double>::lowest();
-        
+        // Find min/max independently for X (measured) and Y (simulated)
+        double xMinData = std::numeric_limits<double>::max();
+        double xMaxData = std::numeric_limits<double>::lowest();
+        double yMinData = std::numeric_limits<double>::max();
+        double yMaxData = std::numeric_limits<double>::lowest();
         for (const QPointF &point : allPoints) {
-            minVal = qMin(minVal, qMin(point.x(), point.y()));
-            maxVal = qMax(maxVal, qMax(point.x(), point.y()));
+            xMinData = qMin(xMinData, point.x());
+            xMaxData = qMax(xMaxData, point.x());
+            yMinData = qMin(yMinData, point.y());
+            yMaxData = qMax(yMaxData, point.y());
         }
-        
-        // Handle case where all values are the same (or very close)
-        double range = maxVal - minVal;
-        double padding;
-        if (range < 1e-10) {
-            // All points are at the same location - create a visible range around the value
-            double center = minVal; // minVal == maxVal in this case
-            if (qAbs(center) < 1e-10) {
-                // Value is near zero, use a small range around zero
-                minVal = -1.0;
-                maxVal = 1.0;
-            } else {
-                // Use 5% of the absolute value as padding (smaller padding for better visibility)
-                padding = qAbs(center) * 0.05;
-                if (padding < 1.0) {
-                    padding = 1.0; // Minimum 1 unit padding
-                }
-                minVal = center - padding;
-                maxVal = center + padding;
-            }
-        } else {
-            // Normal case - add padding
-            padding = range * 0.1;
-            minVal -= padding;
-            maxVal += padding;
-        }
-        
-        referenceLine->append(minVal, minVal);
-        referenceLine->append(maxVal, maxVal);
+
+        // Helper: compute nice axis bounds (floor/ceil to multiples of 5*10^n), never below 0
+        // outFormat receives a label format string suited to the step size
+        auto niceAxis = [](double dataMin, double dataMax, double &outMin, double &outMax, int &outTicks, QString &outFormat) {
+            // Add 5% padding, with a minimum absolute pad so tiny ranges still get breathing room
+            double range = dataMax - dataMin;
+            double pad = qMax(range * 0.05, range > 0 ? range * 0.05 : 1.0);
+            if (range < 1.0) pad = qMax(pad, 1.0); // at least 1 unit pad for near-constant data
+            dataMin -= pad;
+            dataMax += pad;
+            dataMin = qMax(0.0, dataMin); // clamp: no negative axis
+            if (dataMax <= dataMin) dataMax = dataMin + 1.0;
+            double rawRange = dataMax - dataMin;
+            double roughStep = rawRange / 5.0;
+            if (roughStep <= 0) roughStep = 1.0;
+            double mag = qPow(10.0, qFloor(std::log10(roughStep)));
+            double norm = roughStep / mag;
+            double step;
+            if      (norm < 3.5) step = 5.0 * mag;
+            else if (norm < 7.5) step = 5.0 * mag;
+            else                 step = 10.0 * mag;
+            // Ensure step is at least 1 for integer-valued data to avoid duplicate labels
+            if (step < 1.0) step = 1.0;
+            outMin = qFloor(dataMin / step) * step;
+            outMin = qMax(0.0, outMin);               // never go below zero
+            outMax = qCeil(dataMax  / step) * step;
+            if (outMax <= outMin) outMax = outMin + step;
+            outTicks = qRound((outMax - outMin) / step) + 1;
+            outFormat = (step < 1.0) ? "%.1f" : "%.0f";
+        };
+
+        double xNiceMin, xNiceMax, yNiceMin, yNiceMax;
+        int xTicks, yTicks;
+        QString xLabelFormat, yLabelFormat;
+        niceAxis(xMinData, xMaxData, xNiceMin, xNiceMax, xTicks, xLabelFormat);
+        niceAxis(yMinData, yMaxData, yNiceMin, yNiceMax, yTicks, yLabelFormat);
+
+        // 1:1 reference line spans the union of both axes so it always crosses the plot area
+        double refMin = qMin(xNiceMin, yNiceMin);
+        double refMax = qMax(xNiceMax, yNiceMax);
+        referenceLine->append(refMin, refMin);
+        referenceLine->append(refMax, refMax);
         m_chart->addSeries(referenceLine);
-        
-        qDebug() << "PlotWidget::plotScatter() - Axis range: min=" << minVal << "max=" << maxVal;
-        
+
+        qDebug() << "PlotWidget::plotScatter() - X range:" << xNiceMin << xNiceMax
+                 << "Y range:" << yNiceMin << yNiceMax;
+
         // Setup axes
         QValueAxis *xAxis = new QValueAxis();
         QValueAxis *yAxis = new QValueAxis();
-        
+
         // Extract base variable name for X axis (remove trailing 'm')
         QString baseXVarName = xVar;
-        if (baseXVarName.endsWith("m", Qt::CaseInsensitive)) {
-            baseXVarName.chop(1); // Remove the last character ('m')
-        }
-        
-        // Try to get full name: first try base name (uppercase), then original variable name
+        if (baseXVarName.endsWith("m", Qt::CaseInsensitive))
+            baseXVarName.chop(1);
+
         QPair<QString, QString> baseXVarInfo = DataProcessor::getVariableInfo(baseXVarName.toUpper());
         QString xTitle;
         if (!baseXVarInfo.first.isEmpty()) {
             xTitle = baseXVarInfo.first;
         } else {
-            // Try original variable name (uppercase)
             QPair<QString, QString> origXVarInfo = DataProcessor::getVariableInfo(xVar.toUpper());
-            if (!origXVarInfo.first.isEmpty()) {
-                xTitle = origXVarInfo.first;
-            } else {
-                // Fallback to base name if no info found
-                xTitle = baseXVarName;
-            }
+            xTitle = origXVarInfo.first.isEmpty() ? baseXVarName : origXVarInfo.first;
         }
         // yTitle already declared above (using base variable name)
-        
-        // Add "(measured)" to X-axis and "(simulated)" to Y-axis for scatter plots
+
         xAxis->setTitleText(xTitle + " (measured)");
         yAxis->setTitleText(yTitle + " (simulated)");
-        
-        // Set axis ranges
-        xAxis->setRange(minVal, maxVal);
-        yAxis->setRange(minVal, maxVal);
+
+        xAxis->setRange(xNiceMin, xNiceMax);
+        yAxis->setRange(yNiceMin, yNiceMax);
+        xAxis->setTickCount(xTicks);
+        yAxis->setTickCount(yTicks);
+        xAxis->setLabelFormat(xLabelFormat);
+        yAxis->setLabelFormat(yLabelFormat);
         xAxis->setLinePen(QPen(Qt::black));
         yAxis->setLinePen(QPen(Qt::black));
         xAxis->setLabelsBrush(QBrush(Qt::black));

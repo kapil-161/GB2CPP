@@ -701,8 +701,10 @@ void MainWindow::onExportPlot()
 
 void MainWindow::onCopyPlot()
 {
-    if (m_plotWidget) {
-        m_plotWidget->copyPlotToClipboard();
+    bool isScatterTab = (m_tabWidget && m_tabWidget->currentIndex() == 2);
+    PlotWidget *activeWidget = (isScatterTab && m_scatterPlotWidget) ? m_scatterPlotWidget : m_plotWidget;
+    if (activeWidget) {
+        activeWidget->copyPlotToClipboard();
         m_statusWidget->showSuccess("Plot copied to clipboard");
     }
 }
@@ -1649,9 +1651,9 @@ void MainWindow::checkAndAutoSwitchToScatterPlot(bool autoPlot)
         return; // Variables not selected yet, wait
     }
     
-    // Check if data is loaded
-    if (m_currentData.rowCount == 0) {
-        return; // Data not loaded yet
+    // Check if EVALUATE data is loaded (not m_currentData which is time-series only)
+    if (m_evaluateData.rowCount == 0) {
+        return; // EVALUATE.OUT data not loaded yet
     }
     
     // All conditions met: switch to scatter plot tab
@@ -1939,9 +1941,9 @@ void MainWindow::onFileSelectionChanged()
                 }
                 qDebug() << "MainWindow: Selected simulated file path:" << filePath;
                 
-                // Check if THIS specific file is EVALUATE.OUT (not just the first one)
+                // Check if THIS specific file is EVALUATE.OUT or evaluate.csv
                 QString upperFileName = selectedFile.toUpper();
-                bool isEvaluateFile = upperFileName.contains("EVALUATE") || upperFileName == "EVALUATE.OUT";
+                bool isEvaluateFile = upperFileName.contains("EVALUATE");
                 if (isEvaluateFile) {
                     hasEvaluateFile = true;
                 } else {
@@ -1951,13 +1953,13 @@ void MainWindow::onFileSelectionChanged()
                     }
                 }
                 qDebug() << "MainWindow::onFileSelectionChanged() - File" << selectedFile << "is EVALUATE:" << isEvaluateFile;
-                
+
                 // Load data from current file using appropriate reader
                 DataTable fileData;
                 bool readSuccess = false;
                 if (isEvaluateFile) {
-                    // Use readEvaluateFile for EVALUATE.OUT files
-                    readSuccess = m_dataProcessor->readEvaluateFile(filePath, fileData);
+                    // readFile dispatches .OUT to readEvaluateFile and .csv to readCsvFile
+                    readSuccess = m_dataProcessor->readFile(filePath, fileData);
                 } else {
                     readSuccess = m_dataProcessor->readFile(filePath, fileData);
                 }

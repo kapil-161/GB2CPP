@@ -148,6 +148,8 @@ bool DataProcessor::readFile(const QString &filePath, DataTable &table)
     // Route to appropriate reader based on extension (matching Python logic)
     if (extension == "OSU") {
         return readOsuFile(filePath, table);
+    } else if (extension == "CSV") {
+        return readCsvFile(filePath, table);
     } else if (extension.startsWith("O")) {  // .OUT, .OPT, .OVT, etc.
         return readOutFile(filePath, table);
     } else {
@@ -455,6 +457,262 @@ bool DataProcessor::readOutFile(const QString &filePath, DataTable &table)
         emit errorOccurred("Unknown error parsing file");
         return false;
     }
+}
+
+bool DataProcessor::readCsvFile(const QString &filePath, DataTable &table)
+{
+    qDebug() << "DataProcessor::readCsvFile() called with:" << filePath;
+
+    QFile file(filePath);
+    if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        emit errorOccurred(QString("Cannot open file: %1").arg(filePath));
+        return false;
+    }
+
+    QTextStream in(&file);
+    in.setEncoding(QStringConverter::Utf8);
+
+    // Read header line
+    if (in.atEnd()) {
+        emit errorOccurred(QString("CSV file is empty: %1").arg(filePath));
+        return false;
+    }
+    QString headerLine = in.readLine().trimmed();
+    QStringList headers = headerLine.split(',');
+    for (QString &h : headers) h = h.trimmed();
+
+    if (headers.isEmpty()) {
+        emit errorOccurred(QString("CSV file has no columns: %1").arg(filePath));
+        return false;
+    }
+
+    table.clear();
+    table.tableName = QFileInfo(filePath).baseName();
+
+    // Normalize column names to match internal conventions
+    // EXP -> EXPERIMENT, TRTNUM -> TRT
+    QStringList normalizedHeaders;
+    for (const QString &h : headers) {
+        if (h.toUpper() == "EXP")    normalizedHeaders << "EXPERIMENT";
+        else if (h.toUpper() == "TRTNUM" || h.toUpper() == "TRNO") normalizedHeaders << "TRT";
+        else normalizedHeaders << h.toUpper();
+    }
+
+    // Add columns
+    for (const QString &col : normalizedHeaders) {
+        DataColumn dc(col);
+        table.addColumn(dc);
+    }
+
+    // Do NOT add a CROP column here — MainWindow derives it from the folder name
+    // (e.g. "Wheat" -> "WH") and adds it after loading, ensuring it matches observed data.
+
+    // Read data rows
+    while (!in.atEnd()) {
+        QString line = in.readLine().trimmed();
+        if (line.isEmpty()) continue;
+        QStringList fields = line.split(',');
+
+        // Columns that must be stored as integer strings to match the rest of the codebase
+        static const QStringList intStringCols = {"TRT", "RUN", "TRTNUM", "ROTNUM", "REPNO", "ON", "REP", "CN"};
+
+        QVector<QVariant> rowData;
+        for (int i = 0; i < normalizedHeaders.size(); ++i) {
+            QString val = (i < fields.size()) ? fields[i].trimmed() : QString();
+            if (val.isEmpty() || val == "99" || val == "99.0") {
+                rowData << QVariant();
+            } else {
+                bool ok;
+                double d = val.toDouble(&ok);
+                QVariant v = ok ? QVariant(d) : QVariant(val);
+                if (isMissingValue(v)) {
+                    rowData << QVariant();
+                } else if (ok && intStringCols.contains(normalizedHeaders[i])) {
+                    // Store as integer string so treatment filter "1" matches, not "1.0"
+                    rowData << QVariant(QString::number(static_cast<int>(d)));
+                } else {
+                    rowData << v;
+                }
+            }
+        }
+
+        table.addRow(rowData);
+    }
+    file.close();
+
+    if (table.rowCount == 0) {
+        emit errorOccurred(QString("CSV file has no data rows: %1").arg(filePath));
+        return false;
+    }
+
+    // Build DATE column from YEAR + DOY if both present and DATE not already there
+    if (!table.columnNames.contains("DATE") &&
+        table.columnNames.contains("YEAR") &&
+        table.columnNames.contains("DOY")) {
+        DataColumn dateCol("DATE");
+        for (int r = 0; r < table.rowCount; ++r) {
+            QVariant yearVar = table.getValue(r, "YEAR");
+            QVariant doyVar  = table.getValue(r, "DOY");
+            bool oy, od;
+            int year = yearVar.toInt(&oy);
+            int doy  = doyVar.toInt(&od);
+            if (oy && od) {
+                QDateTime dt = convertYearDOYToDate(year, doy);
+                dateCol.data << QVariant(dt.isValid() ? dt.toString("yyyy-MM-dd") : QString());
+            } else {
+                dateCol.data << QVariant();
+            }
+        }
+        dateCol.dataType = "string";
+        table.addColumn(dateCol);
+    }
+
+    // Normalize EXPERIMENT column: CSV EXP values like "KSAS8101WH" include the crop code suffix,
+    // but .OUT files (and observed data filenames) use just the 8-char base code "KSAS8101".
+    // Truncate to 8 characters to match observed data lookup.
+    if (table.columnNames.contains("EXPERIMENT")) {
+        DataColumn *expCol = table.getColumn("EXPERIMENT");
+        if (expCol) {
+            for (auto &val : expCol->data) {
+                QString s = val.toString();
+                if (s.length() > 8)
+                    val = QVariant(s.left(8));
+            }
+        }
+    }
+
+    // Add TNAME column by reading treatment names from the experiment X file.
+    if (!table.columnNames.contains("TNAME") && table.columnNames.contains("TRT")) {
+        QMap<QString, QString> trtNames; // trtNum -> name from X file
+
+        QString csvDir = QFileInfo(filePath).absolutePath();
+        QSet<QString> expCodes;
+        if (table.columnNames.contains("EXPERIMENT")) {
+            const DataColumn *expCol = table.getColumn("EXPERIMENT");
+            for (const QVariant &v : expCol->data) {
+                QString s = v.toString().trimmed();
+                if (!s.isEmpty()) expCodes.insert(s);
+            }
+        }
+
+        qDebug() << "readCsvFile TNAME lookup: csvDir=" << csvDir << "expCodes=" << expCodes;
+        // Search for {expCode}.??X files in the CSV directory, then all DSSAT crop dirs
+        for (const QString &expCode : expCodes) {
+            QDir dir(csvDir);
+            // Match e.g. "KSAS8101.WHX" — extension ends with X, base name matches expCode
+            auto findXFiles = [](const QDir &d, const QString &expCode) {
+                QStringList all = d.entryList(QDir::Files);
+                QStringList result;
+                for (const QString &f : all) {
+                    QFileInfo fi(f);
+                    if (fi.baseName().compare(expCode, Qt::CaseInsensitive) == 0 &&
+                        fi.suffix().toUpper().endsWith('X'))
+                        result << f;
+                }
+                return result;
+            };
+
+            QStringList xFiles = findXFiles(dir, expCode);
+            qDebug() << "readCsvFile TNAME lookup: expCode=" << expCode << "xFiles in csvDir=" << xFiles;
+            if (xFiles.isEmpty()) {
+                QString dssatBase = getDSSATBase();
+                if (!dssatBase.isEmpty()) {
+                    for (const QString &cropDir : QDir(dssatBase).entryList(QDir::Dirs | QDir::NoDotAndDotDot)) {
+                        QDir cd(dssatBase + "/" + cropDir);
+                        QStringList found = findXFiles(cd, expCode);
+                        if (!found.isEmpty()) {
+                            csvDir = cd.absolutePath();
+                            xFiles = found;
+                            break;
+                        }
+                    }
+                }
+            }
+            for (const QString &xFile : xFiles) {
+                QMap<QString, QString> names = readTreatmentNamesFromXFile(QDir(csvDir).absoluteFilePath(xFile));
+                for (auto it = names.begin(); it != names.end(); ++it)
+                    trtNames.insert(it.key(), it.value());
+                if (!trtNames.isEmpty()) break;
+            }
+            if (!trtNames.isEmpty()) break;
+        }
+
+        if (trtNames.isEmpty()) {
+            emit errorOccurred(QString("Could not find experiment X file for CSV: %1. Treatment names unavailable.").arg(QFileInfo(filePath).fileName()));
+        }
+
+        DataColumn tnameCol("TNAME");
+        const DataColumn *trtCol = table.getColumn("TRT");
+        for (int r = 0; r < table.rowCount; ++r) {
+            QString trt = trtCol->data[r].toString();
+            if (trt.isEmpty()) {
+                tnameCol.data << QVariant();
+            } else if (trtNames.contains(trt)) {
+                tnameCol.data << QVariant(trtNames[trt]);
+            } else {
+                tnameCol.data << QVariant(trt); // just the number if not found in X file
+            }
+        }
+        tnameCol.dataType = "string";
+        table.addColumn(tnameCol);
+    }
+
+    standardizeDataTypes(table);
+
+    qDebug() << "DataProcessor::readCsvFile() completed:"
+             << table.rowCount << "rows," << table.columnNames.size() << "columns";
+    return true;
+}
+
+QMap<QString, QString> DataProcessor::readTreatmentNamesFromXFile(const QString &xFilePath)
+{
+    QMap<QString, QString> trtNames; // trtNum (string) -> TNAME
+    QFile file(xFilePath);
+    if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        qDebug() << "DataProcessor::readTreatmentNamesFromXFile: cannot open" << xFilePath;
+        return trtNames;
+    }
+
+    QTextStream in(&file);
+    bool inTreatmentSection = false;
+
+    while (!in.atEnd()) {
+        QString line = in.readLine();
+        QString trimmed = line.trimmed();
+
+        if (trimmed.isEmpty() || trimmed.startsWith('!'))
+            continue;
+
+        // Detect the treatments header line
+        if (trimmed.startsWith("@N") && trimmed.contains("TNAME")) {
+            inTreatmentSection = true;
+            continue;
+        }
+
+        if (inTreatmentSection) {
+            // A new section header (@...) ends the treatments block
+            if (trimmed.startsWith('@')) {
+                inTreatmentSection = false;
+                continue;
+            }
+            // Data line: first token is treatment number, TNAME is columns 4-29 (fixed-width)
+            // Format: " 1 1 0 0 DRYLAND  - 0 KG N/HA       1  1 ..."
+            // TNAME starts at col 9 (0-based after " N R O C ") and is 25 chars wide
+            // Simpler: split by whitespace for trt number, then extract TNAME by position
+            if (line.length() < 9) continue;
+            QString trtNum = trimmed.split(' ', Qt::SkipEmptyParts).value(0);
+            bool ok;
+            trtNum.toInt(&ok);
+            if (!ok) continue;
+            // TNAME: fixed width starting at column 9, 25 chars
+            QString tname = line.mid(9, 25).trimmed();
+            if (!tname.isEmpty())
+                trtNames[trtNum] = tname;
+        }
+    }
+    file.close();
+    qDebug() << "DataProcessor::readTreatmentNamesFromXFile: read" << trtNames.size() << "treatment names from" << xFilePath;
+    return trtNames;
 }
 
 bool DataProcessor::readOsuFile(const QString &filePath, DataTable &table)
@@ -1102,6 +1360,7 @@ QStringList DataProcessor::prepareOutFiles(const QString &folderName)
     QStringList filters;
     filters << "*.OUT" << "*.out"
             << "*.OSU" << "*.osu"
+            << "*.CSV" << "*.csv"
             << "*.OVT" << "*.ovt"
             << "*.OPT" << "*.opt"
             << "*.OPG" << "*.opg"
@@ -1137,7 +1396,7 @@ QStringList DataProcessor::prepareOutFiles(const QString &folderName)
         QString filterReason = "";
         
         // Known plottable file types - always allow these through
-        QStringList knownPlottableExtensions = {"OSU", "OPG", "OVT", "OPT"};
+        QStringList knownPlottableExtensions = {"OSU", "OPG", "OVT", "OPT", "CSV"};
         if (knownPlottableExtensions.contains(extension)) {
             outFiles.append(file);
             qDebug() << "prepareOutFiles: Allowing known plottable file:" << file << "(extension:" << extension << ")";
@@ -2559,10 +2818,10 @@ bool DataProcessor::readEvaluateFile(const QString &filePath, DataTable &table)
 QVector<QMap<QString, QString>> DataProcessor::getEvaluateVariablePairs(const DataTable &evaluateData)
 {
     QVector<QMap<QString, QString>> pairs;
-    
-    // Metadata columns to exclude (EXCODE, TRT, CR, RN are metadata in EVALUATE.OUT)
-    QStringList metadataColumns = {"RUN", "RUNNO", "TRNO", "EXPNO", "EXPERIMENT", "TREATMENT", "TRTNO", "TRT", "EXP", 
-                                   "EXCODE", "CR", "RN"};
+
+    // Metadata columns to exclude (EXCODE, TRT, CR, RN, REP are metadata in EVALUATE.OUT/.CSV)
+    QStringList metadataColumns = {"RUN", "RUNNO", "TRNO", "EXPNO", "EXPERIMENT", "TREATMENT", "TRTNO", "TRT", "EXP",
+                                   "EXCODE", "CR", "RN", "REP"};
     
     // Find all simulated variables (ending with 'S')
     QStringList simVariables;
@@ -2668,9 +2927,9 @@ QVector<QPair<QString, QString>> DataProcessor::getAllEvaluateVariables(const Da
 {
     QVector<QPair<QString, QString>> variables;
     
-    // Metadata columns to exclude (EXCODE, TRT, CR, RN are metadata in EVALUATE.OUT)
-    QStringList metadataColumns = {"RUN", "RUNNO", "TRNO", "EXPNO", "EXPERIMENT", "TREATMENT", "TRTNO", "TRT", "EXP", 
-                                   "EXCODE", "CR", "RN"};
+    // Metadata columns to exclude (EXCODE, TRT, CR, RN, REP are metadata in EVALUATE.OUT/.CSV)
+    QStringList metadataColumns = {"RUN", "RUNNO", "TRNO", "EXPNO", "EXPERIMENT", "TREATMENT", "TRTNO", "TRT", "EXP",
+                                   "EXCODE", "CR", "RN", "REP"};
     
     for (const QString &colName : evaluateData.columnNames) {
         QString upperCol = colName.toUpper();

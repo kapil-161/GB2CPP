@@ -5,6 +5,7 @@ build_*/
 
 # CMake generated files
 CMakeCache.txt
+include/version_generated.h
 CMakeFiles/
 cmake_install.cmake
 Makefile
