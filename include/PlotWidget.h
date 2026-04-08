@@ -72,10 +72,17 @@ public:
     /** Draw error bars onto the given painter. Use viewportOffset when painting on full chart-view-sized pixmap (e.g. export). */
     void paintErrorBars(QPainter *painter, const QPoint &viewportOffset = QPoint(0, 0));
 
-    // Box plot median markers (red asterisks drawn via custom painter)
-    void setBoxPlotMedians(const QVector<QPointF> &medians, int nCategories, double yMin, double yMax);
+    // Box plot — all drawn via custom painter (no stacked bar series)
+    struct BoxPlotStats {
+        double q0, q1, q2, q3, q4;
+        QString label;
+    };
+    void setBoxPlotData(const QVector<BoxPlotStats> &stats, double yMin, double yMax);
     void clearBoxPlotMedians();
     void paintBoxPlotMedians(QPainter *painter);
+    // Legacy — kept so setBoxPlotWhiskers callers still compile; no-op
+    void setBoxPlotMedians(const QVector<QPointF> &, int, double, double) {}
+    void setBoxPlotWhiskers(const QVector<QPointF> &, const QVector<QPointF> &) {}
 
 protected:
     void paintEvent(QPaintEvent *event) override;
@@ -86,8 +93,7 @@ private:
 
 private:
     QMap<QAbstractSeries*, QVector<ErrorBarData>> m_errorBars;
-    QVector<QPointF> m_boxPlotMedians;  // (category index, median value)
-    int    m_bpNCats = 0;
+    QVector<BoxPlotStats> m_boxStats;
     double m_bpYMin  = 0.0;
     double m_bpYMax  = 0.0;
 };

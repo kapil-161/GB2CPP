@@ -6,6 +6,7 @@
 #include <QColor>
 #include <QSize>
 #include <set>
+#include "version_generated.h"
 
 // Debug output control - disable for release builds
 #if defined(ENABLE_DEBUG_OUTPUT) && ENABLE_DEBUG_OUTPUT
@@ -23,7 +24,8 @@
 namespace Config {
     // Application information
     const QString APP_NAME = "GB2";
-    const QString APP_VERSION = "2.0.0";
+    const QString APP_VERSION = QString(GB2_VERSION);       // e.g. "2.0.42"
+    const QString APP_VERSION_FULL = QString(GB2_VERSION_FULL); // e.g. "2.0.42-a1b2c3d" (for releases)
     const QString ORGANIZATION_NAME = "DSSAT";
     
     // DSSAT paths

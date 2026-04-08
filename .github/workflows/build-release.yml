@@ -1,0 +1,96 @@
+name: Build and Release
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # full history so git rev-list --count works
+
+      - name: Get version info
+        id: version
+        shell: bash
+        run: |
+          COUNT=$(git rev-list --count HEAD)
+          HASH=$(git rev-parse --short HEAD)
+          echo "version=2.0.${COUNT}" >> $GITHUB_OUTPUT
+          echo "version_full=2.0.${COUNT}-${HASH}" >> $GITHUB_OUTPUT
+          echo "tag=v2.0.${COUNT}" >> $GITHUB_OUTPUT
+
+      - name: Install Qt6 + MinGW via aqtinstall
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.8.1'
+          host: windows
+          target: desktop
+          arch: win64_mingw
+          modules: ''
+          tools: 'tools_mingw1310'
+
+      - name: Configure with CMake
+        shell: bash
+        run: |
+          cmake -S . -B build_ci \
+            -G "MinGW Makefiles" \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_CXX_COMPILER="${IQTA_TOOLS}/mingw1310_64/bin/g++.exe" \
+            -DCMAKE_C_COMPILER="${IQTA_TOOLS}/mingw1310_64/bin/gcc.exe" \
+            -DCMAKE_MAKE_PROGRAM="${IQTA_TOOLS}/mingw1310_64/bin/mingw32-make.exe" \
+            -DCMAKE_PREFIX_PATH="${Qt6_DIR}"
+
+      - name: Build
+        shell: bash
+        run: cmake --build build_ci --config Release -- -j4
+
+      - name: Deploy Qt dependencies
+        shell: cmd
+        run: |
+          mkdir release_pkg
+          copy build_ci\bin\GB2.exe release_pkg\
+          if exist resources xcopy /E /I resources release_pkg\resources
+          windeployqt --release --no-translations --no-system-d3d-compiler --no-opengl-sw release_pkg\GB2.exe
+
+      - name: Clean up unnecessary files
+        shell: cmd
+        run: |
+          if exist release_pkg\generic       rmdir /s /q release_pkg\generic
+          if exist release_pkg\iconengines   rmdir /s /q release_pkg\iconengines
+          if exist release_pkg\imageformats  rmdir /s /q release_pkg\imageformats
+          if exist release_pkg\networkinformation rmdir /s /q release_pkg\networkinformation
+          if exist release_pkg\styles        rmdir /s /q release_pkg\styles
+          if exist release_pkg\tls           rmdir /s /q release_pkg\tls
+          if exist release_pkg\Qt6Network.dll       del release_pkg\Qt6Network.dll
+          if exist release_pkg\Qt6Svg.dll           del release_pkg\Qt6Svg.dll
+          if exist release_pkg\D3Dcompiler_47.dll   del release_pkg\D3Dcompiler_47.dll
+          if exist release_pkg\opengl32sw.dll        del release_pkg\opengl32sw.dll
+
+      - name: Zip release package
+        shell: pwsh
+        run: |
+          Compress-Archive -Path release_pkg\* `
+            -DestinationPath "GB2-${{ steps.version.outputs.version_full }}-windows.zip"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: "GB2 ${{ steps.version.outputs.version_full }}"
+          body: |
+            **Automated build** from commit `${{ github.sha }}`
+
+            ### Changes
+            ${{ github.event.head_commit.message }}
+
+            ### Install
+            Download the zip, extract, and run `GB2.exe`.
+          files: GB2-${{ steps.version.outputs.version_full }}-windows.zip
+          make_latest: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

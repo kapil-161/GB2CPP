@@ -3,6 +3,7 @@
 #include "PlotWidget.h"
 #include "CDECodesDialog.h"
 #include <QApplication>
+#include <QClipboard>
 #include <QMessageBox>
 #include <QCloseEvent>
 #include <QResizeEvent>
@@ -113,7 +114,11 @@ void MainWindow::setupMenuBar()
     QAction *savePlotAction = fileMenu->addAction("Save &Plot Data...");
     savePlotAction->setShortcut(QKeySequence("Ctrl+Shift+S"));
     connect(savePlotAction, &QAction::triggered, this, &MainWindow::onSavePlotData);
-    
+
+    QAction *copyPlotDataAction = fileMenu->addAction("&Copy Plot Data");
+    copyPlotDataAction->setShortcut(QKeySequence("Ctrl+Shift+D"));
+    connect(copyPlotDataAction, &QAction::triggered, this, &MainWindow::onCopyPlotData);
+
     fileMenu->addSeparator();
     
     QAction *exportAction = fileMenu->addAction("&Export Plot...");
@@ -681,6 +686,23 @@ void MainWindow::onSavePlotData()
     file.close();
 
     m_statusWidget->showSuccess("Plot data saved: " + QFileInfo(fileName).fileName());
+}
+
+void MainWindow::onCopyPlotData()
+{
+    if (!m_plotWidget) {
+        m_statusWidget->showWarning("No plot widget available");
+        return;
+    }
+
+    QString csv = m_plotWidget->getPlotCSV();
+    if (csv.isEmpty()) {
+        m_statusWidget->showWarning("No plot data to copy — generate a plot first");
+        return;
+    }
+
+    QGuiApplication::clipboard()->setText(csv);
+    m_statusWidget->showSuccess("Plot data copied to clipboard");
 }
 
 void MainWindow::onExportPlot()

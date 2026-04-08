@@ -57,6 +57,8 @@ public:
     bool readOsuFile(const QString &filePath, DataTable &table);
     bool readTFile(const QString &filePath, DataTable &table);
     bool readEvaluateFile(const QString &filePath, DataTable &table);  // Read EVALUATE.OUT file
+    bool readCsvFile(const QString &filePath, DataTable &table);      // Read CSV output file
+    static QMap<QString, QString> readTreatmentNamesFromXFile(const QString &xFilePath); // Read trt names from .XXX experiment file
 
     QStringList prepareFolders(bool includeExtraFolders);
     QStringList prepareOutFiles(const QString &folderName);
