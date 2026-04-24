@@ -184,6 +184,7 @@ public:
     void clear();
     void clearChart();  // Clear chart without clearing data
     QString getPlotCSV() const;
+    QString getScatterCSV() const; // CSV export for multi-panel scatter (VARIABLE,EXPERIMENT,SIMULATED,MEASURED)
     void exportPlot(const QString &filePath, const QString &format = "PNG");
     void exportPlot(const QString &filePath, const QString &format, int width, int height, int dpi);
     void exportPlotComposite(const QString &filePath, const QString &format, int width, int height, int dpi);
@@ -368,6 +369,9 @@ private:
     QGridLayout *m_scatterPanelGrid = nullptr;
     QScrollArea *m_scatterScrollArea = nullptr;
     QVector<QChartView*> m_scatterPanelViews;
+
+    // Scatter CSV export: key = "VARIABLE::EXPERIMENT", value = list of (sim, meas) points
+    QMap<QString, QVector<QPointF>> m_scatterExportData;
     
     // Data processor reference
     DataProcessor *m_dataProcessor;

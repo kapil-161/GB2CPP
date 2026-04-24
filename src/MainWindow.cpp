@@ -587,6 +587,42 @@ void MainWindow::onOpenFile()
 
 void MainWindow::onSaveData()
 {
+    bool isScatterTab = (m_tabWidget && m_tabWidget->currentIndex() == 2);
+
+    // On scatter tab, save the EVALUATE data instead of time-series data
+    if (isScatterTab) {
+        if (m_evaluateData.rowCount == 0) {
+            m_statusWidget->showWarning("No EVALUATE data to save");
+            return;
+        }
+        QString fileName = QFileDialog::getSaveFileName(
+            this, "Save EVALUATE Data",
+            QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation),
+            "CSV Files (*.csv);;All Files (*)");
+        if (fileName.isEmpty()) return;
+
+        QFile file(fileName);
+        if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
+            m_statusWidget->showError("Failed to open file for writing");
+            return;
+        }
+        QTextStream out(&file);
+        out << m_evaluateData.columnNames.join(",") << "\n";
+        for (int row = 0; row < m_evaluateData.rowCount; ++row) {
+            QStringList vals;
+            for (const QString &col : m_evaluateData.columnNames) {
+                QString v = m_evaluateData.getValue(row, col).toString();
+                if (v.contains(',') || v.contains('"') || v.contains('\n'))
+                    v = "\"" + v.replace("\"", "\"\"") + "\"";
+                vals << v;
+            }
+            out << vals.join(",") << "\n";
+        }
+        file.close();
+        m_statusWidget->showSuccess("Saved: " + QFileInfo(fileName).fileName());
+        return;
+    }
+
     if (m_currentData.rowCount == 0) {
         m_statusWidget->showWarning("No data to save");
         return;
@@ -654,48 +690,48 @@ void MainWindow::onSaveData()
 
 void MainWindow::onSavePlotData()
 {
-    if (!m_plotWidget) {
-        m_statusWidget->showWarning("No plot widget available");
-        return;
+    bool isScatterTab = (m_tabWidget && m_tabWidget->currentIndex() == 2);
+
+    QString csv;
+    if (isScatterTab) {
+        csv = m_scatterPlotWidget ? m_scatterPlotWidget->getScatterCSV() : QString();
+    } else {
+        csv = m_plotWidget ? m_plotWidget->getPlotCSV() : QString();
     }
 
-    QString csv = m_plotWidget->getPlotCSV();
     if (csv.isEmpty()) {
         m_statusWidget->showWarning("No plot data to save — generate a plot first");
         return;
     }
 
     QString fileName = QFileDialog::getSaveFileName(
-        this,
-        "Save Plot Data",
+        this, "Save Plot Data",
         QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation),
-        "CSV Files (*.csv);;Text Files (*.txt);;All Files (*)"
-    );
+        "CSV Files (*.csv);;Text Files (*.txt);;All Files (*)");
 
-    if (fileName.isEmpty())
-        return;
+    if (fileName.isEmpty()) return;
 
     QFile file(fileName);
     if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
         m_statusWidget->showError("Failed to open file for writing: " + fileName);
         return;
     }
-
-    QTextStream out(&file);
-    out << csv;
+    QTextStream(&file) << csv;
     file.close();
-
     m_statusWidget->showSuccess("Plot data saved: " + QFileInfo(fileName).fileName());
 }
 
 void MainWindow::onCopyPlotData()
 {
-    if (!m_plotWidget) {
-        m_statusWidget->showWarning("No plot widget available");
-        return;
+    bool isScatterTab = (m_tabWidget && m_tabWidget->currentIndex() == 2);
+
+    QString csv;
+    if (isScatterTab) {
+        csv = m_scatterPlotWidget ? m_scatterPlotWidget->getScatterCSV() : QString();
+    } else {
+        csv = m_plotWidget ? m_plotWidget->getPlotCSV() : QString();
     }
 
-    QString csv = m_plotWidget->getPlotCSV();
     if (csv.isEmpty()) {
         m_statusWidget->showWarning("No plot data to copy — generate a plot first");
         return;
@@ -713,10 +749,13 @@ void MainWindow::onExportPlot()
         QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation),
         "PNG Files (*.png);;JPG Files (*.jpg);;PDF Files (*.pdf);;All Files (*)"
     );
-    
-    if (!fileName.isEmpty() && m_plotWidget) {
-        // Export the plot widget
-        m_plotWidget->exportPlot(fileName);
+
+    if (fileName.isEmpty()) return;
+
+    bool isScatterTab = (m_tabWidget && m_tabWidget->currentIndex() == 2);
+    PlotWidget *activeWidget = (isScatterTab && m_scatterPlotWidget) ? m_scatterPlotWidget : m_plotWidget;
+    if (activeWidget) {
+        activeWidget->exportPlot(fileName);
         m_statusWidget->showSuccess("Plot exported successfully");
     }
 }

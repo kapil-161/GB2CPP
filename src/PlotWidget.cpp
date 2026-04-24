@@ -2954,6 +2954,26 @@ QString PlotWidget::getPlotCSV() const
     return csv;
 }
 
+QString PlotWidget::getScatterCSV() const
+{
+    if (m_scatterExportData.isEmpty())
+        return {};
+
+    QString csv = "VARIABLE,EXPERIMENT,SIMULATED,MEASURED\n";
+    for (auto it = m_scatterExportData.begin(); it != m_scatterExportData.end(); ++it) {
+        QStringList parts = it.key().split("::");
+        QString varName = parts.value(0);
+        QString expName = parts.value(1);
+        for (const QPointF &pt : it.value()) {
+            csv += QString("%1,%2,%3,%4\n")
+                .arg(varName).arg(expName)
+                .arg(pt.x(), 0, 'g', 6)
+                .arg(pt.y(), 0, 'g', 6);
+        }
+    }
+    return csv;
+}
+
 void PlotWidget::exportPlot(const QString &filePath, const QString &format)
 {
     if (!this) return;
@@ -5555,6 +5575,7 @@ void PlotWidget::plotScatter(
 {
     qDebug() << "PlotWidget::plotScatter() - ENTRY, vars:" << varNames;
     m_isScatterMode = true;
+    m_scatterExportData.clear();
     setXAxisButtonsVisible(false);
 
     // Cap at 9 variables
@@ -5701,6 +5722,10 @@ void PlotWidget::plotScatter(
             expPoints[rowExp[i]].append(QPointF(s, m));
         }
         if (expPoints.isEmpty()) continue;
+
+        // Store for CSV export
+        for (auto it = expPoints.begin(); it != expPoints.end(); ++it)
+            m_scatterExportData[baseVar + "::" + it.key()] = it.value();
 
         // Compute overall range across all points for shared axis
         double xMin = std::numeric_limits<double>::max();
