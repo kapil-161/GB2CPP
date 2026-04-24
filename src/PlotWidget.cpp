@@ -3344,7 +3344,10 @@ void PlotWidget::renderLegendContent(QPainter *painter, const QRect &rect)
 void PlotWidget::setShowLegend(bool show)
 {
     m_showLegend = show;
-    m_legendScrollArea->setVisible(show);
+    // In scatter mode the experiment color legend is always shown — it's the only
+    // way to know which color maps to which experiment.
+    bool forceShow = m_isScatterMode ? true : show;
+    m_legendScrollArea->setVisible(forceShow);
 }
 
 void PlotWidget::setShowGrid(bool show)
@@ -5274,8 +5277,9 @@ void PlotWidget::applyPlotSettings(const PlotSettings &settings)
     // Apply grid settings
     setShowGrid(settings.showGrid);
     
-    // Apply legend settings
-    setShowLegend(settings.showLegend);
+    // Apply legend settings (scatter mode always keeps legend visible)
+    if (!m_isScatterMode)
+        setShowLegend(settings.showLegend);
     
     // Apply axis titles (skip for scatter mode — it has its own measured/simulated titles)
     if (!m_isScatterMode) {
@@ -5415,7 +5419,7 @@ void PlotWidget::applyPlotSettings(const PlotSettings &settings)
 
             // Update strip label and stats label fonts
             int stripFontPx = qMax(8, settings.titleFontSize);
-            int statsFontPx = qMax(13, settings.axisTickFontSize);
+            int statsFontPx = qMax(11, settings.axisTickFontSize);
             if (cv->parentWidget()) {
                 for (QLabel *lbl : cv->parentWidget()->findChildren<QLabel*>()) {
                     if (lbl->parent() == cv->parentWidget()) { // strip label
@@ -5891,7 +5895,7 @@ void PlotWidget::plotScatter(
             .arg(rmse, 0, 'f', rmse < 1 ? 3 : (rmse < 100 ? 2 : 1))
             .arg(r2,   0, 'f', 2);
         QLabel *statsLabel = new QLabel(statsText, cv);
-        int statsFontPx = qMax(13, m_plotSettings.axisTickFontSize);
+        int statsFontPx = qMax(11, m_plotSettings.axisTickFontSize);
         statsLabel->setStyleSheet(QString(
             "QLabel { background: rgba(255,255,255,210); font-size: %1pt; "
             "padding: 2px 4px; border: none; }").arg(statsFontPx));
@@ -5938,9 +5942,10 @@ void PlotWidget::plotScatter(
         allMetrics.append(mmap);
     }
 
-    // --- Build legend in right panel ---
+    // --- Build legend in right panel (always visible in scatter mode) ---
     clearLegend();
     if (m_legendStack) m_legendStack->setCurrentIndex(1);
+    if (m_legendScrollArea) m_legendScrollArea->setVisible(true);
 
     // Title
     QLabel *legendTitle = new QLabel("Experiment");
