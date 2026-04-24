@@ -5846,8 +5846,8 @@ void PlotWidget::plotScatter(
         QLabel *stripLabel = new QLabel(baseVar);
         stripLabel->setAlignment(Qt::AlignCenter);
         stripLabel->setStyleSheet(QString(
-            "QLabel { background-color: #e8e8e8; border: 1px solid #cccccc; "
-            "font-weight: bold; font-size: %1px; padding: 3px 0px; }")
+            "QLabel { background-color: #e8e8e8; border-bottom: 1px solid #cccccc; "
+            "font-weight: bold; font-size: %1px; padding: 2px 0px; }")
             .arg(m_plotSettings.titleFontSize > 0 ? m_plotSettings.titleFontSize : 10));
         stripLabel->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
         panelLayout->addWidget(stripLabel);
