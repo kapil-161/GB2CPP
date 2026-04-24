@@ -5779,8 +5779,8 @@ void PlotWidget::plotScatter(
         chart->setPlotAreaBackgroundBrush(QBrush(m_plotSettings.plotAreaColor));
         chart->setPlotAreaBackgroundVisible(true);
         chart->legend()->setVisible(false);
-        chart->setMargins(QMargins(2, 2, 2, 2));
-        chart->setTitle("");
+        chart->setMargins(QMargins(2, 0, 2, 2)); // top=0: no gap below strip label
+        chart->setTitle(""); // empty title so Qt Charts doesn't reserve title height
 
         // 1:1 reference line
         QLineSeries *refLine = new QLineSeries();
@@ -5854,6 +5854,7 @@ void PlotWidget::plotScatter(
 
         QChartView *cv = new QChartView(chart);
         cv->setRenderHint(QPainter::Antialiasing);
+        cv->setFrameShape(QFrame::NoFrame);  // remove border gap between strip and chart
         cv->setMinimumSize(panelSize, panelSize - 22);
         cv->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
         panelLayout->addWidget(cv, 1);
