@@ -5757,30 +5757,42 @@ void PlotWidget::plotScatter(
         cv->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
         panelLayout->addWidget(cv, 1);
 
-        // RMSE / R² overlay label (top-left inside chart view using absolute position)
-        // We use a QLabel child of the chart view, repositioned on first show
+        // RMSE / R² overlay label — repositioned on every resize via event filter
         QString statsText = QString("RMSE = %1\nR² = %2")
             .arg(rmse, 0, 'f', rmse < 1 ? 3 : (rmse < 100 ? 2 : 1))
             .arg(r2,   0, 'f', 2);
         QLabel *statsLabel = new QLabel(statsText, cv);
         statsLabel->setStyleSheet(
-            "QLabel { background: rgba(255,255,255,200); font-size: 9px; "
+            "QLabel { background: rgba(255,255,255,210); font-size: 9px; "
             "padding: 2px 4px; border: none; }");
         statsLabel->setAlignment(Qt::AlignLeft | Qt::AlignTop);
         statsLabel->adjustSize();
         statsLabel->raise();
         statsLabel->show();
-        // Position inside plot area once chart has laid out (single-shot after event loop)
+
+        // Install event filter on the chart view to reposition label whenever it resizes
         QChartView *cvRef = cv;
         QLabel *labelRef = statsLabel;
-        QTimer::singleShot(0, cv, [cvRef, labelRef]() {
-            if (!cvRef || !labelRef) return;
-            QRectF pa = cvRef->chart()->plotArea();
-            labelRef->move(
-                static_cast<int>(pa.left()) + 4,
-                static_cast<int>(pa.top())  + 4);
-            labelRef->raise();
-        });
+        struct Repositioner : public QObject {
+            QChartView *view;
+            QLabel     *label;
+            Repositioner(QChartView *v, QLabel *l, QObject *parent)
+                : QObject(parent), view(v), label(l) {}
+            bool eventFilter(QObject *, QEvent *e) override {
+                if (e->type() == QEvent::Resize || e->type() == QEvent::Paint) {
+                    QRectF pa = view->chart()->plotArea();
+                    if (pa.isValid() && pa.width() > 10) {
+                        label->move(
+                            static_cast<int>(pa.left()) + 4,
+                            static_cast<int>(pa.top())  + 4);
+                        label->raise();
+                    }
+                }
+                return false; // never consume the event
+            }
+        };
+        auto *repo = new Repositioner(cvRef, labelRef, cvRef);
+        cvRef->installEventFilter(repo);
 
         int row = vi / nCols;
         int col = vi % nCols;
