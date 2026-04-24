@@ -5415,7 +5415,7 @@ void PlotWidget::applyPlotSettings(const PlotSettings &settings)
 
             // Update strip label and stats label fonts
             int stripFontPx = qMax(8, settings.titleFontSize);
-            int statsFontPx = qMax(10, settings.axisTickFontSize);
+            int statsFontPx = qMax(13, settings.axisTickFontSize);
             if (cv->parentWidget()) {
                 for (QLabel *lbl : cv->parentWidget()->findChildren<QLabel*>()) {
                     if (lbl->parent() == cv->parentWidget()) { // strip label
@@ -5891,9 +5891,9 @@ void PlotWidget::plotScatter(
             .arg(rmse, 0, 'f', rmse < 1 ? 3 : (rmse < 100 ? 2 : 1))
             .arg(r2,   0, 'f', 2);
         QLabel *statsLabel = new QLabel(statsText, cv);
-        int statsFontPx = qMax(10, m_plotSettings.axisTickFontSize);
+        int statsFontPx = qMax(13, m_plotSettings.axisTickFontSize);
         statsLabel->setStyleSheet(QString(
-            "QLabel { background: rgba(255,255,255,210); font-size: %1px; "
+            "QLabel { background: rgba(255,255,255,210); font-size: %1pt; "
             "padding: 2px 4px; border: none; }").arg(statsFontPx));
         statsLabel->setAlignment(Qt::AlignLeft | Qt::AlignTop);
         statsLabel->adjustSize();
