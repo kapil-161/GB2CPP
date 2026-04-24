@@ -5764,13 +5764,23 @@ void PlotWidget::plotScatter(
             .arg(r2,   0, 'f', 2);
         QLabel *statsLabel = new QLabel(statsText, cv);
         statsLabel->setStyleSheet(
-            "QLabel { background: rgba(255,255,255,180); font-size: 9px; "
+            "QLabel { background: rgba(255,255,255,200); font-size: 9px; "
             "padding: 2px 4px; border: none; }");
         statsLabel->setAlignment(Qt::AlignLeft | Qt::AlignTop);
         statsLabel->adjustSize();
-        statsLabel->move(48, 10);  // approximate; fine-tuned after layout
         statsLabel->raise();
         statsLabel->show();
+        // Position inside plot area once chart has laid out (single-shot after event loop)
+        QChartView *cvRef = cv;
+        QLabel *labelRef = statsLabel;
+        QTimer::singleShot(0, cv, [cvRef, labelRef]() {
+            if (!cvRef || !labelRef) return;
+            QRectF pa = cvRef->chart()->plotArea();
+            labelRef->move(
+                static_cast<int>(pa.left()) + 4,
+                static_cast<int>(pa.top())  + 4);
+            labelRef->raise();
+        });
 
         int row = vi / nCols;
         int col = vi % nCols;
