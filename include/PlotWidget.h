@@ -164,12 +164,11 @@ public:
     );
     
     // Scatter plot function for model evaluation (simulated vs measured)
+    // varNames: list of base variable names (e.g. "ADAP", "CWAM") — S/M suffixes auto-appended
+    // Up to 9 variables; excess are ignored. Layout: 1→1×1, 2→1×2, 3→1×3, 4→2×2, 5-6→2×3, 7-9→3×3
     void plotScatter(
         const DataTable &evaluateData,
-        const QString &xVar,
-        const QString &yVar,
-        const QStringList &selectedTreatments = QStringList(),
-        const QMap<QString, QMap<QString, QString>> &treatmentNames = QMap<QString, QMap<QString, QString>>()
+        const QStringList &varNames
     );
     
     void setData(const DataTable &data);
@@ -363,6 +362,12 @@ private:
     int m_maxLegendEntries;
     bool m_isScatterMode;
     bool m_isBoxPlotMode;
+
+    // Multi-panel scatter: grid of QChartViews owned here, shown in m_scatterPanelArea
+    QWidget *m_scatterPanelContainer = nullptr;
+    QGridLayout *m_scatterPanelGrid = nullptr;
+    QScrollArea *m_scatterScrollArea = nullptr;
+    QVector<QChartView*> m_scatterPanelViews;
     
     // Data processor reference
     DataProcessor *m_dataProcessor;

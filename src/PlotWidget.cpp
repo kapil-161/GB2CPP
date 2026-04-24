@@ -2794,6 +2794,15 @@ void PlotWidget::clear()
     m_isScatterMode = false;
     setXAxisButtonsVisible(true);
 
+    // Hide scatter panel area and restore normal chart view
+    if (m_scatterScrollArea) m_scatterScrollArea->setVisible(false);
+    if (m_chartView) m_chartView->setVisible(true);
+    if (m_bottomContainer) m_bottomContainer->setVisible(true);
+
+    // Destroy old scatter panel chart views
+    for (QChartView *cv : m_scatterPanelViews) cv->deleteLater();
+    m_scatterPanelViews.clear();
+
     // Show treatment selection panel in legend area when plot is cleared
     if (m_legendStack && m_preplotPanelEnabled) m_legendStack->setCurrentIndex(0);
 }
@@ -5224,11 +5233,9 @@ void PlotWidget::onSettingsButtonClicked()
         bool needsReplot = (filterChanged || errorBarChanged) && m_simData.rowCount > 0;
         if (needsReplot) {
             if (m_isScatterMode) {
-                QString yVar = m_currentYVars.isEmpty() ? QString() : m_currentYVars.first();
-                if (!yVar.isEmpty()) {
-                    // Copy data before plotScatter — clear() inside destroys m_simData
+                if (!m_currentYVars.isEmpty()) {
                     DataTable dataCopy = m_simData;
-                    plotScatter(dataCopy, m_currentXVar, yVar, m_currentTreatments, m_treatmentNames);
+                    plotScatter(dataCopy, m_currentYVars);
                 }
             } else {
                 updatePlotWithScaling();
@@ -5489,449 +5496,313 @@ void PlotWidget::setXAxisVariable(const QString &xVar)
 
 void PlotWidget::plotScatter(
     const DataTable &evaluateData,
-    const QString &xVar,
-    const QString &yVar,
-    const QStringList &selectedTreatments,
-    const QMap<QString, QMap<QString, QString>> &treatmentNames)
+    const QStringList &varNames)
 {
-        qDebug() << "PlotWidget::plotScatter() - ENTRY";
-        m_isScatterMode = true;
+    qDebug() << "PlotWidget::plotScatter() - ENTRY, vars:" << varNames;
+    m_isScatterMode = true;
+    setXAxisButtonsVisible(false);
 
-        // Store variables for re-plotting from settings dialog
-        m_currentXVar = xVar;
-        m_currentYVars = QStringList() << yVar;
-
-        // Resolve experiment for scatter from EXCODE column
-        const DataColumn *excodeForExp = evaluateData.getColumn("EXCODE");
-        if (excodeForExp && !excodeForExp->data.isEmpty()) {
-            QString firstExcode = excodeForExp->data.first().toString();
-            if (!firstExcode.isEmpty()) {
-                m_selectedExperiment = firstExcode;
-            }
-        }
-
-        // Hide DAS, DAP, DATE buttons for scatter plots (not applicable)
-        setXAxisButtonsVisible(false);
-        qDebug() << "  X Variable:" << xVar;
-        qDebug() << "  Y Variable:" << yVar;
-        qDebug() << "  Treatments:" << selectedTreatments;
-        qDebug() << "  Data row count:" << evaluateData.rowCount;
-        qDebug() << "  Available columns:" << evaluateData.columnNames;
-        
-        try {
-            clear();
-            // Re-set scatter mode after clear() (which resets it to false)
-            m_isScatterMode = true;
-
-            // Reset chart margins for scatter plots
-            if (m_chart) {
-                m_chart->setMargins(QMargins(0, 0, 0, 0));  // Use default margins
-            }
-
-            if (evaluateData.rowCount == 0) {
-                qWarning() << "PlotWidget: No data available for scatter plot";
-                return;
-            }
-            
-            const DataColumn *xCol = evaluateData.getColumn(xVar);
-            const DataColumn *yCol = evaluateData.getColumn(yVar);
-            
-            qDebug() << "PlotWidget::plotScatter() - X column found:" << (xCol != nullptr);
-            qDebug() << "PlotWidget::plotScatter() - Y column found:" << (yCol != nullptr);
-            
-            if (!xCol || !yCol) {
-                qWarning() << "PlotWidget: X or Y column not found";
-                qWarning() << "  X column name:" << xVar << "exists:" << evaluateData.columnNames.contains(xVar);
-                qWarning() << "  Y column name:" << yVar << "exists:" << evaluateData.columnNames.contains(yVar);
-                return;
-            }
-        
-        // Get experiment code column (EXCODE in EVALUATE.OUT) for metrics
-        const DataColumn *excodeCol = evaluateData.getColumn("EXCODE");
-        const DataColumn *crCol = evaluateData.getColumn("CR");  // Crop code
-        const DataColumn *trtCol = evaluateData.getColumn("TRT");
-
-        // Store evaluate data and treatment names for settings dialog
-        m_simData = evaluateData;
-        m_treatmentNames = treatmentNames;
-
-        // Reset treatment filter when dataset or variable changes
-        QMap<QString, QStringList> newExpTrts;
-        if (trtCol) {
-            QSet<QString> seenPairs;
-            for (int i = 0; i < evaluateData.rowCount; ++i) {
-                QString trtId = trtCol->data.value(i).toString();
-                if (trtId.isEmpty()) continue;
-                QString expId = m_selectedExperiment;
-                if (excodeCol && i < excodeCol->data.size()) {
-                    QString e = excodeCol->data.value(i).toString();
-                    if (!e.isEmpty()) expId = e;
-                }
-                QString pk = expId + "::" + trtId;
-                if (!seenPairs.contains(pk)) {
-                    seenPairs.insert(pk);
-                    newExpTrts[expId].append(trtId);
-                }
-            }
-        }
-        QStringList scatterYVars = QStringList() << yVar;
-        if (newExpTrts != m_plotSettings.experimentTreatments || scatterYVars != m_plotSettings.lastYVars) {
-            m_plotSettings.excludedSeriesKeys.clear();
-            m_plotSettings.experimentTreatments = newExpTrts;
-            m_plotSettings.availableExperiments = newExpTrts.keys();
-            m_plotSettings.availableYVars = scatterYVars;
-            m_plotSettings.lastYVars = scatterYVars;
-        }
-
-        // Apply treatment filter
-        if (selectedTreatments.isEmpty() || selectedTreatments.contains("All")) {
-            m_currentTreatments = QStringList() << "All";
-        } else {
-            m_currentTreatments = selectedTreatments;
-        }
-
-        // Collect all data points and by experiment (for metrics), with treatment filtering
-        QVector<QPointF> allPoints;
-        QMap<QString, QVector<QPointF>> experimentPoints;
-        QMap<QString, QString> experimentCropCodes;
-
-        int validPointCount = 0;
-        for (int i = 0; i < evaluateData.rowCount; ++i) {
-            QVariant xVal = xCol->data.value(i);
-            QVariant yVal = yCol->data.value(i);
-
-            // Skip missing values
-            if (DataProcessor::isMissingValue(xVal) || DataProcessor::isMissingValue(yVal)) {
-                continue;
-            }
-
-            // Apply treatment filter
-            if (trtCol && i < trtCol->data.size()) {
-                QString trt = trtCol->data.value(i).toString();
-                // Per-variable filter: resolve experiment for this row
-                QString rowExp = m_selectedExperiment;
-                if (excodeCol && i < excodeCol->data.size()) {
-                    QString e = excodeCol->data.value(i).toString();
-                    if (!e.isEmpty()) rowExp = e;
-                }
-                if (!m_currentTreatments.contains("All") && !m_currentTreatments.contains(trt)
-                    && !m_currentTreatments.contains(rowExp + "::" + trt)) {
-                    continue;
-                }
-                if (m_plotSettings.excludedSeriesKeys.contains(yVar + "::" + rowExp + "::" + trt)) {
-                    continue;
-                }
-            }
-
-            bool okX, okY;
-            double x = DataProcessor::toDouble(xVal, &okX);
-            double y = DataProcessor::toDouble(yVal, &okY);
-
-            if (!okX || !okY) {
-                qDebug() << "PlotWidget::plotScatter() - Row" << i << "failed conversion: x=" << xVal << "y=" << yVal;
-                continue;
-            }
-
-            validPointCount++;
-
-            // Get experiment code and crop for metrics
-            QString expCode = "";
-            QString cropCode = "";
-            if (excodeCol && i < excodeCol->data.size()) {
-                QVariant excodeVal = excodeCol->data.value(i);
-                if (!DataProcessor::isMissingValue(excodeVal)) {
-                    expCode = excodeVal.toString();
-                }
-            }
-            if (crCol && i < crCol->data.size()) {
-                QVariant crVal = crCol->data.value(i);
-                if (!DataProcessor::isMissingValue(crVal)) {
-                    cropCode = crVal.toString();
-                }
-            }
-
-            // Create experiment key (use experiment code when available)
-            QString experimentKey = expCode.isEmpty() ? QString("Experiment") : expCode;
-
-            allPoints.append(QPointF(x, y));
-
-            experimentPoints[experimentKey].append(QPointF(x, y));
-            if (!cropCode.isEmpty()) {
-                experimentCropCodes[experimentKey] = cropCode;
-            }
-        }
-        
-        qDebug() << "PlotWidget::plotScatter() - Valid points found:" << validPointCount;
-        
-        if (allPoints.isEmpty()) {
-            qWarning() << "PlotWidget: No valid data points for scatter plot";
-            qWarning() << "  Total rows processed:" << evaluateData.rowCount;
-            qWarning() << "  Valid points found:" << validPointCount;
-            return;
-        }
-        
-        // Chart is already cleared by clear() call at the beginning of this function
-        // Just ensure plotDataList is cleared
-        m_plotDataList.clear();
-        
-        // Create a single scatter series for all points with one shape marker
-        // Extract base variable name (remove trailing 's' or 'm') to get full name
-        QString baseVarName = yVar;
-        if (baseVarName.endsWith("s", Qt::CaseInsensitive) || baseVarName.endsWith("m", Qt::CaseInsensitive)) {
-            baseVarName.chop(1); // Remove the last character ('s' or 'm')
-        }
-        
-        // Try to get full name: first try base name (uppercase), then original variable name
-        QPair<QString, QString> baseVarInfo = DataProcessor::getVariableInfo(baseVarName.toUpper());
-        QString yTitle;
-        if (!baseVarInfo.first.isEmpty()) {
-            yTitle = baseVarInfo.first;
-        } else {
-            // Try original variable name (uppercase)
-            QPair<QString, QString> origVarInfo = DataProcessor::getVariableInfo(yVar.toUpper());
-            if (!origVarInfo.first.isEmpty()) {
-                yTitle = origVarInfo.first;
-            } else {
-                // Fallback to base name if no info found
-                yTitle = baseVarName;
-            }
-        }
-        
-        // Use a default color (blue) for all points
-        QColor pointColor = QColor("#1f77b4"); // Default blue color
-        
-        QScatterSeries *scatterSeries = new QScatterSeries();
-        scatterSeries->setUseOpenGL(false);
-        scatterSeries->setName(yTitle); // Use base variable full name instead of treatment
-        scatterSeries->setColor(pointColor);
-        scatterSeries->setMarkerSize(8.0);
-        scatterSeries->setMarkerShape(QScatterSeries::MarkerShapeCircle);
-        scatterSeries->setPen(QPen(pointColor, 2));
-        scatterSeries->setBrush(QBrush(pointColor));
-        
-        for (const QPointF &point : allPoints) {
-            scatterSeries->append(point);
-        }
-        
-        m_chart->addSeries(scatterSeries);
-        
-        // Store plot data for legend (variable-based, not treatment-based)
-        QSharedPointer<PlotData> plotData = QSharedPointer<PlotData>::create();
-        plotData->treatment = ""; // No treatment grouping
-        plotData->treatmentName = yTitle; // Use variable name
-        plotData->variable = yVar;
-        plotData->points = allPoints;
-        plotData->color = pointColor;
-        plotData->isObserved = false;
-        plotData->series = scatterSeries;
-        plotData->pen = QPen(pointColor, 2);
-        plotData->brush = QBrush(pointColor);
-        plotData->symbol = "o";
-        m_plotDataList.append(plotData);
-        
-        // Add 1:1 reference line
-        QLineSeries *referenceLine = new QLineSeries();
-        referenceLine->setName("1:1 Line");
-        referenceLine->setColor(Qt::black);
-        QPen refPen(Qt::black, 2, Qt::DashLine);
-        referenceLine->setPen(refPen);
-        
-        // Find min/max independently for X (measured) and Y (simulated)
-        double xMinData = std::numeric_limits<double>::max();
-        double xMaxData = std::numeric_limits<double>::lowest();
-        double yMinData = std::numeric_limits<double>::max();
-        double yMaxData = std::numeric_limits<double>::lowest();
-        for (const QPointF &point : allPoints) {
-            xMinData = qMin(xMinData, point.x());
-            xMaxData = qMax(xMaxData, point.x());
-            yMinData = qMin(yMinData, point.y());
-            yMaxData = qMax(yMaxData, point.y());
-        }
-
-        // Helper: compute nice axis bounds (floor/ceil to multiples of 5*10^n), never below 0
-        // outFormat receives a label format string suited to the step size
-        auto niceAxis = [](double dataMin, double dataMax, double &outMin, double &outMax, int &outTicks, QString &outFormat) {
-            // Add 5% padding, with a minimum absolute pad so tiny ranges still get breathing room
-            double range = dataMax - dataMin;
-            double pad = qMax(range * 0.05, range > 0 ? range * 0.05 : 1.0);
-            if (range < 1.0) pad = qMax(pad, 1.0); // at least 1 unit pad for near-constant data
-            dataMin -= pad;
-            dataMax += pad;
-            dataMin = qMax(0.0, dataMin); // clamp: no negative axis
-            if (dataMax <= dataMin) dataMax = dataMin + 1.0;
-            double rawRange = dataMax - dataMin;
-            double roughStep = rawRange / 5.0;
-            if (roughStep <= 0) roughStep = 1.0;
-            double mag = qPow(10.0, qFloor(std::log10(roughStep)));
-            double norm = roughStep / mag;
-            double step;
-            if      (norm < 3.5) step = 5.0 * mag;
-            else if (norm < 7.5) step = 5.0 * mag;
-            else                 step = 10.0 * mag;
-            // Ensure step is at least 1 for integer-valued data to avoid duplicate labels
-            if (step < 1.0) step = 1.0;
-            outMin = qFloor(dataMin / step) * step;
-            outMin = qMax(0.0, outMin);               // never go below zero
-            outMax = qCeil(dataMax  / step) * step;
-            if (outMax <= outMin) outMax = outMin + step;
-            outTicks = qRound((outMax - outMin) / step) + 1;
-            outFormat = (step < 1.0) ? "%.1f" : "%.0f";
-        };
-
-        double xNiceMin, xNiceMax, yNiceMin, yNiceMax;
-        int xTicks, yTicks;
-        QString xLabelFormat, yLabelFormat;
-        niceAxis(xMinData, xMaxData, xNiceMin, xNiceMax, xTicks, xLabelFormat);
-        niceAxis(yMinData, yMaxData, yNiceMin, yNiceMax, yTicks, yLabelFormat);
-
-        // 1:1 reference line spans the union of both axes so it always crosses the plot area
-        double refMin = qMin(xNiceMin, yNiceMin);
-        double refMax = qMax(xNiceMax, yNiceMax);
-        referenceLine->append(refMin, refMin);
-        referenceLine->append(refMax, refMax);
-        m_chart->addSeries(referenceLine);
-
-        qDebug() << "PlotWidget::plotScatter() - X range:" << xNiceMin << xNiceMax
-                 << "Y range:" << yNiceMin << yNiceMax;
-
-        // Setup axes
-        QValueAxis *xAxis = new QValueAxis();
-        QValueAxis *yAxis = new QValueAxis();
-
-        // Extract base variable name for X axis (remove trailing 'm')
-        QString baseXVarName = xVar;
-        if (baseXVarName.endsWith("m", Qt::CaseInsensitive))
-            baseXVarName.chop(1);
-
-        QPair<QString, QString> baseXVarInfo = DataProcessor::getVariableInfo(baseXVarName.toUpper());
-        QString xTitle;
-        if (!baseXVarInfo.first.isEmpty()) {
-            xTitle = baseXVarInfo.first;
-        } else {
-            QPair<QString, QString> origXVarInfo = DataProcessor::getVariableInfo(xVar.toUpper());
-            xTitle = origXVarInfo.first.isEmpty() ? baseXVarName : origXVarInfo.first;
-        }
-        // yTitle already declared above (using base variable name)
-
-        xAxis->setTitleText(xTitle + " (measured)");
-        yAxis->setTitleText(yTitle + " (simulated)");
-
-        xAxis->setRange(xNiceMin, xNiceMax);
-        yAxis->setRange(yNiceMin, yNiceMax);
-        xAxis->setTickCount(xTicks);
-        yAxis->setTickCount(yTicks);
-        xAxis->setLabelFormat(xLabelFormat);
-        yAxis->setLabelFormat(yLabelFormat);
-        xAxis->setLinePen(QPen(Qt::black));
-        yAxis->setLinePen(QPen(Qt::black));
-        xAxis->setLabelsBrush(QBrush(Qt::black));
-        yAxis->setLabelsBrush(QBrush(Qt::black));
-
-        // Add axes to chart (using non-deprecated method)
-        m_chart->addAxis(xAxis, Qt::AlignBottom);
-        m_chart->addAxis(yAxis, Qt::AlignLeft);
-        
-        // Attach series to axes
-        for (QAbstractSeries *series : m_chart->series()) {
-            if (series != referenceLine) {
-                static_cast<QXYSeries*>(series)->attachAxis(xAxis);
-                static_cast<QXYSeries*>(series)->attachAxis(yAxis);
-            }
-        }
-        referenceLine->attachAxis(xAxis);
-        referenceLine->attachAxis(yAxis);
-        
-        // Calculate metrics for each experiment (since scatter data has one point per treatment)
-        QVector<QMap<QString, QVariant>> metrics;
-        for (auto it = experimentPoints.begin(); it != experimentPoints.end(); ++it) {
-            QString experimentKey = it.key();
-            QVector<QPointF> points = it.value();
-            
-            QVector<double> xValues, yValues;
-            for (const QPointF &point : points) {
-                xValues.append(point.x());
-                yValues.append(point.y());
-            }
-            
-            // Calculate metrics (X = measured, Y = simulated)
-            QVariantMap metricResult = MetricsCalculator::calculateMetrics(yValues, xValues, 0);
-            
-            // Calculate R² for scatter plots
-            double rSquared = MetricsCalculator::rSquared(xValues, yValues);
-            metricResult["R²"] = rSquared;
-            
-            QMap<QString, QVariant> metricMap;
-            for (auto it2 = metricResult.begin(); it2 != metricResult.end(); ++it2) {
-                metricMap[it2.key()] = it2.value();
-            }
-            metricMap["Treatment"] = experimentKey;
-            metricMap["TreatmentName"] = experimentKey;
-            metricMap["Experiment"] = experimentKey;
-            metricMap["ExperimentName"] = experimentKey;
-            metricMap["Variable"] = baseVarName; // Use base variable name (without 's' or 'm')
-            metricMap["VariableName"] = yTitle; // Use full name from variable info
-
-            QString cropCodeForExp = experimentCropCodes.value(experimentKey);
-            if (!cropCodeForExp.isEmpty()) {
-                metricMap["Crop"] = cropCodeForExp;
-                QString cropDisplay = getCropNameFromCode(cropCodeForExp);
-                if (!cropDisplay.isEmpty()) {
-                    metricMap["CropName"] = cropDisplay;
-                }
-            }
-            metrics.append(metricMap);
-        }
-        
-        // Sort scatter plot metrics by Experiment (which serves as treatment identifier), then by Variable and Crop
-        if (!metrics.isEmpty()) {
-            std::sort(metrics.begin(), metrics.end(), [](const QMap<QString, QVariant>& a, const QMap<QString, QVariant>& b) {
-                // Sort by Experiment (treatment identifier in scatter plots)
-                QString expA = a.value("Experiment").toString();
-                QString expB = b.value("Experiment").toString();
-                
-                // Try to extract numeric part for numerical sorting
-                bool okA, okB;
-                int expNumA = expA.toInt(&okA);
-                int expNumB = expB.toInt(&okB);
-                
-                if (okA && okB) {
-                    if (expNumA != expNumB) {
-                        return expNumA < expNumB;
-                    }
-                } else {
-                    if (expA != expB) {
-                        return expA < expB;
-                    }
-                }
-                
-                // If experiments are equal, sort by Variable
-                QString varA = a.value("Variable").toString();
-                QString varB = b.value("Variable").toString();
-                if (varA != varB) {
-                    return varA < varB;
-                }
-                
-                // If variables are equal, sort by Crop
-                QString cropA = a.value("Crop").toString();
-                QString cropB = b.value("Crop").toString();
-                return cropA < cropB;
-            });
-        }
-        
-        // Emit metrics signal
-        emit metricsCalculated(metrics);
-        
-        // Update legend (updateLegend uses m_plotDataList internally, parameter is unused)
-        QVector<PlotData> emptyPlotDataList;
-        updateLegend(emptyPlotDataList);
-        
-        emit plotUpdated();
-        
-    } catch (const std::exception& e) {
-        QString error = QString("Error in plotScatter: %1").arg(e.what());
-        qWarning() << error;
-        emit errorOccurred(error);
+    // Cap at 9 variables
+    QStringList vars = varNames.mid(0, 9);
+    if (vars.isEmpty()) {
+        qWarning() << "PlotWidget::plotScatter() - No variables provided";
+        return;
     }
+
+    if (evaluateData.rowCount == 0) {
+        qWarning() << "PlotWidget::plotScatter() - No data";
+        return;
+    }
+
+    // --- Gather experiment colors from EXCODE (last 4 chars) ---
+    const DataColumn *excodeCol = evaluateData.getColumn("EXCODE");
+    const DataColumn *crCol     = evaluateData.getColumn("CR");
+
+    // Build sorted unique experiment labels
+    QStringList expOrder;
+    QMap<int, QString> rowExp; // row index -> experiment label (last 4 chars of EXCODE)
+    for (int i = 0; i < evaluateData.rowCount; ++i) {
+        QString raw = excodeCol ? excodeCol->data.value(i).toString() : QString();
+        QString label = raw.length() >= 4 ? raw.right(4) : raw;
+        if (label.isEmpty()) label = "?";
+        rowExp[i] = label;
+        if (!expOrder.contains(label)) expOrder.append(label);
+    }
+    std::sort(expOrder.begin(), expOrder.end(), [](const QString &a, const QString &b) {
+        bool okA, okB;
+        int na = a.toInt(&okA), nb = b.toInt(&okB);
+        if (okA && okB) return na < nb;
+        return a < b;
+    });
+
+    // Assign colors to experiments (palette matching R ggplot default hues)
+    static const QVector<QColor> kPalette = {
+        QColor("#F8766D"), QColor("#7CAE00"), QColor("#00BFC4"), QColor("#C77CFF"),
+        QColor("#FF7F00"), QColor("#A65628"), QColor("#F781BF"), QColor("#999999"),
+        QColor("#E41A1C"), QColor("#377EB8"), QColor("#4DAF4A"), QColor("#984EA3")
+    };
+    QMap<QString, QColor> expColor;
+    for (int ei = 0; ei < expOrder.size(); ++ei)
+        expColor[expOrder[ei]] = kPalette[ei % kPalette.size()];
+
+    // --- Nice-axis helper (reused per panel) ---
+    auto niceAxis = [](double dataMin, double dataMax,
+                       double &outMin, double &outMax, int &outTicks, QString &outFmt) {
+        double range = dataMax - dataMin;
+        double pad = (range > 0) ? range * 0.05 : 1.0;
+        if (range < 1.0) pad = qMax(pad, 0.5 * range + 0.5);
+        dataMin -= pad;  dataMax += pad;
+        if (dataMax <= dataMin) dataMax = dataMin + 1.0;
+        double rawRange = dataMax - dataMin;
+        double roughStep = rawRange / 5.0;
+        if (roughStep <= 0) roughStep = 1.0;
+        double mag  = qPow(10.0, qFloor(std::log10(roughStep)));
+        double norm = roughStep / mag;
+        double step = (norm < 7.5) ? 5.0 * mag : 10.0 * mag;
+        if (step < 1e-10) step = 1.0;
+        outMin  = qFloor(dataMin / step) * step;
+        outMax  = qCeil (dataMax / step) * step;
+        if (outMax <= outMin) outMax = outMin + step;
+        outTicks = qRound((outMax - outMin) / step) + 1;
+        outFmt   = (step < 1.0) ? QString("%.2g") : QString("%.0f");
+    };
+
+    // --- Build / reset scatter scroll area ---
+    // Hide the regular chart view; show scatter panels instead
+    if (m_chartView) m_chartView->setVisible(false);
+    if (m_bottomContainer) m_bottomContainer->setVisible(false);
+
+    // Destroy old panels
+    for (QChartView *cv : m_scatterPanelViews) { cv->deleteLater(); }
+    m_scatterPanelViews.clear();
+
+    if (!m_scatterScrollArea) {
+        m_scatterScrollArea = new QScrollArea();
+        m_scatterScrollArea->setWidgetResizable(true);
+        m_scatterScrollArea->setFrameShape(QFrame::NoFrame);
+        m_scatterPanelContainer = new QWidget();
+        m_scatterPanelGrid = new QGridLayout(m_scatterPanelContainer);
+        m_scatterPanelGrid->setSpacing(4);
+        m_scatterPanelGrid->setContentsMargins(4, 4, 4, 4);
+        m_scatterScrollArea->setWidget(m_scatterPanelContainer);
+        // Insert at position 0 in left layout (where chartView lives)
+        m_leftLayout->insertWidget(0, m_scatterScrollArea, 1);
+    }
+
+    // Remove old items from grid
+    while (m_scatterPanelGrid->count()) {
+        QLayoutItem *item = m_scatterPanelGrid->takeAt(0);
+        if (item->widget()) item->widget()->deleteLater();
+        delete item;
+    }
+
+    m_scatterScrollArea->setVisible(true);
+
+    // --- Determine grid layout ---
+    int n     = vars.size();
+    int nCols = qMin(n, 3);
+    int nRows = (n + nCols - 1) / nCols;
+    // For 4 vars: 2×2
+    if (n == 4) { nCols = 2; nRows = 2; }
+
+    // Compute minimum panel size so each panel is roughly square
+    int panelSize = 260;
+
+    // --- Build one panel per variable ---
+    QVector<QMap<QString, QVariant>> allMetrics;
+
+    for (int vi = 0; vi < vars.size(); ++vi) {
+        QString baseVar = vars[vi].toUpper();
+        QString simVar  = baseVar + "S";
+        QString measVar = baseVar + "M";
+
+        // Case-insensitive column lookup
+        auto findCol = [&](const QString &name) -> const DataColumn* {
+            for (const QString &cn : evaluateData.columnNames)
+                if (cn.compare(name, Qt::CaseInsensitive) == 0)
+                    return evaluateData.getColumn(cn);
+            return nullptr;
+        };
+        const DataColumn *simCol  = findCol(simVar);
+        const DataColumn *measCol = findCol(measVar);
+        if (!simCol || !measCol) {
+            qDebug() << "plotScatter: skipping" << baseVar << "- missing columns";
+            continue;
+        }
+
+        // Collect points per experiment
+        // key = experiment label; value = list of (sim, meas) points
+        // X = simulated, Y = measured  (matching R plot)
+        QMap<QString, QVector<QPointF>> expPoints;
+        for (int i = 0; i < evaluateData.rowCount; ++i) {
+            QVariant sv = simCol->data.value(i);
+            QVariant mv = measCol->data.value(i);
+            if (DataProcessor::isMissingValue(sv) || DataProcessor::isMissingValue(mv)) continue;
+            bool okS, okM;
+            double s = DataProcessor::toDouble(sv, &okS);
+            double m = DataProcessor::toDouble(mv, &okM);
+            if (!okS || !okM) continue;
+            if (s < 0 || m < 0) continue; // treat negatives as missing (like R code)
+            expPoints[rowExp[i]].append(QPointF(s, m));
+        }
+        if (expPoints.isEmpty()) continue;
+
+        // Compute overall range across all points for shared axis
+        double xMin = std::numeric_limits<double>::max();
+        double xMax = std::numeric_limits<double>::lowest();
+        double yMin = std::numeric_limits<double>::max();
+        double yMax = std::numeric_limits<double>::lowest();
+        int totalPts = 0;
+        for (const auto &pts : expPoints) {
+            for (const QPointF &p : pts) {
+                xMin = qMin(xMin, p.x()); xMax = qMax(xMax, p.x());
+                yMin = qMin(yMin, p.y()); yMax = qMax(yMax, p.y());
+                ++totalPts;
+            }
+        }
+        if (totalPts == 0) continue;
+
+        // Use combined range for both axes (free per variable, but X=Y scale for 1:1 line)
+        double combinedMin = qMin(xMin, yMin);
+        double combinedMax = qMax(xMax, yMax);
+        double axMin, axMax;
+        int    axTicks;
+        QString axFmt;
+        niceAxis(combinedMin, combinedMax, axMin, axMax, axTicks, axFmt);
+
+        // Compute RMSE and R² over all points
+        QVector<double> simVals, measVals;
+        for (const auto &pts : expPoints)
+            for (const QPointF &p : pts) { simVals.append(p.x()); measVals.append(p.y()); }
+        double rmse = 0;
+        for (int k = 0; k < simVals.size(); ++k) {
+            double d = measVals[k] - simVals[k];
+            rmse += d * d;
+        }
+        rmse = std::sqrt(rmse / simVals.size());
+        double r2 = MetricsCalculator::rSquared(simVals, measVals);
+
+        // Build panel chart
+        QChart *chart = new QChart();
+        chart->setBackgroundBrush(QBrush(Qt::white));
+        chart->setPlotAreaBackgroundBrush(QBrush(Qt::white));
+        chart->setPlotAreaBackgroundVisible(true);
+        chart->legend()->setVisible(false);
+        chart->setMargins(QMargins(2, 2, 2, 2));
+
+        // Title = base variable name (bold, via chart title)
+        chart->setTitle(QString("<b>%1</b>").arg(baseVar));
+        QFont titleFont; titleFont.setPointSize(9); titleFont.setBold(true);
+        chart->setTitleFont(titleFont);
+
+        // 1:1 reference line
+        QLineSeries *refLine = new QLineSeries();
+        QPen refPen(QColor("#666666"), 1, Qt::DashLine);
+        refLine->setPen(refPen);
+        refLine->append(axMin, axMin);
+        refLine->append(axMax, axMax);
+        chart->addSeries(refLine);
+
+        // One scatter series per experiment
+        for (const QString &expLabel : expOrder) {
+            if (!expPoints.contains(expLabel)) continue;
+            QScatterSeries *ss = new QScatterSeries();
+            ss->setName(expLabel);
+            QColor c = expColor.value(expLabel, Qt::gray);
+            ss->setColor(c);
+            ss->setBorderColor(c.darker(120));
+            ss->setMarkerSize(7.0);
+            ss->setMarkerShape(QScatterSeries::MarkerShapeCircle);
+            ss->setUseOpenGL(false);
+            for (const QPointF &p : expPoints[expLabel]) ss->append(p);
+            chart->addSeries(ss);
+        }
+
+        // Axes (shared scale)
+        QValueAxis *xAx = new QValueAxis();
+        QValueAxis *yAx = new QValueAxis();
+        xAx->setRange(axMin, axMax); xAx->setTickCount(qMin(axTicks, 6));
+        yAx->setRange(axMin, axMax); yAx->setTickCount(qMin(axTicks, 6));
+        xAx->setLabelFormat(axFmt);  yAx->setLabelFormat(axFmt);
+        xAx->setTitleText("Simulated");
+        yAx->setTitleText("Measured");
+        QFont axFont; axFont.setPointSize(8);
+        xAx->setLabelsFont(axFont);  yAx->setLabelsFont(axFont);
+        QFont axTitleFont; axTitleFont.setPointSize(8);
+        xAx->setTitleFont(axTitleFont); yAx->setTitleFont(axTitleFont);
+        xAx->setGridLineVisible(true);  yAx->setGridLineVisible(true);
+        chart->addAxis(xAx, Qt::AlignBottom);
+        chart->addAxis(yAx, Qt::AlignLeft);
+        for (QAbstractSeries *s : chart->series()) {
+            static_cast<QXYSeries*>(s)->attachAxis(xAx);
+            static_cast<QXYSeries*>(s)->attachAxis(yAx);
+        }
+
+        // Chart view
+        QChartView *cv = new QChartView(chart);
+        cv->setRenderHint(QPainter::Antialiasing);
+        cv->setMinimumSize(panelSize, panelSize);
+        cv->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+
+        // RMSE / R² overlay label (top-left inside chart view using absolute position)
+        // We use a QLabel child of the chart view, repositioned on first show
+        QString statsText = QString("RMSE = %1\nR² = %2")
+            .arg(rmse, 0, 'f', rmse < 1 ? 3 : (rmse < 100 ? 2 : 1))
+            .arg(r2,   0, 'f', 2);
+        QLabel *statsLabel = new QLabel(statsText, cv);
+        statsLabel->setStyleSheet(
+            "QLabel { background: rgba(255,255,255,180); font-size: 9px; "
+            "padding: 2px 4px; border: none; }");
+        statsLabel->setAlignment(Qt::AlignLeft | Qt::AlignTop);
+        statsLabel->adjustSize();
+        statsLabel->move(48, 10);  // approximate; fine-tuned after layout
+        statsLabel->raise();
+        statsLabel->show();
+
+        int row = vi / nCols;
+        int col = vi % nCols;
+        m_scatterPanelGrid->addWidget(cv, row, col);
+        m_scatterPanelViews.append(cv);
+
+        // Collect metrics
+        QMap<QString, QVariant> mmap;
+        mmap["Variable"] = baseVar;
+        mmap["RMSE"]     = rmse;
+        mmap["R²"]       = r2;
+        mmap["N"]        = totalPts;
+        allMetrics.append(mmap);
+    }
+
+    // --- Build legend in right panel ---
+    clearLegend();
+    if (m_legendStack) m_legendStack->setCurrentIndex(1);
+
+    // Title
+    QLabel *legendTitle = new QLabel("Experiment");
+    legendTitle->setStyleSheet("font-weight: bold; font-size: 10px; padding: 4px 0px 2px 0px;");
+    m_legendLayout->addWidget(legendTitle);
+
+    for (const QString &expLabel : expOrder) {
+        QWidget *row = new QWidget();
+        QHBoxLayout *hl = new QHBoxLayout(row);
+        hl->setContentsMargins(0, 1, 0, 1);
+        hl->setSpacing(4);
+
+        QLabel *swatch = new QLabel();
+        swatch->setFixedSize(12, 12);
+        QColor c = expColor.value(expLabel, Qt::gray);
+        swatch->setStyleSheet(QString("background-color: %1; border-radius: 6px;").arg(c.name()));
+        QLabel *txt = new QLabel(expLabel);
+        txt->setStyleSheet("font-size: 10px;");
+
+        hl->addWidget(swatch);
+        hl->addWidget(txt);
+        hl->addStretch();
+        m_legendLayout->addWidget(row);
+    }
+
+    emit metricsCalculated(allMetrics);
+    emit plotUpdated();
 }
 
 

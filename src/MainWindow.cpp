@@ -1129,145 +1129,77 @@ void MainWindow::updateVariableComboBoxes()
         }
     }
     
-    // For EVALUATE.OUT files (scatter plot tab), use special variable population
+    // For EVALUATE.OUT files (scatter plot tab): show base variable names (e.g. "ADAP", "CWAM")
+    // in the Y list as a multi-select. X combo is hidden/unused for scatter.
     if (isEvaluateFile) {
-        // Set Y variable list to single selection mode for scatter plots (only one Y variable can be plotted)
-        if (m_yVariableComboBox) {
-            m_yVariableComboBox->setSelectionMode(QListWidget::SingleSelection);
-        }
-        
-        // Get all variables from EVALUATE.OUT data
-        QVector<QPair<QString, QString>> allVars = DataProcessor::getAllEvaluateVariables(m_evaluateData);
-        
-        // Build a set of base variable names that have both "s" and "m" versions with valid data
-        QSet<QString> variablesWithBothVersions;
-        
-        // First, collect all base variable names from the actual column names
-        QMap<QString, QString> baseToSimCol;  // base name (lowercase) -> actual sim column name
-        QMap<QString, QString> baseToMeasCol; // base name (lowercase) -> actual meas column name
-        
-        qDebug() << "MainWindow::updateVariableComboBoxes() - Checking EVALUATE.OUT columns for asterisk logic";
-        qDebug() << "  Total columns:" << m_evaluateData.columnNames.size();
-        
+        if (m_yVariableComboBox)
+            m_yVariableComboBox->setSelectionMode(QListWidget::MultiSelection);
+
+        // Collect base names that have both a simulated (S) and measured (M) column with valid data
+        QStringList baseNames;
+        QMap<QString, QString> baseToSim, baseToMeas; // uppercase base -> actual column name
+
         for (const QString &colName : m_evaluateData.columnNames) {
-            QString upperCol = colName.toUpper();
-            if (upperCol.endsWith("S") && upperCol.length() > 1) {
-                QString baseName = upperCol.left(upperCol.length() - 1).toLower();
-                baseToSimCol[baseName] = colName; // Store actual column name (preserving case)
-                qDebug() << "  Found sim column:" << colName << "-> base:" << baseName;
-            } else if (upperCol.endsWith("M") && upperCol.length() > 1) {
-                QString baseName = upperCol.left(upperCol.length() - 1).toLower();
-                baseToMeasCol[baseName] = colName; // Store actual column name (preserving case)
-                qDebug() << "  Found meas column:" << colName << "-> base:" << baseName;
-            }
+            QString upper = colName.toUpper();
+            if (upper.length() <= 1) continue;
+            if (upper.endsWith("S"))
+                baseToSim[upper.left(upper.length() - 1)] = colName;
+            else if (upper.endsWith("M"))
+                baseToMeas[upper.left(upper.length() - 1)] = colName;
         }
-        
-        qDebug() << "  Found" << baseToSimCol.size() << "sim columns and" << baseToMeasCol.size() << "meas columns";
-        
-        // Check which base names have both versions with valid data
-        for (auto it = baseToSimCol.begin(); it != baseToSimCol.end(); ++it) {
-            QString baseKey = it.key();
-            if (baseToMeasCol.contains(baseKey)) {
-                // Both versions exist, check for valid data
-                QString simColName = it.value();
-                QString measColName = baseToMeasCol[baseKey];
-                
-                const DataColumn *simCol = m_evaluateData.getColumn(simColName);
-                const DataColumn *measCol = m_evaluateData.getColumn(measColName);
-                
-                bool hasValidSimData = false;
-                bool hasValidMeasData = false;
-                
-                if (simCol) {
-                    for (const QVariant &value : simCol->data) {
-                        if (!DataProcessor::isMissingValue(value)) {
-                            hasValidSimData = true;
-                            break;
-                        }
-                    }
-                } else {
-                    qDebug() << "  WARNING: Sim column" << simColName << "not found in data";
+
+        // Metadata columns that happen to end with S or M — exclude them
+        static const QSet<QString> kExclude = {
+            "RUN", "RUNNO", "TRNO", "EXPNO", "EXPERIMENT", "TREATMENT",
+            "TRTNO", "TRT", "EXP", "EXCODE", "CR", "RN", "REP", "EXNAM"
+        };
+
+        for (auto it = baseToSim.begin(); it != baseToSim.end(); ++it) {
+            QString base = it.key();
+            if (kExclude.contains(base)) continue;
+            if (!baseToMeas.contains(base)) continue;
+
+            // Check both columns have at least one valid (non-missing, non-negative) value
+            auto hasValid = [&](const QString &cn) {
+                const DataColumn *col = m_evaluateData.getColumn(cn);
+                if (!col) return false;
+                for (const QVariant &v : col->data) {
+                    if (DataProcessor::isMissingValue(v)) continue;
+                    bool ok; double d = v.toDouble(&ok);
+                    if (ok && d >= 0) return true;
                 }
-                
-                if (measCol) {
-                    for (const QVariant &value : measCol->data) {
-                        if (!DataProcessor::isMissingValue(value)) {
-                            hasValidMeasData = true;
-                            break;
-                        }
-                    }
-                } else {
-                    qDebug() << "  WARNING: Meas column" << measColName << "not found in data";
-                }
-                
-                // Only add asterisk if both versions have valid data
-                if (hasValidSimData && hasValidMeasData) {
-                    variablesWithBothVersions.insert(baseKey);
-                    qDebug() << "  ✓ Variable" << baseKey << "has both simulated (" << simColName 
-                             << ") and measured (" << measColName << ") data with valid values - adding asterisk";
-                } else {
-                    qDebug() << "  ✗ Variable" << baseKey << "missing valid data - sim:" << hasValidSimData << "meas:" << hasValidMeasData;
-                }
-            }
+                return false;
+            };
+            if (!hasValid(it.value()) || !hasValid(baseToMeas[base])) continue;
+
+            baseNames.append(base);
         }
-        
-        qDebug() << "  Total variables with both versions:" << variablesWithBothVersions.size();
-        
-        // For scatter plots: X-axis = variables ending with "m" (measured), Y-axis = variables ending with "s" (simulated)
-        for (const QPair<QString, QString> &varPair : allVars) {
-            QString displayName = varPair.first;
-            QString columnName = varPair.second;
-            
-            // Extract base variable name (remove trailing 's' or 'm') to get full name from variable info
-            QString baseVarName = columnName;
-            if (baseVarName.endsWith("s", Qt::CaseInsensitive) || baseVarName.endsWith("m", Qt::CaseInsensitive)) {
-                baseVarName.chop(1); // Remove the last character ('s' or 'm')
-            }
-            
-            // Get full name using base variable name (try uppercase base name first)
-            QPair<QString, QString> baseVarInfo = DataProcessor::getVariableInfo(baseVarName.toUpper());
-            QString fullDisplayName;
-            if (!baseVarInfo.first.isEmpty()) {
-                fullDisplayName = baseVarInfo.first;
-            } else {
-                // Try original variable name (uppercase)
-                QPair<QString, QString> origVarInfo = DataProcessor::getVariableInfo(columnName.toUpper());
-                if (!origVarInfo.first.isEmpty()) {
-                    fullDisplayName = origVarInfo.first;
-                } else {
-                    // Fallback to original display name if no info found
-                    fullDisplayName = displayName;
-                }
-            }
-            
-            // Check if this variable has both "s" and "m" versions - add asterisk if so
-            bool hasBothVersions = variablesWithBothVersions.contains(baseVarName.toLower());
-            if (hasBothVersions) {
-                fullDisplayName = "* " + fullDisplayName;
-            }
-            
-            // Check if variable ends with "m" (measured) - add to X variable combo box
-            if (columnName.endsWith("m", Qt::CaseInsensitive)) {
-                m_xVariableComboBox->addItem(fullDisplayName, columnName);
-            }
-            
-            // Check if variable ends with "s" (simulated) - add to Y variable list widget
-            if (columnName.endsWith("s", Qt::CaseInsensitive)) {
-                QListWidgetItem *item = new QListWidgetItem();
-                item->setText(fullDisplayName);
-                item->setData(Qt::UserRole, columnName);
-                m_yVariableComboBox->addItem(item);
-            }
+        baseNames.sort();
+
+        // Clear X combo (not used for scatter), hide label
+        m_xVariableComboBox->clear();
+        m_xVariableComboBox->setVisible(false);
+
+        // Populate Y list with base names
+        for (const QString &base : baseNames) {
+            QPair<QString, QString> info = DataProcessor::getVariableInfo(base);
+            QString label = info.first.isEmpty() ? base : QString("%1 (%2)").arg(info.first, base);
+            QListWidgetItem *item = new QListWidgetItem(label);
+            item->setData(Qt::UserRole, base); // store base name (e.g. "ADAP")
+            m_yVariableComboBox->addItem(item);
         }
-        
-        qDebug() << "MainWindow::updateVariableComboBoxes() - Populated EVALUATE.OUT variables (X: m-ending, Y: s-ending)";
+
+        qDebug() << "MainWindow::updateVariableComboBoxes() - Scatter tab: populated" << baseNames.size() << "base variables";
         return;
     }
     
     // For non-EVALUATE files (time series), allow multiple Y variable selection
-    if (m_yVariableComboBox) {
+    if (m_yVariableComboBox)
         m_yVariableComboBox->setSelectionMode(QListWidget::MultiSelection);
-    }
+
+    // Restore X combo visibility (may have been hidden on scatter tab)
+    if (m_xVariableComboBox)
+        m_xVariableComboBox->setVisible(true);
 
     // Variables to exclude from Y variable list (these are typically X-axis or grouping variables)
     QStringList yVariableExclusions = {"YEAR", "WYEAR", "HYEAR", "RUNNO", "RUN", "CR", "FILEX",
@@ -1442,104 +1374,31 @@ void MainWindow::updateTreatmentComboBox()
 void MainWindow::updateScatterPlot()
 {
     qDebug() << "MainWindow::updateScatterPlot() - ENTRY POINT";
-    
-    // Use EVALUATE.OUT data for scatter plots
+
     if (m_evaluateData.rowCount == 0) {
-        qDebug() << "MainWindow::updateScatterPlot() - No EVALUATE.OUT data available. Aborting scatter plot update.";
-        m_statusWidget->showWarning("No EVALUATE.OUT data available for scatter plot. Please select EVALUATE.OUT files.");
+        m_statusWidget->showWarning("No EVALUATE.OUT data available. Please select an EVALUATE file.");
         return;
     }
-    
-    // Get selected Y variables from ListWidget (should end with "s" for simulated)
-    // For scatter plots, only one Y variable can be selected
-    QStringList yVars;
-    QList<QListWidgetItem*> selectedItems = m_yVariableComboBox->selectedItems();
-    for (QListWidgetItem* item : selectedItems) {
-        yVars.append(item->data(Qt::UserRole).toString());
+
+    // Collect selected base variable names from the Y list widget
+    QStringList selectedVars;
+    if (m_yVariableComboBox) {
+        for (QListWidgetItem *item : m_yVariableComboBox->selectedItems())
+            selectedVars.append(item->data(Qt::UserRole).toString());
     }
-    
-    if (yVars.isEmpty()) {
-        qDebug() << "MainWindow::updateScatterPlot() - No Y variables selected.";
-        m_statusWidget->showInfo("Please select a Y variable (ending with 's') for scatter plot");
+
+    if (selectedVars.isEmpty()) {
+        m_statusWidget->showInfo("Select one or more variables to plot.");
         return;
     }
-    
-    // If multiple Y variables are selected, only use the first one and clear others
-    if (yVars.size() > 1) {
-        qDebug() << "MainWindow::updateScatterPlot() - Multiple Y variables selected, using first one only";
-        // Clear other selections
-        for (int i = 1; i < selectedItems.size(); ++i) {
-            selectedItems[i]->setSelected(false);
-        }
-        yVars = QStringList() << yVars.first();
-        m_statusWidget->showInfo("Only one Y variable can be plotted in scatter plot. Using first selected variable.");
-    }
-    
-    // For EVALUATE.OUT files, automatically match Y variable (ending with "s") to X variable (ending with "m")
-    // Get the first selected Y variable and find its corresponding X variable
-    QString yVar = yVars.first();
-    QString xVar;
-    
-    // Check if current file is EVALUATE.OUT
-    bool isEvaluateFile = false;
-    if (m_fileListWidget) {
-        QList<QListWidgetItem*> selectedFileItems = m_fileListWidget->selectedItems();
-        if (!selectedFileItems.isEmpty()) {
-            QString firstSelectedFile = selectedFileItems.first()->text();
-            QString upperFileName = firstSelectedFile.toUpper();
-            isEvaluateFile = upperFileName.contains("EVALUATE") || upperFileName == "EVALUATE.OUT";
-        }
-    }
-    
-    if (isEvaluateFile && yVar.endsWith("s", Qt::CaseInsensitive)) {
-        // Find corresponding X variable by replacing "s" with "m"
-        QString baseName = yVar;
-        baseName.chop(1); // Remove the "s" at the end
-        QString correspondingXVar = baseName + "m";
-        
-        // Check if this variable exists in the data
-        if (m_currentData.columnNames.contains(correspondingXVar)) {
-            xVar = correspondingXVar;
-            // Automatically select it in the X combo box
-            int index = m_xVariableComboBox->findData(xVar);
-            if (index >= 0) {
-                m_xVariableComboBox->blockSignals(true);
-                m_xVariableComboBox->setCurrentIndex(index);
-                m_xVariableComboBox->blockSignals(false);
-            }
-            qDebug() << "MainWindow::updateScatterPlot() - Auto-matched X variable:" << xVar << "for Y variable:" << yVar;
-        } else {
-            // Fallback: use the currently selected X variable
-            xVar = m_xVariableComboBox->currentData(Qt::UserRole).toString();
-            qDebug() << "MainWindow::updateScatterPlot() - Could not find matching X variable for" << yVar << ", using selected:" << xVar;
-        }
-    } else {
-        // For non-EVALUATE files or if Y doesn't end with "s", use the selected X variable
-        xVar = m_xVariableComboBox->currentData(Qt::UserRole).toString();
-    }
-    
-    if (xVar.isEmpty()) {
-        qDebug() << "MainWindow::updateScatterPlot() - X variable not available.";
-        m_statusWidget->showInfo("Please select X variable (ending with 'm') for scatter plot");
-        return;
-    }
-    
-    qDebug() << "MainWindow::updateScatterPlot() - X variable:" << xVar;
-    qDebug() << "MainWindow::updateScatterPlot() - Y variables:" << yVars;
-    
-    // For scatter plot, plot each Y variable against X variable
+
+    // Cap at 9
+    if (selectedVars.size() > 9) selectedVars = selectedVars.mid(0, 9);
+
+    qDebug() << "MainWindow::updateScatterPlot() - Variables:" << selectedVars;
+
     if (m_scatterPlotWidget) {
-        QString treatment = m_treatmentComboBox ? m_treatmentComboBox->currentText() : "All";
-        QStringList treatments = treatment == "All" ? QStringList() : QStringList() << treatment;
-        
-        // Plot the first selected Y variable using EVALUATE.OUT data
-        m_scatterPlotWidget->plotScatter(
-            m_evaluateData,
-            xVar,
-            yVar,
-            treatments,
-            m_treatmentNames
-        );
+        m_scatterPlotWidget->plotScatter(m_evaluateData, selectedVars);
         qDebug() << "MainWindow::updateScatterPlot() - Scatter plot updated";
     } else {
         qWarning() << "MainWindow::updateScatterPlot() - Scatter plot widget is null!";
@@ -1645,50 +1504,26 @@ void MainWindow::updatePlot()
 
 void MainWindow::checkAndAutoSwitchToScatterPlot(bool autoPlot)
 {
-    // Only auto-switch if we're on the time series tab (index 0)
-    if (!m_tabWidget || m_tabWidget->currentIndex() != 0) {
+    if (!m_tabWidget || m_tabWidget->currentIndex() != 0)
         return;
-    }
-    
-    // Check if EVALUATE.OUT file is selected
+
     bool isEvaluateFile = false;
     if (m_fileListWidget) {
-        QList<QListWidgetItem*> selectedItems = m_fileListWidget->selectedItems();
-        if (!selectedItems.isEmpty()) {
-            QString firstSelectedFile = selectedItems.first()->text();
-            QString upperFileName = firstSelectedFile.toUpper();
-            isEvaluateFile = upperFileName.contains("EVALUATE") || upperFileName == "EVALUATE.OUT";
+        for (QListWidgetItem *item : m_fileListWidget->selectedItems()) {
+            if (item->text().toUpper().contains("EVALUATE")) { isEvaluateFile = true; break; }
         }
     }
-    
-    if (!isEvaluateFile) {
-        return; // Not an EVALUATE.OUT file, don't switch
-    }
-    
-    // Check if X and Y variables are selected
-    QString xVar = m_xVariableComboBox ? m_xVariableComboBox->currentData(Qt::UserRole).toString() : QString();
-    QList<QListWidgetItem*> selectedYItems = m_yVariableComboBox ? m_yVariableComboBox->selectedItems() : QList<QListWidgetItem*>();
-    
-    if (xVar.isEmpty() || selectedYItems.isEmpty()) {
-        return; // Variables not selected yet, wait
-    }
-    
-    // Check if EVALUATE data is loaded (not m_currentData which is time-series only)
-    if (m_evaluateData.rowCount == 0) {
-        return; // EVALUATE.OUT data not loaded yet
-    }
-    
-    // All conditions met: switch to scatter plot tab
+    if (!isEvaluateFile || m_evaluateData.rowCount == 0)
+        return;
+
     qDebug() << "MainWindow: Auto-switching to scatter plot tab for EVALUATE.OUT file";
-    m_tabWidget->setCurrentIndex(2); // Switch to scatter plot tab
-    
-    // Only auto-plot if requested (default is true for backward compatibility)
+    m_tabWidget->setCurrentIndex(2);
+
     if (autoPlot) {
-        // Update scatter plot immediately (tab switch is synchronous)
+        if (m_yVariableComboBox) m_yVariableComboBox->selectAll();
         updateScatterPlot();
         m_statusWidget->showSuccess("Automatically switched to scatter plot for EVALUATE.OUT file");
     } else {
-        // Just switch tabs, don't plot - user must click Refresh Plot
         m_statusWidget->showInfo("Switched to scatter plot tab. Click 'Refresh Plot' to view the scatter plot");
     }
 }
