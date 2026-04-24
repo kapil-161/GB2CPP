@@ -5359,6 +5359,61 @@ void PlotWidget::applyPlotSettings(const PlotSettings &settings)
         }
     }
 
+    // Apply settings live to all scatter panel charts (no full replot needed for style-only changes)
+    if (m_isScatterMode) {
+        QFont axFont(settings.fontFamily, settings.axisTickFontSize);
+        QFont axTitleFont(settings.fontFamily, settings.axisLabelFontSize);
+        axTitleFont.setBold(settings.boldAxisLabels);
+        int tickCount = (settings.xAxisTickCount > 0) ? settings.xAxisTickCount : 6;
+
+        for (QChartView *cv : m_scatterPanelViews) {
+            if (!cv || !cv->chart()) continue;
+            QChart *ch = cv->chart();
+            ch->setBackgroundBrush(QBrush(settings.backgroundColor));
+            ch->setPlotAreaBackgroundBrush(QBrush(settings.plotAreaColor));
+
+            for (QAbstractAxis *axis : ch->axes()) {
+                axis->setLabelsFont(axFont);
+                axis->setTitleFont(axTitleFont);
+                if (auto va = qobject_cast<QValueAxis*>(axis)) {
+                    va->setLabelsVisible(settings.showAxisLabels);
+                    va->setGridLineVisible(settings.showGrid);
+                    va->setMinorGridLineVisible(settings.showMinorGrid);
+                    va->setMinorTickCount(settings.showMinorGrid ? settings.minorTickCount : 0);
+                    va->setTickCount(qMin(tickCount, va->tickCount() > 0 ? 10 : 6));
+                }
+                if (ch->axes(Qt::Horizontal).contains(axis))
+                    axis->setTitleText(settings.showAxisTitles ? "Simulated" : "");
+                else
+                    axis->setTitleText(settings.showAxisTitles ? "Measured" : "");
+            }
+
+            for (QAbstractSeries *s : ch->series()) {
+                if (auto ss = qobject_cast<QScatterSeries*>(s))
+                    ss->setMarkerSize(settings.markerSize);
+            }
+
+            // Update strip label font size (child QLabel of panelWidget, not cv)
+            if (cv->parentWidget()) {
+                for (QLabel *lbl : cv->parentWidget()->findChildren<QLabel*>()) {
+                    if (lbl->parent() == cv->parentWidget()) { // strip label only
+                        lbl->setStyleSheet(QString(
+                            "QLabel { background-color: #e8e8e8; border: 1px solid #cccccc; "
+                            "font-weight: bold; font-size: %1px; padding: 3px 0px; }")
+                            .arg(settings.titleFontSize > 0 ? settings.titleFontSize : 10));
+                    }
+                }
+            }
+        }
+
+        // Update experiment legend font
+        if (m_legendWidget) {
+            QFont legendFont(settings.fontFamily, settings.legendFontSize);
+            for (QLabel *lbl : m_legendWidget->findChildren<QLabel*>())
+                lbl->setFont(legendFont);
+        }
+    }
+
     // Update internal settings
     m_showGrid = settings.showGrid;
     m_showLegend = settings.showLegend;
@@ -5682,15 +5737,13 @@ void PlotWidget::plotScatter(
         rmse = std::sqrt(rmse / simVals.size());
         double r2 = MetricsCalculator::rSquared(simVals, measVals);
 
-        // Build panel chart
+        // Build panel chart — honour m_plotSettings where applicable
         QChart *chart = new QChart();
-        chart->setBackgroundBrush(QBrush(Qt::white));
-        chart->setPlotAreaBackgroundBrush(QBrush(Qt::white));
+        chart->setBackgroundBrush(QBrush(m_plotSettings.backgroundColor));
+        chart->setPlotAreaBackgroundBrush(QBrush(m_plotSettings.plotAreaColor));
         chart->setPlotAreaBackgroundVisible(true);
         chart->legend()->setVisible(false);
         chart->setMargins(QMargins(2, 2, 2, 2));
-
-        // Title rendered as strip label above the chart view (not via QChart::setTitle)
         chart->setTitle("");
 
         // 1:1 reference line
@@ -5709,26 +5762,37 @@ void PlotWidget::plotScatter(
             QColor c = expColor.value(expLabel, Qt::gray);
             ss->setColor(c);
             ss->setBorderColor(c.darker(120));
-            ss->setMarkerSize(7.0);
+            ss->setMarkerSize(m_plotSettings.markerSize);
             ss->setMarkerShape(QScatterSeries::MarkerShapeCircle);
             ss->setUseOpenGL(false);
             for (const QPointF &p : expPoints[expLabel]) ss->append(p);
             chart->addSeries(ss);
         }
 
-        // Axes (shared scale)
+        // Axes — use settings for fonts, grid, tick count
         QValueAxis *xAx = new QValueAxis();
         QValueAxis *yAx = new QValueAxis();
-        xAx->setRange(axMin, axMax); xAx->setTickCount(qMin(axTicks, 6));
-        yAx->setRange(axMin, axMax); yAx->setTickCount(qMin(axTicks, 6));
+        int tickCount = (m_plotSettings.xAxisTickCount > 0)
+            ? qMin(m_plotSettings.xAxisTickCount, axTicks)
+            : qMin(axTicks, 6);
+        xAx->setRange(axMin, axMax); xAx->setTickCount(tickCount);
+        yAx->setRange(axMin, axMax); yAx->setTickCount(tickCount);
         xAx->setLabelFormat(axFmt);  yAx->setLabelFormat(axFmt);
-        xAx->setTitleText("Simulated");
-        yAx->setTitleText("Measured");
-        QFont axFont; axFont.setPointSize(8);
+        xAx->setTitleText(m_plotSettings.showAxisTitles ? "Simulated" : "");
+        yAx->setTitleText(m_plotSettings.showAxisTitles ? "Measured"  : "");
+        QFont axFont(m_plotSettings.fontFamily, m_plotSettings.axisTickFontSize);
         xAx->setLabelsFont(axFont);  yAx->setLabelsFont(axFont);
-        QFont axTitleFont; axTitleFont.setPointSize(8);
+        xAx->setLabelsVisible(m_plotSettings.showAxisLabels);
+        yAx->setLabelsVisible(m_plotSettings.showAxisLabels);
+        QFont axTitleFont(m_plotSettings.fontFamily, m_plotSettings.axisLabelFontSize);
+        axTitleFont.setBold(m_plotSettings.boldAxisLabels);
         xAx->setTitleFont(axTitleFont); yAx->setTitleFont(axTitleFont);
-        xAx->setGridLineVisible(true);  yAx->setGridLineVisible(true);
+        xAx->setGridLineVisible(m_plotSettings.showGrid);
+        yAx->setGridLineVisible(m_plotSettings.showGrid);
+        xAx->setMinorTickCount(m_plotSettings.showMinorGrid ? m_plotSettings.minorTickCount : 0);
+        yAx->setMinorTickCount(m_plotSettings.showMinorGrid ? m_plotSettings.minorTickCount : 0);
+        xAx->setMinorGridLineVisible(m_plotSettings.showMinorGrid);
+        yAx->setMinorGridLineVisible(m_plotSettings.showMinorGrid);
         chart->addAxis(xAx, Qt::AlignBottom);
         chart->addAxis(yAx, Qt::AlignLeft);
         for (QAbstractSeries *s : chart->series()) {
@@ -5745,9 +5809,10 @@ void PlotWidget::plotScatter(
 
         QLabel *stripLabel = new QLabel(baseVar);
         stripLabel->setAlignment(Qt::AlignCenter);
-        stripLabel->setStyleSheet(
+        stripLabel->setStyleSheet(QString(
             "QLabel { background-color: #e8e8e8; border: 1px solid #cccccc; "
-            "font-weight: bold; font-size: 10px; padding: 3px 0px; }");
+            "font-weight: bold; font-size: %1px; padding: 3px 0px; }")
+            .arg(m_plotSettings.titleFontSize > 0 ? m_plotSettings.titleFontSize : 10));
         stripLabel->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
         panelLayout->addWidget(stripLabel);
 
