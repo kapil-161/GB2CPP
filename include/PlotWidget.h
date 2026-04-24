@@ -194,6 +194,8 @@ public:
     
     // Plot customization
     void setShowLegend(bool show);
+    PlotSettings getPlotSettings() const { return m_plotSettings; }
+    void setPlotSettings(const PlotSettings &s) { m_plotSettings = s; }
     void setShowGrid(bool show);
     void setPlotTitle(const QString &title);
     void setAxisTitles(const QString &xTitle, const QString &yTitle);

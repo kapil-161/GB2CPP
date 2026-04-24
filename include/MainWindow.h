@@ -62,6 +62,8 @@ public:
     QListWidget* getYVariableSelector() const { return m_yVariableComboBox; }
     QTabWidget* getTabWidget() const { return m_tabWidget; }
     PlotWidget* getPlotWidget() const { return m_plotWidget; }
+    PlotWidget* getScatterPlotWidget() const { return m_scatterPlotWidget; }
+    DataTable getEvaluateData() const { return m_evaluateData; }
 
 protected:
     void closeEvent(QCloseEvent *event) override;

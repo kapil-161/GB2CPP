@@ -66,6 +66,9 @@ struct PlotSettings {
     bool boldTitle = true;
     bool boldAxisLabels = false;
 
+    // Scatter panel overlay metrics (subset of available stats to display)
+    QSet<QString> scatterMetrics = {"RMSE", "R²"};
+
     // Treatment filter (empty excludedSeriesKeys = show all)
     QSet<QString> excludedSeriesKeys;  // format: "varName::expId::trtId"
     QStringList availableExperiments;
@@ -144,6 +147,9 @@ private:
     QSpinBox *m_legendFontSizeSpinBox;
     QCheckBox *m_boldTitleCheckBox;
     QCheckBox *m_boldAxisLabelsCheckBox;
+
+    // Scatter metrics checkboxes
+    QMap<QString, QCheckBox*> m_scatterMetricCheckBoxes;
 
     // Buttons
     QPushButton *m_resetButton;

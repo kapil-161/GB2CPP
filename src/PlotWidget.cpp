@@ -588,6 +588,7 @@ void PlotWidget::setupUI()
     connect(m_dateButton, &QPushButton::clicked, this, &PlotWidget::onDateButtonClicked);
     connect(m_boxPlotButton, &QPushButton::clicked, this, &PlotWidget::onBoxPlotButtonClicked);
     connect(m_treatmentsButton, &QPushButton::clicked, this, &PlotWidget::showTreatmentSelection);
+    connect(m_settingsButton, &QPushButton::clicked, this, &PlotWidget::onSettingsButtonClicked);
     
     // Add spacer
     m_bottomLayout->addSpacing(20);
@@ -5346,19 +5347,14 @@ void PlotWidget::onSettingsButtonClicked()
         m_plotSettings = newSettings;
         saveSettings();
 
-        // Re-plot if filter or error bar settings changed
-        bool needsReplot = (filterChanged || errorBarChanged) && m_simData.rowCount > 0;
-        if (needsReplot) {
-            if (m_isScatterMode) {
-                if (!m_currentYVars.isEmpty()) {
-                    DataTable dataCopy = m_simData;
-                    plotScatter(dataCopy, m_currentYVars);
-                }
-            } else {
-                updatePlotWithScaling();
-                if (m_obsData.rowCount > 0) {
-                    calculateMetrics();
-                }
+        if (m_isScatterMode && m_simData.rowCount > 0 && !m_currentYVars.isEmpty()) {
+            // Always replot scatter — metrics selection, appearance, etc. all require rebuild
+            DataTable dataCopy = m_simData;
+            plotScatter(dataCopy, m_currentYVars);
+        } else if (!m_isScatterMode && (filterChanged || errorBarChanged) && m_simData.rowCount > 0) {
+            updatePlotWithScaling();
+            if (m_obsData.rowCount > 0) {
+                calculateMetrics();
             }
         }
     }
@@ -5687,6 +5683,8 @@ void PlotWidget::plotScatter(
 {
     qDebug() << "PlotWidget::plotScatter() - ENTRY, vars:" << varNames;
     m_isScatterMode = true;
+    m_simData = evaluateData;      // store so settings changes can trigger replot
+    m_currentYVars = varNames;     // store so replot from settings dialog works
     m_scatterExportData.clear();
     setXAxisButtonsVisible(false);
 
@@ -5988,7 +5986,9 @@ void PlotWidget::plotScatter(
         panelLayout->setContentsMargins(0, 0, 0, 0);
         panelLayout->setSpacing(0);
 
-        QLabel *stripLabel = new QLabel(baseVar);
+        QPair<QString, QString> stripVarInfo = DataProcessor::getVariableInfo(baseVar);
+        QString stripDisplayName = stripVarInfo.first.isEmpty() ? baseVar : stripVarInfo.first;
+        QLabel *stripLabel = new QLabel(stripDisplayName);
         stripLabel->setAlignment(Qt::AlignCenter);
         stripLabel->setStyleSheet(QString(
             "QLabel { background-color: #e8e8e8; border-bottom: 1px solid #cccccc; "
@@ -6003,10 +6003,44 @@ void PlotWidget::plotScatter(
         cv->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
         panelLayout->addWidget(cv, 1);
 
-        // RMSE / R² overlay label — repositioned on every resize via event filter
-        QString statsText = QString("RMSE = %1\nR² = %2")
-            .arg(rmse, 0, 'f', rmse < 1 ? 3 : (rmse < 100 ? 2 : 1))
-            .arg(r2,   0, 'f', 2);
+        // Build overlay stats text from user-selected metrics
+        // Put R², N, and normalized MSEs/MSEu into the map so we can look them up uniformly
+        fullMetrics["R²"] = r2;
+        fullMetrics["N"]  = totalPts;
+        {
+            double mseTotal = rmse * rmse;
+            double mseSraw  = fullMetrics.value("MSEs", 0.0).toDouble();
+            double mseUraw  = fullMetrics.value("MSEu", 0.0).toDouble();
+            fullMetrics["MSEs/MSE"] = (mseTotal > 0) ? mseSraw / mseTotal : 0.0;
+            fullMetrics["MSEu/MSE"] = (mseTotal > 0) ? mseUraw / mseTotal : 0.0;
+        }
+
+        // Ordered list so display is consistent regardless of QSet iteration order
+        const QStringList kMetricOrder = {"N", "RMSE", "R²", "d-stat", "BIAS", "MSEs/MSE", "MSEu/MSE"};
+
+        QStringList statsLines;
+        for (const QString &mkey : kMetricOrder) {
+            if (!m_plotSettings.scatterMetrics.contains(mkey)) continue;
+            // Map display key → fullMetrics map key
+            QString fkey = mkey;
+            if (mkey == "d-stat") fkey = "Willmott's d-stat";
+            else if (mkey == "R²") fkey = "R²";
+            QVariant val = fullMetrics.value(fkey);
+            if (!val.isValid()) continue;
+            bool ok = false;
+            double dval = val.toDouble(&ok);
+            if (!ok) continue;
+            QString fmt;
+            if (mkey == "N")          fmt = QString("N = %1").arg(static_cast<int>(dval));
+            else if (mkey == "RMSE")  fmt = QString("RMSE = %1").arg(dval, 0, 'f', dval < 1 ? 3 : (dval < 100 ? 2 : 1));
+            else if (mkey == "R²")    fmt = QString("R² = %1").arg(dval, 0, 'f', 2);
+            else if (mkey == "d-stat") fmt = QString("d = %1").arg(dval, 0, 'f', 3);
+            else if (mkey == "BIAS")  fmt = QString("BIAS = %1").arg(dval, 0, 'f', 3);
+            else if (mkey == "MSEs/MSE") fmt = QString("MSEs/MSE = %1").arg(dval, 0, 'f', 2);
+            else if (mkey == "MSEu/MSE") fmt = QString("MSEu/MSE = %1").arg(dval, 0, 'f', 2);
+            statsLines << fmt;
+        }
+        QString statsText = statsLines.join("\n");
         QLabel *statsLabel = new QLabel(statsText, cv);
         // Scale font with panel size: ~9pt at 200px, ~11pt at 300px, ~13pt at 400px
         int statsFontPt = qBound(8, panelSize / 28, 13);
@@ -6096,21 +6130,21 @@ void PlotWidget::plotScatter(
 
     // Title
     QLabel *legendTitle = new QLabel("Experiment");
-    legendTitle->setStyleSheet("font-weight: bold; font-size: 10px; padding: 4px 0px 2px 0px;");
+    legendTitle->setStyleSheet("font-weight: bold; font-size: 12px; padding: 4px 0px 2px 0px;");
     m_legendLayout->addWidget(legendTitle);
 
     for (const QString &expLabel : expOrder) {
         QWidget *row = new QWidget();
         QHBoxLayout *hl = new QHBoxLayout(row);
-        hl->setContentsMargins(0, 1, 0, 1);
-        hl->setSpacing(4);
+        hl->setContentsMargins(0, 2, 0, 2);
+        hl->setSpacing(6);
 
         QLabel *swatch = new QLabel();
         swatch->setFixedSize(12, 12);
         QColor c = expColor.value(expLabel, Qt::gray);
         swatch->setStyleSheet(QString("background-color: %1; border-radius: 6px;").arg(c.name()));
         QLabel *txt = new QLabel(expLabel);
-        txt->setStyleSheet("font-size: 10px;");
+        txt->setStyleSheet("font-size: 12px;");
 
         hl->addWidget(swatch);
         hl->addWidget(txt);

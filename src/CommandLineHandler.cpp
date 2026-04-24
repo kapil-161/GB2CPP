@@ -39,6 +39,13 @@ CommandLineArgs CommandLineHandler::parseCommandLineArgs(const QStringList &args
                 result.headlessMode = true;
             } else if (tok == "--metrics" && i + 1 < tokens.size()) {
                 result.saveMetricsPath = tokens[++i];
+            } else if (tok == "--scatter") {
+                result.scatterMode = true;
+                result.headlessMode = true;
+            } else if (tok == "--scatter-vars" && i + 1 < tokens.size()) {
+                result.scatterVars = tokens[++i].split(',', Qt::SkipEmptyParts);
+            } else if (tok == "--scatter-metrics" && i + 1 < tokens.size()) {
+                result.scatterMetrics = tokens[++i].split(',', Qt::SkipEmptyParts);
             } else {
                 positional.append(tok);
             }
@@ -71,6 +78,15 @@ CommandLineArgs CommandLineHandler::parseCommandLineArgs(const QStringList &args
                     params.append(cleaned);
                 }
             }
+        }
+
+        // Scatter headless mode only needs crop name (1 positional arg)
+        if (result.scatterMode && params.size() >= 1) {
+            result.cropName = params[0];
+            result.dssatBase = "C:/DSSAT48";
+            result.cropDir = result.dssatBase + "/" + result.cropName;
+            result.isValid = true;
+            return result;
         }
 
         if (params.size() < 2) {
@@ -140,10 +156,22 @@ void CommandLineHandler::applyCommandLineArgsToUI()
                  << "Files:" << m_args.outputFiles;
         
         // Step 1: Select the crop folder
-        // This automatically populates the file list via onFolderSelectionChanged()
-        if (!selectCropFolder(m_args.cropName)) {
+        // For scatter mode, try by directory path first, then by name
+        bool folderOk = false;
+        if (m_args.scatterMode && !m_args.cropDir.isEmpty())
+            folderOk = m_mainWindow->selectCropFolder(m_args.cropDir) ||
+                       selectCropFolder(m_args.cropName);
+        else
+            folderOk = selectCropFolder(m_args.cropName);
+
+        if (!folderOk) {
             QString message = QString("Crop folder '%1' not found").arg(m_args.cropName);
-            QMessageBox::warning(m_mainWindow, "Command Line Warning", message);
+            if (m_args.headlessMode) {
+                qCritical() << message;
+                QApplication::quit();
+            } else {
+                QMessageBox::warning(m_mainWindow, "Command Line Warning", message);
+            }
             return;
         }
         
@@ -171,7 +199,9 @@ void CommandLineHandler::selectOutputFiles()
 {
     if (!m_mainWindow || m_args.outputFiles.isEmpty()) {
         qDebug() << "No output files specified in command line";
-        // UI is already hidden in applyCommandLineArgsToUI, so just return
+        // For scatter headless mode, no output files needed — go straight to scatter plot
+        if (m_args.scatterMode)
+            QTimer::singleShot(100, this, &CommandLineHandler::loadInitialContent);
         return;
     }
     
@@ -213,9 +243,16 @@ void CommandLineHandler::loadInitialContent()
     try {
         QTabWidget *tabWidget = m_mainWindow->getTabWidget();
         if (tabWidget) {
+            // For scatter headless mode, switch to scatter tab (index 2) first
+            if (m_args.scatterMode && tabWidget->currentIndex() != 2)
+                tabWidget->setCurrentIndex(2);
+
             int currentTab = tabWidget->currentIndex();
-            
-            if (currentTab == 0) {  // Time series tab
+
+            if (m_args.scatterMode) {
+                // Scatter headless — trigger scatter plot directly
+                QTimer::singleShot(300, this, &CommandLineHandler::headlessScatterPlot);
+            } else if (currentTab == 0) {  // Time series tab
                 // Load variables but don't auto-plot
                 m_mainWindow->loadVariables();
 
@@ -336,5 +373,68 @@ void CommandLineHandler::headlessAutoPlot()
             }
         }
         QApplication::quit();
+    });
+}
+
+void CommandLineHandler::headlessScatterPlot()
+{
+    if (!m_mainWindow) { QApplication::quit(); return; }
+
+    PlotWidget *plot = m_mainWindow->getScatterPlotWidget();
+    if (!plot) {
+        fprintf(stderr, "[SCATTER-HEADLESS] no scatter PlotWidget\n"); fflush(stderr);
+        QApplication::quit();
+        return;
+    }
+
+    // Select Evaluate.OUT via the same UI path as the user would
+    m_mainWindow->selectOutputFiles({"Evaluate.OUT"});
+
+    // Wait for file to load then get evaluate data and plot
+    QTimer::singleShot(1500, this, [this]() {
+        PlotWidget *plot = m_mainWindow->getScatterPlotWidget();
+        DataTable evalData = m_mainWindow->getEvaluateData();
+
+        if (evalData.rowCount == 0) {
+            QApplication::quit();
+            return;
+        }
+
+        // Determine variables
+        QStringList vars = m_args.scatterVars;
+        if (vars.isEmpty()) {
+            QSet<QString> seen;
+            for (const QString &col : evalData.columnNames) {
+                if ((col.endsWith('S') || col.endsWith('M')) && col.length() > 1) {
+                    QString base = col.left(col.length() - 1);
+                    if (!seen.contains(base)) { seen.insert(base); vars.append(base); }
+                }
+                if (vars.size() >= 4) break;
+            }
+        }
+
+        // Apply metrics
+        if (!m_args.scatterMetrics.isEmpty()) {
+            PlotSettings s = plot->getPlotSettings();
+            s.scatterMetrics.clear();
+            for (const QString &m : m_args.scatterMetrics) {
+                if (m == "R2") s.scatterMetrics.insert("R\xc2\xb2");  // R²
+                else s.scatterMetrics.insert(m);
+            }
+            plot->setPlotSettings(s);
+        }
+
+        plot->plotScatter(evalData, vars);
+
+        // Export after render
+        QTimer::singleShot(3000, this, [this]() {
+            PlotWidget *p = m_mainWindow->getScatterPlotWidget();
+            if (p && !m_args.savePlotPath.isEmpty()) {
+                p->show();
+                QApplication::processEvents(QEventLoop::AllEvents, 500);
+                p->exportPlot(m_args.savePlotPath, "PNG");
+            }
+            QApplication::quit();
+        });
     });
 }

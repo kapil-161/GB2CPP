@@ -153,7 +153,9 @@ void MainWindow::setupMenuBar()
     QAction *plotSettingsAction = menuBar->addAction("Plot &Settings");
     plotSettingsAction->setShortcut(QKeySequence("Ctrl+,"));
     connect(plotSettingsAction, &QAction::triggered, this, [this]() {
-        if (m_plotWidget) m_plotWidget->onSettingsButtonClicked();
+        bool isScatterTab = (m_tabWidget && m_tabWidget->currentIndex() == 2);
+        PlotWidget *active = (isScatterTab && m_scatterPlotWidget) ? m_scatterPlotWidget : m_plotWidget;
+        if (active) active->onSettingsButtonClicked();
     });
 
 }

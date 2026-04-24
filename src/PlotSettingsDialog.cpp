@@ -52,6 +52,13 @@ PlotSettings PlotSettingsDialog::getSettings() const
     settings.boldTitle = m_boldTitleCheckBox->isChecked();
     settings.boldAxisLabels = m_boldAxisLabelsCheckBox->isChecked();
 
+    // Scatter metrics — collect checked items
+    settings.scatterMetrics.clear();
+    for (auto it = m_scatterMetricCheckBoxes.begin(); it != m_scatterMetricCheckBoxes.end(); ++it) {
+        if (it.value()->isChecked())
+            settings.scatterMetrics.insert(it.key());
+    }
+
     // Preserve treatment filter and available data unchanged
     settings.excludedSeriesKeys = m_settings.excludedSeriesKeys;
     settings.availableExperiments = m_settings.availableExperiments;
@@ -167,7 +174,24 @@ void PlotSettingsDialog::setupUI()
     legendLayout->addLayout(errorBarTypeLayout);
     
     appearanceLayout->addWidget(legendGroup);
-    
+
+    // Scatter panel metrics group
+    QGroupBox *scatterMetricsGroup = new QGroupBox("Scatter Panel Metrics");
+    QGridLayout *scatterMetricsLayout = new QGridLayout(scatterMetricsGroup);
+    scatterMetricsGroup->setToolTip("Choose which statistics to display inside each scatter panel");
+
+    QStringList metricOptions = {"RMSE", "R²", "d-stat", "BIAS", "MSEs/MSE", "MSEu/MSE", "N"};
+    int col = 0, row = 0;
+    for (const QString &metric : metricOptions) {
+        QCheckBox *cb = new QCheckBox(metric);
+        cb->setChecked(m_settings.scatterMetrics.contains(metric));
+        m_scatterMetricCheckBoxes[metric] = cb;
+        scatterMetricsLayout->addWidget(cb, row, col);
+        col++;
+        if (col >= 3) { col = 0; row++; }
+    }
+    appearanceLayout->addWidget(scatterMetricsGroup);
+
     // Plot appearance group
     QGroupBox *plotGroup = new QGroupBox("Plot Appearance");
     QGridLayout *plotLayout = new QGridLayout(plotGroup);

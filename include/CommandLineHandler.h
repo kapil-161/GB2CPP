@@ -21,6 +21,11 @@ struct CommandLineArgs {
     QString savePlotPath;       // --save plot.png
     QString saveMetricsPath;    // --metrics metrics.csv
     bool headlessMode = false;  // true when --save is present
+
+    // Scatter headless mode
+    bool scatterMode = false;        // --scatter
+    QStringList scatterVars;         // --scatter-vars ADAP,CWAM
+    QStringList scatterMetrics;      // --scatter-metrics "RMSE,R2,d-stat"
 };
 
 class CommandLineHandler : public QObject
@@ -38,6 +43,7 @@ private slots:
     void selectOutputFiles();
     void loadInitialContent();
     void headlessAutoPlot();
+    void headlessScatterPlot();
 
 private:
     MainWindow *m_mainWindow;
