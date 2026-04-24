@@ -5413,15 +5413,26 @@ void PlotWidget::applyPlotSettings(const PlotSettings &settings)
                     ss->setMarkerSize(settings.markerSize);
             }
 
-            // Update strip label font size (child QLabel of panelWidget, not cv)
+            // Update strip label and stats label fonts
+            int stripFontPx = qMax(8, settings.titleFontSize);
+            int statsFontPx = qMax(10, settings.axisTickFontSize);
             if (cv->parentWidget()) {
                 for (QLabel *lbl : cv->parentWidget()->findChildren<QLabel*>()) {
-                    if (lbl->parent() == cv->parentWidget()) { // strip label only
+                    if (lbl->parent() == cv->parentWidget()) { // strip label
                         lbl->setStyleSheet(QString(
                             "QLabel { background-color: #e8e8e8; border: 1px solid #cccccc; "
                             "font-weight: bold; font-size: %1px; padding: 3px 0px; }")
-                            .arg(settings.titleFontSize > 0 ? settings.titleFontSize : 10));
+                            .arg(stripFontPx));
                     }
+                }
+            }
+            // Stats label is a child of cv
+            for (QLabel *lbl : cv->findChildren<QLabel*>()) {
+                if (lbl->parent() == cv) {
+                    lbl->setStyleSheet(QString(
+                        "QLabel { background: rgba(255,255,255,210); font-size: %1px; "
+                        "padding: 2px 4px; border: none; }").arg(statsFontPx));
+                    lbl->adjustSize();
                 }
             }
         }
@@ -5852,9 +5863,10 @@ void PlotWidget::plotScatter(
             .arg(rmse, 0, 'f', rmse < 1 ? 3 : (rmse < 100 ? 2 : 1))
             .arg(r2,   0, 'f', 2);
         QLabel *statsLabel = new QLabel(statsText, cv);
-        statsLabel->setStyleSheet(
-            "QLabel { background: rgba(255,255,255,210); font-size: 9px; "
-            "padding: 2px 4px; border: none; }");
+        int statsFontPx = qMax(10, m_plotSettings.axisTickFontSize);
+        statsLabel->setStyleSheet(QString(
+            "QLabel { background: rgba(255,255,255,210); font-size: %1px; "
+            "padding: 2px 4px; border: none; }").arg(statsFontPx));
         statsLabel->setAlignment(Qt::AlignLeft | Qt::AlignTop);
         statsLabel->adjustSize();
         statsLabel->raise();
