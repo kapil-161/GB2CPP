@@ -5622,11 +5622,16 @@ void PlotWidget::plotScatter(
         return a < b;
     });
 
-    // Assign colors to experiments (palette matching R ggplot default hues)
+    // Okabe-Ito colorblind-safe palette (high contrast, distinct shapes of color)
     static const QVector<QColor> kPalette = {
-        QColor("#F8766D"), QColor("#7CAE00"), QColor("#00BFC4"), QColor("#C77CFF"),
-        QColor("#FF7F00"), QColor("#A65628"), QColor("#F781BF"), QColor("#999999"),
-        QColor("#E41A1C"), QColor("#377EB8"), QColor("#4DAF4A"), QColor("#984EA3")
+        QColor("#E69F00"),  // orange
+        QColor("#56B4E9"),  // sky blue
+        QColor("#009E73"),  // bluish green
+        QColor("#CC79A7"),  // reddish purple
+        QColor("#0072B2"),  // blue
+        QColor("#D55E00"),  // vermillion
+        QColor("#F0E442"),  // yellow
+        QColor("#000000"),  // black
     };
     QMap<QString, QColor> expColor;
     for (int ei = 0; ei < expOrder.size(); ++ei)
