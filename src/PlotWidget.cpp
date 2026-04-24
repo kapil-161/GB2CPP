@@ -5690,10 +5690,8 @@ void PlotWidget::plotScatter(
         chart->legend()->setVisible(false);
         chart->setMargins(QMargins(2, 2, 2, 2));
 
-        // Title = base variable name (bold, via chart title)
-        chart->setTitle(QString("<b>%1</b>").arg(baseVar));
-        QFont titleFont; titleFont.setPointSize(9); titleFont.setBold(true);
-        chart->setTitleFont(titleFont);
+        // Title rendered as strip label above the chart view (not via QChart::setTitle)
+        chart->setTitle("");
 
         // 1:1 reference line
         QLineSeries *refLine = new QLineSeries();
@@ -5738,11 +5736,26 @@ void PlotWidget::plotScatter(
             static_cast<QXYSeries*>(s)->attachAxis(yAx);
         }
 
-        // Chart view
+        // Chart view — wrap in a container with a strip title label at the top
+        QWidget *panelWidget = new QWidget();
+        panelWidget->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+        QVBoxLayout *panelLayout = new QVBoxLayout(panelWidget);
+        panelLayout->setContentsMargins(0, 0, 0, 0);
+        panelLayout->setSpacing(0);
+
+        QLabel *stripLabel = new QLabel(baseVar);
+        stripLabel->setAlignment(Qt::AlignCenter);
+        stripLabel->setStyleSheet(
+            "QLabel { background-color: #e8e8e8; border: 1px solid #cccccc; "
+            "font-weight: bold; font-size: 10px; padding: 3px 0px; }");
+        stripLabel->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+        panelLayout->addWidget(stripLabel);
+
         QChartView *cv = new QChartView(chart);
         cv->setRenderHint(QPainter::Antialiasing);
-        cv->setMinimumSize(panelSize, panelSize);
+        cv->setMinimumSize(panelSize, panelSize - 22);
         cv->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+        panelLayout->addWidget(cv, 1);
 
         // RMSE / R² overlay label (top-left inside chart view using absolute position)
         // We use a QLabel child of the chart view, repositioned on first show
@@ -5761,7 +5774,7 @@ void PlotWidget::plotScatter(
 
         int row = vi / nCols;
         int col = vi % nCols;
-        m_scatterPanelGrid->addWidget(cv, row, col);
+        m_scatterPanelGrid->addWidget(panelWidget, row, col);
         m_scatterPanelViews.append(cv);
 
         // Collect metrics
