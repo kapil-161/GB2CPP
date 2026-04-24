@@ -253,6 +253,8 @@ private:
     void updateScalingLabel(const QStringList &yVars);
     void updatePlotWithScaling();
     void setupPreplotPanel();
+    void resizeScatterPanels();
+    QPixmap grabScatterAtSize(int panelSide);
 
     void updateLegend(const QVector<PlotData> &plotDataList);
     void updateLegendAdvanced(const QMap<QString, QMap<QString, QVector<QSharedPointer<PlotData>>>>& legendEntries);
@@ -369,6 +371,8 @@ private:
     QGridLayout *m_scatterPanelGrid = nullptr;
     QScrollArea *m_scatterScrollArea = nullptr;
     QVector<QChartView*> m_scatterPanelViews;
+    int m_scatterNCols = 1;
+    int m_scatterNRows = 1;
 
     // Scatter CSV export: key = "VARIABLE::EXPERIMENT", value = list of (sim, meas) points
     QMap<QString, QVector<QPointF>> m_scatterExportData;

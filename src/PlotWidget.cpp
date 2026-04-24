@@ -616,7 +616,7 @@ void PlotWidget::setupUI()
     m_legendScrollArea->setWidgetResizable(true);
     m_legendScrollArea->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     m_legendScrollArea->setFrameShape(QFrame::NoFrame);
-    m_legendScrollArea->setFixedWidth(200);
+    m_legendScrollArea->setFixedWidth(140);
 
     // Legend container
     m_legendWidget = new QWidget();
@@ -637,7 +637,7 @@ void PlotWidget::setupUI()
     // Legend stack: page 0 = treatment pre-selection, page 1 = legend
     setupPreplotPanel();
     m_legendStack = new QStackedWidget();
-    m_legendStack->setFixedWidth(200);
+    m_legendStack->setFixedWidth(140);
     m_legendStack->addWidget(m_preplotPanel);       // page 0 — shown before first plot
     m_legendStack->addWidget(m_legendScrollArea);   // page 1 — shown after plotting
     m_legendStack->setCurrentIndex(0);
@@ -1102,10 +1102,46 @@ int PlotWidget::calculateOptimalDateTickCount() const
     return optimalTicks;
 }
 
+void PlotWidget::resizeScatterPanels()
+{
+    if (!m_scatterPanelContainer || !m_scatterPanelGrid) return;
+    if (m_scatterPanelGrid->count() == 0) return;
+
+    int nCols   = m_scatterNCols;
+    int nRows   = m_scatterNRows;
+    if (nCols < 1) nCols = 1;
+    int spacing = m_scatterPanelGrid->spacing();
+    int margins = 12;
+
+    int availW = m_scatterScrollArea ? m_scatterScrollArea->viewport()->width()
+                                     : m_leftContainer->width();
+    int availH = m_scatterScrollArea ? m_scatterScrollArea->viewport()->height()
+                                     : m_leftContainer->height();
+    if (availW < 50) availW = width() - 150;
+    if (availH < 50) availH = height() - 20;
+    if (availW < 200) availW = 700;
+    if (availH < 200) availH = 600;
+
+    int sideW = (availW - margins - spacing * (nCols - 1)) / nCols;
+    int sideH = (availH - margins - spacing * (nRows - 1)) / nRows;
+    // Use the smaller of the two so panels fit both axes without scrolling
+    int side  = qMin(sideW, sideH);
+    if (side < 180) side = 180;
+
+    for (int i = 0; i < m_scatterPanelGrid->count(); ++i) {
+        QLayoutItem *item = m_scatterPanelGrid->itemAt(i);
+        if (item && item->widget())
+            item->widget()->setFixedSize(side, side);
+    }
+    int cW = side * nCols + spacing * (nCols - 1) + margins;
+    int cH = side * nRows + spacing * (nRows - 1) + margins;
+    m_scatterPanelContainer->setFixedSize(cW, cH);
+}
+
 void PlotWidget::resizeEvent(QResizeEvent *event)
 {
     QWidget::resizeEvent(event);
-    
+
     // Update date axis tick count when plot is resized
     if (m_chart) {
         auto axes = m_chart->axes(Qt::Horizontal);
@@ -1113,11 +1149,14 @@ void PlotWidget::resizeEvent(QResizeEvent *event)
             if (auto dateAxis = qobject_cast<QDateTimeAxis*>(axis)) {
                 int newTickCount = calculateOptimalDateTickCount();
                 dateAxis->setTickCount(newTickCount);
-                qDebug() << "PlotWidget::resizeEvent() - Updated date axis tick count to:" << newTickCount;
-                break; // Only update the first date axis
+                break;
             }
         }
     }
+
+    // Keep scatter panels square on window resize
+    if (m_isScatterMode && m_scatterPanelContainer && m_scatterPanelContainer->isVisible())
+        resizeScatterPanels();
 }
 
 void PlotWidget::plotTimeSeries(
@@ -2796,6 +2835,7 @@ void PlotWidget::clear()
 
     // Hide scatter panel area and restore normal chart view
     if (m_scatterScrollArea) m_scatterScrollArea->setVisible(false);
+    if (m_scatterPanelContainer) m_scatterPanelContainer->setVisible(false);
     if (m_chartView) m_chartView->setVisible(true);
     if (m_bottomContainer) m_bottomContainer->setVisible(true);
 
@@ -2977,67 +3017,98 @@ QString PlotWidget::getScatterCSV() const
 void PlotWidget::exportPlot(const QString &filePath, const QString &format)
 {
     if (!this) return;
-    
-    // Ensure everything is visible and updated
+
     this->show();
     this->update();
-    // Force chart view to repaint so error bars (drawn in paintEvent) are in the buffer
-    if (m_chartView) {
-        m_chartView->update();
-        m_chartView->repaint();
-    }
+    if (m_chartView) { m_chartView->update(); m_chartView->repaint(); }
     QApplication::processEvents();
-    
-    // Respect legend visibility setting
-    if (m_legendScrollArea) {
-        m_legendScrollArea->setVisible(m_showLegend);
-        if (m_showLegend) {
-            m_legendScrollArea->update();
+
+    QPixmap pixmap;
+
+    if (m_isScatterMode && m_scatterPanelContainer && m_legendWidget) {
+        pixmap = grabScatterAtSize(400);
+    } else {
+        if (m_legendScrollArea) {
+            m_legendScrollArea->setVisible(m_showLegend);
+            if (m_showLegend) m_legendScrollArea->update();
         }
+        pixmap = QPixmap(this->size());
+        pixmap.fill(Qt::white);
+        QPainter painter(&pixmap);
+        painter.setRenderHint(QPainter::Antialiasing, true);
+        painter.setRenderHint(QPainter::TextAntialiasing, true);
+        painter.setRenderHint(QPainter::SmoothPixmapTransform, true);
+        this->render(&painter);
+        painter.end();
     }
-    
-    // Use render() instead of grab() so custom-painted content (error bars in ErrorBarChartView::paintEvent)
-    // is included. grab() can miss custom paint on some platforms.
-    QPixmap pixmap(this->size());
-    pixmap.fill(Qt::white);
-    QPainter painter(&pixmap);
-    painter.setRenderHint(QPainter::Antialiasing, true);
-    painter.setRenderHint(QPainter::TextAntialiasing, true);
-    painter.setRenderHint(QPainter::SmoothPixmapTransform, true);
-    this->render(&painter);
-    painter.end();
-    
-    qDebug() << "Quick export: Widget size" << this->size() << "pixmap size" << pixmap.size();
-    
+
     pixmap.save(filePath, format.toUtf8().constData());
+}
+
+// Render scatter panels at a given panel size, composite with legend, return pixmap
+QPixmap PlotWidget::grabScatterAtSize(int panelSide)
+{
+    if (!m_scatterPanelContainer || !m_scatterPanelGrid || !m_legendWidget)
+        return QPixmap();
+
+    int nCols   = m_scatterNCols;
+    int nRows   = m_scatterNRows;
+    int spacing = m_scatterPanelGrid->spacing();
+    int margins = 12;
+
+    // Resize panels to target size
+    for (int i = 0; i < m_scatterPanelGrid->count(); ++i) {
+        QLayoutItem *item = m_scatterPanelGrid->itemAt(i);
+        if (item && item->widget())
+            item->widget()->setFixedSize(panelSide, panelSide);
+    }
+    int cW = panelSide * nCols + spacing * (nCols - 1) + margins;
+    int cH = panelSide * nRows + spacing * (nRows - 1) + margins;
+    m_scatterPanelContainer->setFixedSize(cW, cH);
+    m_scatterPanelContainer->update();
+    QApplication::processEvents();
+
+    QPixmap panelsPixmap = m_scatterPanelContainer->grab();
+    QPixmap legendPixmap = m_legendWidget->grab();
+
+    int totalW = panelsPixmap.width() + legendPixmap.width() + 12;
+    int totalH = qMax(panelsPixmap.height(), legendPixmap.height());
+    QPixmap result(totalW, totalH);
+    result.fill(Qt::white);
+    QPainter p(&result);
+    p.setRenderHint(QPainter::Antialiasing);
+    p.setRenderHint(QPainter::SmoothPixmapTransform);
+    p.drawPixmap(0, (totalH - panelsPixmap.height()) / 2, panelsPixmap);
+    p.drawPixmap(panelsPixmap.width() + 12, (totalH - legendPixmap.height()) / 2, legendPixmap);
+    p.end();
+
+    // Restore to screen size
+    resizeScatterPanels();
+
+    return result;
 }
 
 void PlotWidget::copyPlotToClipboard()
 {
     if (!this) return;
-    
-    // Ensure everything is visible and updated
+
     this->show();
     this->update();
     QApplication::processEvents();
-    
-    // Respect legend visibility setting
-    if (m_legendScrollArea) {
-        m_legendScrollArea->setVisible(m_showLegend);
-        if (m_showLegend) {
-            m_legendScrollArea->update();
-        }
+
+    QPixmap pixmap;
+
+    if (m_isScatterMode && m_scatterPanelContainer && m_legendWidget) {
+        pixmap = grabScatterAtSize(400); // 400px per panel for clipboard
+    } else {
+        if (m_legendScrollArea)
+            m_legendScrollArea->setVisible(m_showLegend);
+        pixmap = this->grab();
     }
-    
-    // Grab the plot as a pixmap
-    QPixmap pixmap = this->grab();
-    
-    // Copy to clipboard
+
     QClipboard *clipboard = QApplication::clipboard();
-    if (clipboard) {
+    if (clipboard)
         clipboard->setPixmap(pixmap);
-        qDebug() << "Plot copied to clipboard. Size:" << pixmap.size();
-    }
 }
 
 void PlotWidget::exportPlot(const QString &filePath, const QString &format, int width, int height, int dpi)
@@ -3386,7 +3457,15 @@ void PlotWidget::setPreplotPanelVisible(bool visible)
 {
     m_preplotPanelEnabled = visible;
     if (m_treatmentsButton) m_treatmentsButton->setVisible(visible);
-    if (m_legendStack) m_legendStack->setVisible(visible);
+    // Only hide the stack when disabling the preplot panel AND we're on the preplot page.
+    // Once a plot is drawn (page 1 = legend), the stack must remain visible.
+    if (m_legendStack) {
+        if (!visible && m_legendStack->currentIndex() == 0)
+            m_legendStack->setVisible(false);
+        else if (visible)
+            m_legendStack->setVisible(true);
+        // if !visible but currentIndex == 1 (legend page), leave it visible
+    }
 }
 
 void PlotWidget::setPlotTitle(const QString &title)
@@ -5609,26 +5688,13 @@ void PlotWidget::plotScatter(
     const DataColumn *excodeCol = evaluateData.getColumn("EXCODE");
     const DataColumn *crCol     = evaluateData.getColumn("CR");
 
-    // Build sorted unique experiment labels
-    // Build experiment labels: prefer last 4 chars of EXCODE, but fall back to
-    // full EXCODE if two different EXCODEs share the same last 4 chars.
+    // Build experiment label map: full EXCODE -> display label (use full EXCODE directly)
     QMap<QString, QString> fullToShort; // full EXCODE -> display label
     {
-        QMap<QString, QStringList> shortToFulls; // last4 -> list of full EXCODEs that map to it
         for (int i = 0; i < evaluateData.rowCount; ++i) {
             QString raw = excodeCol ? excodeCol->data.value(i).toString().trimmed() : QString();
             if (raw.isEmpty()) raw = "?";
-            QString last4 = raw.length() >= 4 ? raw.right(4) : raw;
-            if (!shortToFulls[last4].contains(raw))
-                shortToFulls[last4].append(raw);
-        }
-        for (auto it = shortToFulls.begin(); it != shortToFulls.end(); ++it) {
-            if (it.value().size() == 1) {
-                fullToShort[it.value().first()] = it.key(); // no collision — use last 4
-            } else {
-                for (const QString &full : it.value())
-                    fullToShort[full] = full; // collision — use full EXCODE
-            }
+            fullToShort[raw] = raw;
         }
     }
 
@@ -5685,7 +5751,7 @@ void PlotWidget::plotScatter(
         outFmt   = (step < 1.0) ? QString("%.2g") : QString("%.0f");
     };
 
-    // --- Build / reset scatter scroll area ---
+    // --- Build / reset scatter panel area ---
     // Hide the regular chart view; show scatter panels instead
     if (m_chartView) m_chartView->setVisible(false);
     if (m_bottomContainer) m_bottomContainer->setVisible(false);
@@ -5696,14 +5762,33 @@ void PlotWidget::plotScatter(
 
     if (!m_scatterScrollArea) {
         m_scatterScrollArea = new QScrollArea();
-        m_scatterScrollArea->setWidgetResizable(true);
+        m_scatterScrollArea->setWidgetResizable(false);
         m_scatterScrollArea->setFrameShape(QFrame::NoFrame);
+        m_scatterScrollArea->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+        m_scatterScrollArea->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
+        m_scatterScrollArea->setWidgetResizable(true);
+
+        // Centering wrapper: scroll area shows this; panel container is centered inside it
+        QWidget *centerWrapper = new QWidget();
+        QVBoxLayout *wrapV = new QVBoxLayout(centerWrapper);
+        wrapV->setContentsMargins(0, 0, 0, 0);
+        QHBoxLayout *wrapH = new QHBoxLayout();
+        wrapH->setContentsMargins(0, 0, 0, 0);
+
         m_scatterPanelContainer = new QWidget();
+        m_scatterPanelContainer->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
         m_scatterPanelGrid = new QGridLayout(m_scatterPanelContainer);
-        m_scatterPanelGrid->setSpacing(4);
-        m_scatterPanelGrid->setContentsMargins(4, 4, 4, 4);
-        m_scatterScrollArea->setWidget(m_scatterPanelContainer);
-        // Insert at position 0 in left layout (where chartView lives)
+        m_scatterPanelGrid->setSpacing(6);
+        m_scatterPanelGrid->setContentsMargins(6, 6, 6, 6);
+
+        wrapH->addStretch(1);
+        wrapH->addWidget(m_scatterPanelContainer);
+        wrapH->addStretch(1);
+        wrapV->addStretch(1);
+        wrapV->addLayout(wrapH);
+        wrapV->addStretch(1);
+
+        m_scatterScrollArea->setWidget(centerWrapper);
         m_leftLayout->insertWidget(0, m_scatterScrollArea, 1);
     }
 
@@ -5714,17 +5799,28 @@ void PlotWidget::plotScatter(
         delete item;
     }
 
-    m_scatterScrollArea->setVisible(true);
+    if (m_scatterScrollArea) m_scatterScrollArea->setVisible(true);
+    m_scatterPanelContainer->setVisible(true);
 
     // --- Determine grid layout ---
     int n     = vars.size();
-    int nCols = qMin(n, 3);
-    int nRows = (n + nCols - 1) / nCols;
-    // For 4 vars: 2×2
-    if (n == 4) { nCols = 2; nRows = 2; }
+    int nCols, nRows;
+    if      (n == 1) { nCols = 1; nRows = 1; }
+    else if (n == 2) { nCols = 2; nRows = 1; }
+    else if (n == 3) { nCols = 2; nRows = 2; } // 2×2 with one empty cell
+    else if (n == 4) { nCols = 2; nRows = 2; }
+    else if (n <= 6) { nCols = 3; nRows = 2; }
+    else             { nCols = 3; nRows = 3; }
 
-    // Compute minimum panel size so each panel is roughly square
-    int panelSize = 260;
+    m_scatterNCols = nCols;
+    m_scatterNRows = nRows;
+
+    // Equal column stretch only — height controlled explicitly
+    for (int c = 0; c < nCols; ++c) m_scatterPanelGrid->setColumnStretch(c, 1);
+
+    // Initial size: use a reasonable default; resizeScatterPanels() will correct it
+    // once the widget is actually laid out (deferred via QTimer below)
+    int panelSize = 300;
 
     // --- Build one panel per variable ---
     QVector<QMap<QString, QVariant>> allMetrics;
@@ -5869,7 +5965,8 @@ void PlotWidget::plotScatter(
 
         // Chart view — wrap in a container with a strip title label at the top
         QWidget *panelWidget = new QWidget();
-        panelWidget->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+        panelWidget->setFixedSize(panelSize, panelSize);
+        panelWidget->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
         QVBoxLayout *panelLayout = new QVBoxLayout(panelWidget);
         panelLayout->setContentsMargins(0, 0, 0, 0);
         panelLayout->setSpacing(0);
@@ -5886,7 +5983,6 @@ void PlotWidget::plotScatter(
         QChartView *cv = new QChartView(chart);
         cv->setRenderHint(QPainter::Antialiasing);
         cv->setFrameShape(QFrame::NoFrame);  // remove border gap between strip and chart
-        cv->setMinimumSize(panelSize, panelSize - 22);
         cv->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
         panelLayout->addWidget(cv, 1);
 
@@ -5942,9 +6038,15 @@ void PlotWidget::plotScatter(
         allMetrics.append(mmap);
     }
 
+    // Defer panel resize until after the layout is complete and widget has real dimensions
+    QTimer::singleShot(0, this, [this]() { resizeScatterPanels(); });
+
     // --- Build legend in right panel (always visible in scatter mode) ---
     clearLegend();
-    if (m_legendStack) m_legendStack->setCurrentIndex(1);
+    if (m_legendStack) {
+        m_legendStack->setCurrentIndex(1);
+        m_legendStack->setVisible(true);  // may have been hidden by setPreplotPanelVisible(false)
+    }
     if (m_legendScrollArea) m_legendScrollArea->setVisible(true);
 
     // Title
