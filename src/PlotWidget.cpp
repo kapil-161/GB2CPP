@@ -5606,12 +5606,34 @@ void PlotWidget::plotScatter(
     const DataColumn *crCol     = evaluateData.getColumn("CR");
 
     // Build sorted unique experiment labels
+    // Build experiment labels: prefer last 4 chars of EXCODE, but fall back to
+    // full EXCODE if two different EXCODEs share the same last 4 chars.
+    QMap<QString, QString> fullToShort; // full EXCODE -> display label
+    {
+        QMap<QString, QStringList> shortToFulls; // last4 -> list of full EXCODEs that map to it
+        for (int i = 0; i < evaluateData.rowCount; ++i) {
+            QString raw = excodeCol ? excodeCol->data.value(i).toString().trimmed() : QString();
+            if (raw.isEmpty()) raw = "?";
+            QString last4 = raw.length() >= 4 ? raw.right(4) : raw;
+            if (!shortToFulls[last4].contains(raw))
+                shortToFulls[last4].append(raw);
+        }
+        for (auto it = shortToFulls.begin(); it != shortToFulls.end(); ++it) {
+            if (it.value().size() == 1) {
+                fullToShort[it.value().first()] = it.key(); // no collision — use last 4
+            } else {
+                for (const QString &full : it.value())
+                    fullToShort[full] = full; // collision — use full EXCODE
+            }
+        }
+    }
+
     QStringList expOrder;
-    QMap<int, QString> rowExp; // row index -> experiment label (last 4 chars of EXCODE)
+    QMap<int, QString> rowExp; // row index -> display label
     for (int i = 0; i < evaluateData.rowCount; ++i) {
-        QString raw = excodeCol ? excodeCol->data.value(i).toString() : QString();
-        QString label = raw.length() >= 4 ? raw.right(4) : raw;
-        if (label.isEmpty()) label = "?";
+        QString raw = excodeCol ? excodeCol->data.value(i).toString().trimmed() : QString();
+        if (raw.isEmpty()) raw = "?";
+        QString label = fullToShort.value(raw, raw);
         rowExp[i] = label;
         if (!expOrder.contains(label)) expOrder.append(label);
     }
