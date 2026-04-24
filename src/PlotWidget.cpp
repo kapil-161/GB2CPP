@@ -1128,10 +1128,25 @@ void PlotWidget::resizeScatterPanels()
     int side  = qMin(sideW, sideH);
     if (side < 180) side = 180;
 
+    int statsFontPt = qBound(8, side / 28, 13);
+    if (m_plotSettings.axisTickFontSize != 9)
+        statsFontPt = qBound(7, m_plotSettings.axisTickFontSize, 14);
+
     for (int i = 0; i < m_scatterPanelGrid->count(); ++i) {
         QLayoutItem *item = m_scatterPanelGrid->itemAt(i);
-        if (item && item->widget())
-            item->widget()->setFixedSize(side, side);
+        if (!item || !item->widget()) continue;
+        item->widget()->setFixedSize(side, side);
+        // Update stats label font to match new panel size
+        for (QChartView *cv : item->widget()->findChildren<QChartView*>()) {
+            for (QLabel *lbl : cv->findChildren<QLabel*>()) {
+                if (lbl->parent() == cv) {
+                    lbl->setStyleSheet(QString(
+                        "QLabel { background: rgba(255,255,255,210); font-size: %1pt; "
+                        "padding: 2px 4px; border: none; }").arg(statsFontPt));
+                    lbl->adjustSize();
+                }
+            }
+        }
     }
     int cW = side * nCols + spacing * (nCols - 1) + margins;
     int cH = side * nRows + spacing * (nRows - 1) + margins;
@@ -5498,7 +5513,10 @@ void PlotWidget::applyPlotSettings(const PlotSettings &settings)
 
             // Update strip label and stats label fonts
             int stripFontPx = qMax(8, settings.titleFontSize);
-            int statsFontPx = qMax(11, settings.axisTickFontSize);
+            int panelW = cv->width();
+            int statsFontPx = qBound(8, panelW / 28, 13);
+            if (settings.axisTickFontSize != 9)
+                statsFontPx = qBound(7, settings.axisTickFontSize, 14);
             if (cv->parentWidget()) {
                 for (QLabel *lbl : cv->parentWidget()->findChildren<QLabel*>()) {
                     if (lbl->parent() == cv->parentWidget()) { // strip label
@@ -5513,7 +5531,7 @@ void PlotWidget::applyPlotSettings(const PlotSettings &settings)
             for (QLabel *lbl : cv->findChildren<QLabel*>()) {
                 if (lbl->parent() == cv) {
                     lbl->setStyleSheet(QString(
-                        "QLabel { background: rgba(255,255,255,210); font-size: %1px; "
+                        "QLabel { background: rgba(255,255,255,210); font-size: %1pt; "
                         "padding: 2px 4px; border: none; }").arg(statsFontPx));
                     lbl->adjustSize();
                 }
@@ -5990,10 +6008,14 @@ void PlotWidget::plotScatter(
             .arg(rmse, 0, 'f', rmse < 1 ? 3 : (rmse < 100 ? 2 : 1))
             .arg(r2,   0, 'f', 2);
         QLabel *statsLabel = new QLabel(statsText, cv);
-        int statsFontPx = qMax(11, m_plotSettings.axisTickFontSize);
+        // Scale font with panel size: ~9pt at 200px, ~11pt at 300px, ~13pt at 400px
+        int statsFontPt = qBound(8, panelSize / 28, 13);
+        // Let user's axisTickFontSize override if explicitly set (non-default)
+        if (m_plotSettings.axisTickFontSize != 9)
+            statsFontPt = qBound(7, m_plotSettings.axisTickFontSize, 14);
         statsLabel->setStyleSheet(QString(
             "QLabel { background: rgba(255,255,255,210); font-size: %1pt; "
-            "padding: 2px 4px; border: none; }").arg(statsFontPx));
+            "padding: 2px 4px; border: none; }").arg(statsFontPt));
         statsLabel->setAlignment(Qt::AlignLeft | Qt::AlignTop);
         statsLabel->adjustSize();
         statsLabel->raise();
