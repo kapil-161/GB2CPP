@@ -19,7 +19,7 @@ MetricsTableModel::MetricsTableModel(const QVariantList& data, bool isScatterPlo
     // For scatter plots, exclude Treatment and Treatment Name columns
     if (isScatterPlot) {
         m_headers = {"Experiment", "Crop", "Variable", "n", "R²", "RMSE", "d-stat",
-                     "BIAS", "MSEs", "MSEu"};
+                     "BIAS", "MSEs/MSE", "MSEu/MSE"};
     } else {
         m_headers = {"Treatment", "Treatment Name", "Experiment", "Crop", "Variable", "n", "Obs. Mean", "Sim. Mean", "R²", "RMSE", "NRMSE", "d-stat"};
     }
@@ -40,8 +40,10 @@ MetricsTableModel::MetricsTableModel(const QVariantList& data, bool isScatterPlo
     m_keyMap["NRMSE"] = {"NRMSE", "nrmse", "normalized_rmse"};
     m_keyMap["d-stat"] = {"d-stat", "Willmott's d-stat", "d_stat", "dstat", "willmott_d"};
     m_keyMap["BIAS"] = {"BIAS", "BiasIndex", "Bias Index", "Bias index", "bias_index"};
-    m_keyMap["MSEs"] = {"MSEs", "MSE systematic", "MSE_systematic", "MSE_s"};
-    m_keyMap["MSEu"] = {"MSEu", "MSE unsystematic", "MSE_unsystematic", "MSE_u"};
+    m_keyMap["MSEs"]     = {"MSEs", "MSE systematic", "MSE_systematic", "MSE_s"};
+    m_keyMap["MSEu"]     = {"MSEu", "MSE unsystematic", "MSE_unsystematic", "MSE_u"};
+    m_keyMap["MSEs/MSE"] = {"MSEs", "MSE systematic", "MSE_systematic", "MSE_s"};
+    m_keyMap["MSEu/MSE"] = {"MSEu", "MSE unsystematic", "MSE_unsystematic", "MSE_u"};
 }
 
 int MetricsTableModel::rowCount(const QModelIndex& parent) const
@@ -91,7 +93,8 @@ QVariant MetricsTableModel::data(const QModelIndex& index, int role) const
         
         if (columnName == "n" || columnName == "Obs. Mean" || columnName == "Sim. Mean" ||
             columnName == "RMSE" || columnName == "NRMSE" || columnName == "d-stat" ||
-            columnName == "BIAS" || columnName == "MSEs" || columnName == "MSEu") {
+            columnName == "BIAS" || columnName == "MSEs" || columnName == "MSEu" ||
+            columnName == "MSEs/MSE" || columnName == "MSEu/MSE") {
             if (value.canConvert<double>()) {
                 if (columnName == "n") {
                     return QString::number((int)value.toDouble());
@@ -106,7 +109,8 @@ QVariant MetricsTableModel::data(const QModelIndex& index, int role) const
                 } else if (columnName == "BIAS") {
                     // Dimensionless bias index (Eq. 7) – show 4 decimals
                     return QString::number(value.toDouble(), 'f', 4);
-                } else if (columnName == "MSEs" || columnName == "MSEu") {
+                } else if (columnName == "MSEs" || columnName == "MSEu" ||
+                           columnName == "MSEs/MSE" || columnName == "MSEu/MSE") {
                     return QString::number(value.toDouble(), 'f', 4);
                 } else {
                     return QString::number(value.toDouble(), 'f', 4);
@@ -467,7 +471,8 @@ void MetricsTableWidget::exportMetrics()
                 cellValue = "-";
             } else if (header == "n" || header == "Obs. Mean" || header == "Sim. Mean" ||
                        header == "RMSE" || header == "NRMSE" || header == "d-stat" ||
-                       header == "BIAS" || header == "MSEs" || header == "MSEu") {
+                       header == "BIAS" || header == "MSEs" || header == "MSEu" ||
+                       header == "MSEs/MSE" || header == "MSEu/MSE") {
                 // These are numeric fields - check if we can convert to number
                 if (value.canConvert<double>()) {
                     double numValue = value.toDouble();
@@ -484,7 +489,8 @@ void MetricsTableWidget::exportMetrics()
                         cellValue = QString::number(numValue, 'f', 2);
                     } else if (header == "BIAS") {
                         cellValue = QString::number(numValue, 'f', 4);
-                    } else if (header == "MSEs" || header == "MSEu") {
+                    } else if (header == "MSEs" || header == "MSEu" ||
+                               header == "MSEs/MSE" || header == "MSEu/MSE") {
                         cellValue = QString::number(numValue, 'f', 4);
                     } else {
                         cellValue = QString::number(numValue, 'f', 4);

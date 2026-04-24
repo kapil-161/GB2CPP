@@ -3415,10 +3415,10 @@ void PlotWidget::renderLegendContent(QPainter *painter, const QRect &rect)
 void PlotWidget::setShowLegend(bool show)
 {
     m_showLegend = show;
-    // In scatter mode the experiment color legend is always shown — it's the only
-    // way to know which color maps to which experiment.
-    bool forceShow = m_isScatterMode ? true : show;
-    m_legendScrollArea->setVisible(forceShow);
+    // In scatter mode: legend is only useful when there are multiple experiments.
+    // plotScatter() already sets visibility correctly; don't override it here.
+    if (!m_isScatterMode)
+        m_legendScrollArea->setVisible(show);
 }
 
 void PlotWidget::setShowGrid(bool show)
@@ -5678,6 +5678,9 @@ void PlotWidget::plotScatter(
         qWarning() << "PlotWidget::plotScatter() - No variables provided";
         return;
     }
+    if (varNames.size() > 9)
+        emit errorOccurred(QString("Showing first 9 of %1 selected variables (maximum is 9).")
+                           .arg(varNames.size()));
 
     if (evaluateData.rowCount == 0) {
         qWarning() << "PlotWidget::plotScatter() - No data";
@@ -5888,17 +5891,13 @@ void PlotWidget::plotScatter(
         QString axFmt;
         niceAxis(combinedMin, combinedMax, axMin, axMax, axTicks, axFmt);
 
-        // Compute RMSE and R² over all points
+        // Compute full metrics over all points (all experiments combined)
         QVector<double> simVals, measVals;
         for (const auto &pts : expPoints)
             for (const QPointF &p : pts) { simVals.append(p.x()); measVals.append(p.y()); }
-        double rmse = 0;
-        for (int k = 0; k < simVals.size(); ++k) {
-            double d = measVals[k] - simVals[k];
-            rmse += d * d;
-        }
-        rmse = std::sqrt(rmse / simVals.size());
-        double r2 = MetricsCalculator::rSquared(simVals, measVals);
+        QVariantMap fullMetrics = MetricsCalculator::calculateMetrics(simVals, measVals, 1);
+        double rmse = fullMetrics.value("RMSE", 0.0).toDouble();
+        double r2   = MetricsCalculator::rSquared(simVals, measVals);
 
         // Build panel chart — honour m_plotSettings where applicable
         QChart *chart = new QChart();
@@ -6029,25 +6028,49 @@ void PlotWidget::plotScatter(
         m_scatterPanelGrid->addWidget(panelWidget, row, col);
         m_scatterPanelViews.append(cv);
 
-        // Collect metrics
+        // Collect full metrics for dialog
         QMap<QString, QVariant> mmap;
-        mmap["Variable"] = baseVar;
-        mmap["RMSE"]     = rmse;
-        mmap["R²"]       = r2;
-        mmap["N"]        = totalPts;
+        mmap["Variable"]          = baseVar;
+        mmap["N"]                 = totalPts;
+        mmap["R²"]                = r2;
+        mmap["RMSE"]              = rmse;
+        mmap["Willmott's d-stat"] = fullMetrics.value("Willmott's d-stat");
+        mmap["BIAS"]              = fullMetrics.value("BIAS");
+        // Store MSEs/MSEu as proportion of total MSE (0–1) so display is unitless
+        double mseTotal = rmse * rmse;
+        double mseSraw  = fullMetrics.value("MSEs", 0.0).toDouble();
+        double mseUraw  = fullMetrics.value("MSEu", 0.0).toDouble();
+        mmap["MSEs"] = (mseTotal > 0) ? mseSraw / mseTotal : QVariant(0.0);
+        mmap["MSEu"] = (mseTotal > 0) ? mseUraw / mseTotal : QVariant(0.0);
+        // Crop from CR column (first non-empty value for this variable's rows)
+        QString cropCode;
+        if (crCol) {
+            for (int i = 0; i < evaluateData.rowCount; ++i) {
+                QString cr = crCol->data.value(i).toString().trimmed();
+                if (!cr.isEmpty()) { cropCode = cr; break; }
+            }
+        }
+        mmap["Crop"]       = cropCode.isEmpty() ? QVariant("NA") : QVariant(cropCode);
+        mmap["Experiment"] = expOrder.size() == 1 ? QVariant(expOrder.first()) : QVariant("All");
         allMetrics.append(mmap);
     }
 
     // Defer panel resize until after the layout is complete and widget has real dimensions
     QTimer::singleShot(0, this, [this]() { resizeScatterPanels(); });
 
-    // --- Build legend in right panel (always visible in scatter mode) ---
+    // --- Build legend in right panel (hide if only one experiment — redundant) ---
     clearLegend();
+    bool showScatterLegend = (expOrder.size() > 1);
     if (m_legendStack) {
         m_legendStack->setCurrentIndex(1);
-        m_legendStack->setVisible(true);  // may have been hidden by setPreplotPanelVisible(false)
+        m_legendStack->setVisible(showScatterLegend);
     }
-    if (m_legendScrollArea) m_legendScrollArea->setVisible(true);
+    if (m_legendScrollArea) m_legendScrollArea->setVisible(showScatterLegend);
+
+    emit metricsCalculated(allMetrics);
+    emit plotUpdated();
+
+    if (!showScatterLegend) return; // single experiment — legend not needed
 
     // Title
     QLabel *legendTitle = new QLabel("Experiment");
@@ -6072,9 +6095,6 @@ void PlotWidget::plotScatter(
         hl->addStretch();
         m_legendLayout->addWidget(row);
     }
-
-    emit metricsCalculated(allMetrics);
-    emit plotUpdated();
 }
 
 
