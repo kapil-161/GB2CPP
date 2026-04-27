@@ -9,6 +9,7 @@
 #include <QCheckBox>
 #include <QSpinBox>
 #include <QDoubleSpinBox>
+#include <QDateTimeEdit>
 #include <QComboBox>
 #include <QColorDialog>
 #include <QPushButton>
@@ -16,6 +17,7 @@
 #include <QSlider>
 #include <QLineEdit>
 #include <QSet>
+#include <QDateTime>
 
 // Forward declaration
 class PlotWidget;
@@ -46,6 +48,16 @@ struct PlotSettings {
     QString yAxisTitle = "";
     int xAxisTickCount = 10;
     double xAxisTickSpacing = 0.0;
+
+    // Axis range overrides (NaN = auto)
+    bool useCustomXMin = false;
+    double xAxisMin = 0.0;
+    bool useCustomXMax = false;
+    double xAxisMax = 100.0;
+    bool useCustomYMin = false;
+    double yAxisMin = 0.0;
+    bool useCustomYMax = false;
+    double yAxisMax = 100.0;
     
     // Plot appearance
     QString plotTitle = "";
@@ -128,6 +140,17 @@ private:
     QLineEdit *m_yAxisTitleEdit;
     QSpinBox *m_xAxisTickCountSpinBox;
     QDoubleSpinBox *m_xAxisTickSpacingSpinBox;
+    QCheckBox *m_useCustomXMinCheckBox;
+    QDoubleSpinBox *m_xAxisMinSpinBox;      // numeric X axis
+    QDateTimeEdit *m_xAxisMinDateEdit;      // date X axis
+    QCheckBox *m_useCustomXMaxCheckBox;
+    QDoubleSpinBox *m_xAxisMaxSpinBox;      // numeric X axis
+    QDateTimeEdit *m_xAxisMaxDateEdit;      // date X axis
+    QCheckBox *m_useCustomYMinCheckBox;
+    QDoubleSpinBox *m_yAxisMinSpinBox;
+    QCheckBox *m_useCustomYMaxCheckBox;
+    QDoubleSpinBox *m_yAxisMaxSpinBox;
+    bool m_xAxisIsDate = false;
     
     // Plot appearance controls
     QLineEdit *m_plotTitleEdit;

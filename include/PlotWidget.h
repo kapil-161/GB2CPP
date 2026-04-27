@@ -171,6 +171,7 @@ public:
         const QStringList &varNames
     );
     
+    QChart *chart() const { return m_chart; }
     void setData(const DataTable &data);
     void setupAxes(const QString &xVar);
     void autoFitAxes();

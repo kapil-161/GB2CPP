@@ -962,7 +962,40 @@ void PlotWidget::autoFitAxes()
     }
     
     qDebug() << "PlotWidget::autoFitAxes() - Completed with data bounds: X(" << minX << "," << maxX << ") Y(" << minY << "," << maxY << ")";
-    
+
+    // Apply user-defined axis range overrides (override auto-fit result)
+    if (!m_isScatterMode) {
+        auto hAxesAf = m_chart->axes(Qt::Horizontal);
+        auto vAxesAf = m_chart->axes(Qt::Vertical);
+        if (!hAxesAf.isEmpty()) {
+            if (auto xAx = qobject_cast<QValueAxis*>(hAxesAf.first())) {
+                // Discard overrides that look like epoch milliseconds on a numeric axis
+                if (m_plotSettings.xAxisMin > 1e10) { m_plotSettings.useCustomXMin = false; m_plotSettings.xAxisMin = xAx->min(); }
+                if (m_plotSettings.xAxisMax > 1e10) { m_plotSettings.useCustomXMax = false; m_plotSettings.xAxisMax = xAx->max(); }
+                double lo = xAx->min(), hi = xAx->max();
+                if (m_plotSettings.useCustomXMin) lo = m_plotSettings.xAxisMin;
+                if (m_plotSettings.useCustomXMax) hi = m_plotSettings.xAxisMax;
+                if (m_plotSettings.useCustomXMin || m_plotSettings.useCustomXMax)
+                    xAx->setRange(lo, hi);
+            } else if (auto xDtAx = qobject_cast<QDateTimeAxis*>(hAxesAf.first())) {
+                QDateTime lo = xDtAx->min(), hi = xDtAx->max();
+                if (m_plotSettings.useCustomXMin) lo = QDateTime::fromMSecsSinceEpoch(static_cast<qint64>(m_plotSettings.xAxisMin));
+                if (m_plotSettings.useCustomXMax) hi = QDateTime::fromMSecsSinceEpoch(static_cast<qint64>(m_plotSettings.xAxisMax));
+                if (m_plotSettings.useCustomXMin || m_plotSettings.useCustomXMax)
+                    xDtAx->setRange(lo, hi);
+            }
+        }
+        if (!vAxesAf.isEmpty()) {
+            if (auto yAx = qobject_cast<QValueAxis*>(vAxesAf.first())) {
+                double lo = yAx->min(), hi = yAx->max();
+                if (m_plotSettings.useCustomYMin) lo = m_plotSettings.yAxisMin;
+                if (m_plotSettings.useCustomYMax) hi = m_plotSettings.yAxisMax;
+                if (m_plotSettings.useCustomYMin || m_plotSettings.useCustomYMax)
+                    yAx->setRange(lo, hi);
+            }
+        }
+    }
+
     // Force chart to repaint with new axis settings
     if (m_chart) {
         m_chart->update();
@@ -1213,6 +1246,15 @@ void PlotWidget::plotTimeSeries(
         m_selectedFolder = selectedFolder;
         m_selectedExperiment = selectedExperiment;
         m_currentTreatments = selectedTreatments;
+
+        // If X axis type changes (date <-> numeric), discard stale range overrides
+        bool prevIsDate = (m_currentXVar.toUpper() == "DATE");
+        bool newIsDate  = (xVar.toUpper() == "DATE");
+        if (prevIsDate != newIsDate) {
+            m_plotSettings.useCustomXMin = false;
+            m_plotSettings.useCustomXMax = false;
+        }
+
         m_currentXVar = xVar;
         m_currentYVars = yVars;
         m_treatmentNames = treatmentNames;
@@ -5334,6 +5376,34 @@ void PlotWidget::onSettingsButtonClicked()
         }
     }
 
+    // Seed axis range spinboxes with the current chart axis values so the user
+    // sees the real current limits rather than 0/100 defaults.
+    // Also detect axis type mismatch and clear stale X overrides.
+    if (m_chart) {
+        auto hAxesSeed = m_chart->axes(Qt::Horizontal);
+        auto vAxesSeed = m_chart->axes(Qt::Vertical);
+        if (!hAxesSeed.isEmpty()) {
+            if (auto xAx = qobject_cast<QValueAxis*>(hAxesSeed.first())) {
+                // Current axis is numeric — clear overrides if stored values look like epoch ms
+                if (m_plotSettings.xAxisMin > 1e10 || m_plotSettings.xAxisMax > 1e10) {
+                    m_plotSettings.useCustomXMin = false;
+                    m_plotSettings.useCustomXMax = false;
+                }
+                m_plotSettings.xAxisMin = xAx->min();
+                m_plotSettings.xAxisMax = xAx->max();
+            } else if (auto xDtAx = qobject_cast<QDateTimeAxis*>(hAxesSeed.first())) {
+                m_plotSettings.xAxisMin = static_cast<double>(xDtAx->min().toMSecsSinceEpoch());
+                m_plotSettings.xAxisMax = static_cast<double>(xDtAx->max().toMSecsSinceEpoch());
+            }
+        }
+        if (!vAxesSeed.isEmpty()) {
+            if (auto yAx = qobject_cast<QValueAxis*>(vAxesSeed.first())) {
+                m_plotSettings.yAxisMin = yAx->min();
+                m_plotSettings.yAxisMax = yAx->max();
+            }
+        }
+    }
+
     PlotSettingsDialog dialog(m_plotSettings, this, this);
     if (dialog.exec() == QDialog::Accepted) {
         PlotSettings newSettings = dialog.getSettings();
@@ -5441,7 +5511,38 @@ void PlotWidget::applyPlotSettings(const PlotSettings &settings)
             }
         }
     }
-    
+
+    // Apply user axis range overrides (after auto-fit has already run)
+    if (!m_isScatterMode) {
+        auto hAxes2 = m_chart->axes(Qt::Horizontal);
+        auto vAxes2 = m_chart->axes(Qt::Vertical);
+        if (!hAxes2.isEmpty()) {
+            if (auto xAx = qobject_cast<QValueAxis*>(hAxes2.first())) {
+                double lo = xAx->min(), hi = xAx->max();
+                if (settings.useCustomXMin) lo = settings.xAxisMin;
+                if (settings.useCustomXMax) hi = settings.xAxisMax;
+                if (settings.useCustomXMin || settings.useCustomXMax)
+                    xAx->setRange(lo, hi);
+            } else if (auto xDtAx = qobject_cast<QDateTimeAxis*>(hAxes2.first())) {
+                // Date axis — treat the values as milliseconds-since-epoch (same encoding as the rest of the code)
+                QDateTime lo = xDtAx->min(), hi = xDtAx->max();
+                if (settings.useCustomXMin) lo = QDateTime::fromMSecsSinceEpoch(static_cast<qint64>(settings.xAxisMin));
+                if (settings.useCustomXMax) hi = QDateTime::fromMSecsSinceEpoch(static_cast<qint64>(settings.xAxisMax));
+                if (settings.useCustomXMin || settings.useCustomXMax)
+                    xDtAx->setRange(lo, hi);
+            }
+        }
+        if (!vAxes2.isEmpty()) {
+            if (auto yAx = qobject_cast<QValueAxis*>(vAxes2.first())) {
+                double lo = yAx->min(), hi = yAx->max();
+                if (settings.useCustomYMin) lo = settings.yAxisMin;
+                if (settings.useCustomYMax) hi = settings.yAxisMax;
+                if (settings.useCustomYMin || settings.useCustomYMax)
+                    yAx->setRange(lo, hi);
+            }
+        }
+    }
+
     // Update line and marker settings for existing series
     auto seriesList = m_chart->series();
     for (auto series : seriesList) {

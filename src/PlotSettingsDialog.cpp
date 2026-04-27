@@ -9,6 +9,9 @@
 #include <QPushButton>
 #include <QDesktopServices>
 #include <QUrl>
+#include <QtCharts/QDateTimeAxis>
+#include <QtCharts/QValueAxis>
+#include <QtCharts/QChart>
 
 PlotSettingsDialog::PlotSettingsDialog(const PlotSettings &currentSettings, PlotWidget *plotWidget, QWidget *parent)
     : QDialog(parent), m_settings(currentSettings), m_plotWidget(plotWidget)
@@ -16,7 +19,14 @@ PlotSettingsDialog::PlotSettingsDialog(const PlotSettings &currentSettings, Plot
     setWindowTitle("Plot Settings");
     setModal(true);
     resize(450, 600);
-    
+
+    // Detect whether the X axis is a date axis so setupUI can show the right widget
+    if (m_plotWidget) {
+        auto hAxes = m_plotWidget->chart()->axes(Qt::Horizontal);
+        if (!hAxes.isEmpty())
+            m_xAxisIsDate = qobject_cast<QDateTimeAxis*>(hAxes.first()) != nullptr;
+    }
+
     setupUI();
 }
 
@@ -40,6 +50,18 @@ PlotSettings PlotSettingsDialog::getSettings() const
     settings.yAxisTitle = m_yAxisTitleEdit->text();
     settings.xAxisTickCount = m_xAxisTickCountSpinBox->value();
     settings.xAxisTickSpacing = m_xAxisTickSpacingSpinBox->value();
+    settings.useCustomXMin = m_useCustomXMinCheckBox->isChecked();
+    settings.xAxisMin = m_xAxisIsDate
+        ? static_cast<double>(m_xAxisMinDateEdit->dateTime().toMSecsSinceEpoch())
+        : m_xAxisMinSpinBox->value();
+    settings.useCustomXMax = m_useCustomXMaxCheckBox->isChecked();
+    settings.xAxisMax = m_xAxisIsDate
+        ? static_cast<double>(m_xAxisMaxDateEdit->dateTime().toMSecsSinceEpoch())
+        : m_xAxisMaxSpinBox->value();
+    settings.useCustomYMin = m_useCustomYMinCheckBox->isChecked();
+    settings.yAxisMin = m_yAxisMinSpinBox->value();
+    settings.useCustomYMax = m_useCustomYMaxCheckBox->isChecked();
+    settings.yAxisMax = m_yAxisMaxSpinBox->value();
     settings.plotTitle = m_plotTitleEdit->text();
     settings.exportWidth = m_exportWidthSpinBox->value();
     settings.exportHeight = m_exportHeightSpinBox->value();
@@ -136,8 +158,92 @@ void PlotSettingsDialog::setupUI()
     m_xAxisTickSpacingSpinBox->setSpecialValueText("Auto");
     m_xAxisTickSpacingSpinBox->setToolTip("Custom spacing between tick labels (0 = automatic)\nOnly works for numeric axes (DAS, DAP, etc.)\nDate axes use tick count only");
     axisLayout->addWidget(m_xAxisTickSpacingSpinBox, 5, 1);
-    
+
+    // Axis range overrides
+    QGroupBox *rangeGroup = new QGroupBox("Axis Range Overrides");
+    rangeGroup->setToolTip("Override automatic axis limits. Leave unchecked for automatic scaling.");
+    QGridLayout *rangeLayout = new QGridLayout(rangeGroup);
+
+    // X Min
+    m_useCustomXMinCheckBox = new QCheckBox("X Min:");
+    m_useCustomXMinCheckBox->setChecked(m_settings.useCustomXMin);
+    rangeLayout->addWidget(m_useCustomXMinCheckBox, 0, 0);
+
+    m_xAxisMinSpinBox = new QDoubleSpinBox();
+    m_xAxisMinSpinBox->setRange(-1e9, 1e9);
+    m_xAxisMinSpinBox->setDecimals(4);
+    m_xAxisMinSpinBox->setValue(m_settings.xAxisMin);
+    m_xAxisMinSpinBox->setEnabled(m_settings.useCustomXMin);
+
+    m_xAxisMinDateEdit = new QDateTimeEdit();
+    m_xAxisMinDateEdit->setDisplayFormat("yyyy-MM-dd");
+    m_xAxisMinDateEdit->setCalendarPopup(true);
+    m_xAxisMinDateEdit->setDateTime(QDateTime::fromMSecsSinceEpoch(static_cast<qint64>(m_settings.xAxisMin)));
+    m_xAxisMinDateEdit->setEnabled(m_settings.useCustomXMin);
+
+    if (m_xAxisIsDate) {
+        m_xAxisMinSpinBox->hide();
+        rangeLayout->addWidget(m_xAxisMinDateEdit, 0, 1);
+        connect(m_useCustomXMinCheckBox, &QCheckBox::toggled, m_xAxisMinDateEdit, &QDateTimeEdit::setEnabled);
+    } else {
+        m_xAxisMinDateEdit->hide();
+        rangeLayout->addWidget(m_xAxisMinSpinBox, 0, 1);
+        connect(m_useCustomXMinCheckBox, &QCheckBox::toggled, m_xAxisMinSpinBox, &QDoubleSpinBox::setEnabled);
+    }
+
+    // X Max
+    m_useCustomXMaxCheckBox = new QCheckBox("X Max:");
+    m_useCustomXMaxCheckBox->setChecked(m_settings.useCustomXMax);
+    rangeLayout->addWidget(m_useCustomXMaxCheckBox, 1, 0);
+
+    m_xAxisMaxSpinBox = new QDoubleSpinBox();
+    m_xAxisMaxSpinBox->setRange(-1e9, 1e9);
+    m_xAxisMaxSpinBox->setDecimals(4);
+    m_xAxisMaxSpinBox->setValue(m_settings.xAxisMax);
+    m_xAxisMaxSpinBox->setEnabled(m_settings.useCustomXMax);
+
+    m_xAxisMaxDateEdit = new QDateTimeEdit();
+    m_xAxisMaxDateEdit->setDisplayFormat("yyyy-MM-dd");
+    m_xAxisMaxDateEdit->setCalendarPopup(true);
+    m_xAxisMaxDateEdit->setDateTime(QDateTime::fromMSecsSinceEpoch(static_cast<qint64>(m_settings.xAxisMax)));
+    m_xAxisMaxDateEdit->setEnabled(m_settings.useCustomXMax);
+
+    if (m_xAxisIsDate) {
+        m_xAxisMaxSpinBox->hide();
+        rangeLayout->addWidget(m_xAxisMaxDateEdit, 1, 1);
+        connect(m_useCustomXMaxCheckBox, &QCheckBox::toggled, m_xAxisMaxDateEdit, &QDateTimeEdit::setEnabled);
+    } else {
+        m_xAxisMaxDateEdit->hide();
+        rangeLayout->addWidget(m_xAxisMaxSpinBox, 1, 1);
+        connect(m_useCustomXMaxCheckBox, &QCheckBox::toggled, m_xAxisMaxSpinBox, &QDoubleSpinBox::setEnabled);
+    }
+
+    // Y Min
+    m_useCustomYMinCheckBox = new QCheckBox("Y Min:");
+    m_useCustomYMinCheckBox->setChecked(m_settings.useCustomYMin);
+    m_yAxisMinSpinBox = new QDoubleSpinBox();
+    m_yAxisMinSpinBox->setRange(-1e9, 1e9);
+    m_yAxisMinSpinBox->setDecimals(4);
+    m_yAxisMinSpinBox->setValue(m_settings.yAxisMin);
+    m_yAxisMinSpinBox->setEnabled(m_settings.useCustomYMin);
+    connect(m_useCustomYMinCheckBox, &QCheckBox::toggled, m_yAxisMinSpinBox, &QDoubleSpinBox::setEnabled);
+    rangeLayout->addWidget(m_useCustomYMinCheckBox, 2, 0);
+    rangeLayout->addWidget(m_yAxisMinSpinBox, 2, 1);
+
+    // Y Max
+    m_useCustomYMaxCheckBox = new QCheckBox("Y Max:");
+    m_useCustomYMaxCheckBox->setChecked(m_settings.useCustomYMax);
+    m_yAxisMaxSpinBox = new QDoubleSpinBox();
+    m_yAxisMaxSpinBox->setRange(-1e9, 1e9);
+    m_yAxisMaxSpinBox->setDecimals(4);
+    m_yAxisMaxSpinBox->setValue(m_settings.yAxisMax);
+    m_yAxisMaxSpinBox->setEnabled(m_settings.useCustomYMax);
+    connect(m_useCustomYMaxCheckBox, &QCheckBox::toggled, m_yAxisMaxSpinBox, &QDoubleSpinBox::setEnabled);
+    rangeLayout->addWidget(m_useCustomYMaxCheckBox, 3, 0);
+    rangeLayout->addWidget(m_yAxisMaxSpinBox, 3, 1);
+
     gridAxesLayout->addWidget(axisGroup);
+    gridAxesLayout->addWidget(rangeGroup);
     gridAxesLayout->addStretch();
     
     tabWidget->addTab(gridAxesTab, "Grid & Axes");
@@ -415,6 +521,20 @@ void PlotSettingsDialog::onResetDefaults()
     m_yAxisTitleEdit->setText(defaults.yAxisTitle);
     m_xAxisTickCountSpinBox->setValue(defaults.xAxisTickCount);
     m_xAxisTickSpacingSpinBox->setValue(defaults.xAxisTickSpacing);
+    m_useCustomXMinCheckBox->setChecked(defaults.useCustomXMin);
+    m_xAxisMinSpinBox->setValue(defaults.xAxisMin);
+    m_xAxisMinSpinBox->setEnabled(defaults.useCustomXMin);
+    m_xAxisMinDateEdit->setEnabled(defaults.useCustomXMin);
+    m_useCustomXMaxCheckBox->setChecked(defaults.useCustomXMax);
+    m_xAxisMaxSpinBox->setValue(defaults.xAxisMax);
+    m_xAxisMaxSpinBox->setEnabled(defaults.useCustomXMax);
+    m_xAxisMaxDateEdit->setEnabled(defaults.useCustomXMax);
+    m_useCustomYMinCheckBox->setChecked(defaults.useCustomYMin);
+    m_yAxisMinSpinBox->setValue(defaults.yAxisMin);
+    m_yAxisMinSpinBox->setEnabled(defaults.useCustomYMin);
+    m_useCustomYMaxCheckBox->setChecked(defaults.useCustomYMax);
+    m_yAxisMaxSpinBox->setValue(defaults.yAxisMax);
+    m_yAxisMaxSpinBox->setEnabled(defaults.useCustomYMax);
     m_plotTitleEdit->setText(defaults.plotTitle);
     updateColorButton(m_backgroundColorButton, defaults.backgroundColor);
     updateColorButton(m_plotAreaColorButton, defaults.plotAreaColor);
