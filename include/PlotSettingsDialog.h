@@ -48,6 +48,13 @@ struct PlotSettings {
     QString yAxisTitle = "";
     int xAxisTickCount = 10;
     double xAxisTickSpacing = 0.0;
+    int xAxisMinorTickCount = 4;
+    int xAxisDecimals = -1;   // -1 = auto
+
+    int yAxisTickCount = 10;
+    double yAxisTickSpacing = 0.0;
+    int yAxisMinorTickCount = 4;
+    int yAxisDecimals = -1;   // -1 = auto
 
     // Axis range overrides (NaN = auto)
     bool useCustomXMin = false;
@@ -140,6 +147,13 @@ private:
     QLineEdit *m_yAxisTitleEdit;
     QSpinBox *m_xAxisTickCountSpinBox;
     QDoubleSpinBox *m_xAxisTickSpacingSpinBox;
+    QSpinBox *m_xAxisMinorTickCountSpinBox;
+    QSpinBox *m_xAxisDecimalsSpinBox;
+
+    QSpinBox *m_yAxisTickCountSpinBox;
+    QDoubleSpinBox *m_yAxisTickSpacingSpinBox;
+    QSpinBox *m_yAxisMinorTickCountSpinBox;
+    QSpinBox *m_yAxisDecimalsSpinBox;
     QCheckBox *m_useCustomXMinCheckBox;
     QDoubleSpinBox *m_xAxisMinSpinBox;      // numeric X axis
     QDateTimeEdit *m_xAxisMinDateEdit;      // date X axis

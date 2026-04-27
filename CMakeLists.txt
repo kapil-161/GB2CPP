@@ -187,6 +187,16 @@ set_target_properties(GB2 PROPERTIES
 )
 
 # Copy resources during build instead of configure time
+# Re-generate version_generated.h from git at every build (pre-build step)
+add_custom_target(GB2_version ALL
+    COMMAND ${CMAKE_COMMAND}
+        -DSOURCE_DIR=${CMAKE_SOURCE_DIR}
+        -DGIT_EXECUTABLE=${GIT_EXECUTABLE}
+        -P ${CMAKE_SOURCE_DIR}/cmake/UpdateVersion.cmake
+    COMMENT "Updating version from git"
+)
+add_dependencies(GB2 GB2_version)
+
 add_custom_command(TARGET GB2 POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_directory
     ${CMAKE_SOURCE_DIR}/resources ${CMAKE_BINARY_DIR}/bin/resources

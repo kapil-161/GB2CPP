@@ -50,6 +50,12 @@ PlotSettings PlotSettingsDialog::getSettings() const
     settings.yAxisTitle = m_yAxisTitleEdit->text();
     settings.xAxisTickCount = m_xAxisTickCountSpinBox->value();
     settings.xAxisTickSpacing = m_xAxisTickSpacingSpinBox->value();
+    settings.xAxisMinorTickCount = m_xAxisMinorTickCountSpinBox->value();
+    settings.xAxisDecimals = m_xAxisDecimalsSpinBox->value();
+    settings.yAxisTickCount = m_yAxisTickCountSpinBox->value();
+    settings.yAxisTickSpacing = m_yAxisTickSpacingSpinBox->value();
+    settings.yAxisMinorTickCount = m_yAxisMinorTickCountSpinBox->value();
+    settings.yAxisDecimals = m_yAxisDecimalsSpinBox->value();
     settings.useCustomXMin = m_useCustomXMinCheckBox->isChecked();
     settings.xAxisMin = m_xAxisIsDate
         ? static_cast<double>(m_xAxisMinDateEdit->dateTime().toMSecsSinceEpoch())
@@ -115,11 +121,9 @@ void PlotSettingsDialog::setupUI()
     m_showMinorGridCheckBox->setChecked(m_settings.showMinorGrid);
     gridLayout->addWidget(m_showMinorGridCheckBox, 1, 0, 1, 2);
     
-    gridLayout->addWidget(new QLabel("Minor Ticks per Major Tick:"), 2, 0);
-    m_minorTickCountSpinBox = new QSpinBox();
-    m_minorTickCountSpinBox->setRange(1, 10);
-    m_minorTickCountSpinBox->setValue(m_settings.minorTickCount);
-    gridLayout->addWidget(m_minorTickCountSpinBox, 2, 1);
+    // Minor tick count is now per-axis (see Axis Settings group below)
+    m_minorTickCountSpinBox = new QSpinBox(); // kept to avoid null pointer, hidden
+    m_minorTickCountSpinBox->hide();
     
     gridAxesLayout->addWidget(gridGroup);
     
@@ -152,12 +156,58 @@ void PlotSettingsDialog::setupUI()
     
     axisLayout->addWidget(new QLabel("X-Axis Tick Spacing:"), 5, 0);
     m_xAxisTickSpacingSpinBox = new QDoubleSpinBox();
-    m_xAxisTickSpacingSpinBox->setRange(0.0, 1000.0);
+    m_xAxisTickSpacingSpinBox->setRange(0.0, 1000000.0);
     m_xAxisTickSpacingSpinBox->setDecimals(1);
     m_xAxisTickSpacingSpinBox->setValue(m_settings.xAxisTickSpacing);
     m_xAxisTickSpacingSpinBox->setSpecialValueText("Auto");
-    m_xAxisTickSpacingSpinBox->setToolTip("Custom spacing between tick labels (0 = automatic)\nOnly works for numeric axes (DAS, DAP, etc.)\nDate axes use tick count only");
+    m_xAxisTickSpacingSpinBox->setToolTip("Spacing between major tick labels (0 = automatic)\nOnly works for numeric axes (DAS, DAP, etc.)");
     axisLayout->addWidget(m_xAxisTickSpacingSpinBox, 5, 1);
+
+    axisLayout->addWidget(new QLabel("X Minor Ticks per Major:"), 6, 0);
+    m_xAxisMinorTickCountSpinBox = new QSpinBox();
+    m_xAxisMinorTickCountSpinBox->setRange(0, 20);
+    m_xAxisMinorTickCountSpinBox->setValue(m_settings.xAxisMinorTickCount);
+    m_xAxisMinorTickCountSpinBox->setToolTip("Number of minor tick marks between each major tick on X-axis (0 = none)");
+    axisLayout->addWidget(m_xAxisMinorTickCountSpinBox, 6, 1);
+
+    axisLayout->addWidget(new QLabel("X Label Decimals:"), 7, 0);
+    m_xAxisDecimalsSpinBox = new QSpinBox();
+    m_xAxisDecimalsSpinBox->setRange(-1, 6);
+    m_xAxisDecimalsSpinBox->setValue(m_settings.xAxisDecimals);
+    m_xAxisDecimalsSpinBox->setSpecialValueText("Auto");
+    m_xAxisDecimalsSpinBox->setToolTip("Decimal places for X-axis tick labels (-1 = auto)");
+    axisLayout->addWidget(m_xAxisDecimalsSpinBox, 7, 1);
+
+    axisLayout->addWidget(new QLabel("Y-Axis Tick Count:"), 8, 0);
+    m_yAxisTickCountSpinBox = new QSpinBox();
+    m_yAxisTickCountSpinBox->setRange(2, 30);
+    m_yAxisTickCountSpinBox->setValue(m_settings.yAxisTickCount);
+    m_yAxisTickCountSpinBox->setToolTip("Number of major tick labels on Y-axis");
+    axisLayout->addWidget(m_yAxisTickCountSpinBox, 8, 1);
+
+    axisLayout->addWidget(new QLabel("Y-Axis Tick Spacing:"), 9, 0);
+    m_yAxisTickSpacingSpinBox = new QDoubleSpinBox();
+    m_yAxisTickSpacingSpinBox->setRange(0.0, 1000000.0);
+    m_yAxisTickSpacingSpinBox->setDecimals(1);
+    m_yAxisTickSpacingSpinBox->setValue(m_settings.yAxisTickSpacing);
+    m_yAxisTickSpacingSpinBox->setSpecialValueText("Auto");
+    m_yAxisTickSpacingSpinBox->setToolTip("Spacing between major tick labels on Y-axis (0 = automatic)");
+    axisLayout->addWidget(m_yAxisTickSpacingSpinBox, 9, 1);
+
+    axisLayout->addWidget(new QLabel("Y Minor Ticks per Major:"), 10, 0);
+    m_yAxisMinorTickCountSpinBox = new QSpinBox();
+    m_yAxisMinorTickCountSpinBox->setRange(0, 20);
+    m_yAxisMinorTickCountSpinBox->setValue(m_settings.yAxisMinorTickCount);
+    m_yAxisMinorTickCountSpinBox->setToolTip("Number of minor tick marks between each major tick on Y-axis (0 = none)");
+    axisLayout->addWidget(m_yAxisMinorTickCountSpinBox, 10, 1);
+
+    axisLayout->addWidget(new QLabel("Y Label Decimals:"), 11, 0);
+    m_yAxisDecimalsSpinBox = new QSpinBox();
+    m_yAxisDecimalsSpinBox->setRange(-1, 6);
+    m_yAxisDecimalsSpinBox->setValue(m_settings.yAxisDecimals);
+    m_yAxisDecimalsSpinBox->setSpecialValueText("Auto");
+    m_yAxisDecimalsSpinBox->setToolTip("Decimal places for Y-axis tick labels (-1 = auto)");
+    axisLayout->addWidget(m_yAxisDecimalsSpinBox, 11, 1);
 
     // Axis range overrides
     QGroupBox *rangeGroup = new QGroupBox("Axis Range Overrides");
@@ -521,6 +571,12 @@ void PlotSettingsDialog::onResetDefaults()
     m_yAxisTitleEdit->setText(defaults.yAxisTitle);
     m_xAxisTickCountSpinBox->setValue(defaults.xAxisTickCount);
     m_xAxisTickSpacingSpinBox->setValue(defaults.xAxisTickSpacing);
+    m_xAxisMinorTickCountSpinBox->setValue(defaults.xAxisMinorTickCount);
+    m_xAxisDecimalsSpinBox->setValue(defaults.xAxisDecimals);
+    m_yAxisTickCountSpinBox->setValue(defaults.yAxisTickCount);
+    m_yAxisTickSpacingSpinBox->setValue(defaults.yAxisTickSpacing);
+    m_yAxisMinorTickCountSpinBox->setValue(defaults.yAxisMinorTickCount);
+    m_yAxisDecimalsSpinBox->setValue(defaults.yAxisDecimals);
     m_useCustomXMinCheckBox->setChecked(defaults.useCustomXMin);
     m_xAxisMinSpinBox->setValue(defaults.xAxisMin);
     m_xAxisMinSpinBox->setEnabled(defaults.useCustomXMin);

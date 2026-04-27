@@ -897,23 +897,27 @@ void PlotWidget::autoFitAxes()
                     double cleanMinX = std::floor(minX / tickInterval) * tickInterval;
                     double cleanMaxX = std::ceil(maxX / tickInterval) * tickInterval;
                     
-                    // Set clean range and interval
+                    // Snap range to clean multiples then derive tickCount (same strategy as Y axis)
+                    int xTickCount = qRound((cleanMaxX - cleanMinX) / tickInterval) + 1;
+                    if (xTickCount < 3) xTickCount = 3;
                     valueAxis->setRange(cleanMinX, cleanMaxX);
-                    valueAxis->setTickInterval(tickInterval);
-                    valueAxis->setLabelFormat("%.0f"); // No decimals for days
-                    
-                    // Force tick count for more ticks
-                    int tickCount = qRound((cleanMaxX - cleanMinX) / tickInterval) + 1;
-                    if (tickCount < 8) tickCount = 8;
-                    valueAxis->setTickCount(tickCount);
-                    
-                    qDebug() << "PlotWidget::autoFitAxes() - Set X day-based axis: range" << cleanMinX << "to" << cleanMaxX << "interval:" << tickInterval << "ticks:" << tickCount;
+                    valueAxis->setTickCount(xTickCount);
+                    // Label format: user decimals or auto (0 for day-based)
+                    if (m_plotSettings.xAxisDecimals >= 0)
+                        valueAxis->setLabelFormat(QString("%.%1f").arg(m_plotSettings.xAxisDecimals));
+                    else
+                        valueAxis->setLabelFormat("%.0f");
+
+                    qDebug() << "PlotWidget::autoFitAxes() - Set X day-based axis: range" << cleanMinX << "to" << cleanMaxX << "interval:" << tickInterval << "tickCount:" << xTickCount;
                 } else {
-                    // For other variables, use default formatting
-                    valueAxis->setLabelFormat("%.2f");
+                    // Label format: user decimals or auto (2dp default)
+                    if (m_plotSettings.xAxisDecimals >= 0)
+                        valueAxis->setLabelFormat(QString("%.%1f").arg(m_plotSettings.xAxisDecimals));
+                    else
+                        valueAxis->setLabelFormat("%.2f");
                 }
-                
-                valueAxis->setMinorTickCount(4);
+
+                valueAxis->setMinorTickCount(m_plotSettings.xAxisMinorTickCount);
                 valueAxis->setMinorGridLineVisible(true);
                 qDebug() << "PlotWidget::autoFitAxes() - Set X ValueAxis range:" << (minX - xLeftPadding) << "to" << (maxX + xRightPadding);
             } else if (auto dateAxis = qobject_cast<QDateTimeAxis*>(axis)) {
@@ -931,32 +935,39 @@ void PlotWidget::autoFitAxes()
             if (auto valueAxis = qobject_cast<QValueAxis*>(axis)) {
                 // Start with data maximum and minimal padding (5%)
                 double dataMax = maxY;
-                double minimalPadding = dataMax * 0.05;  // Just 5% padding
+                double minimalPadding = dataMax * 0.05;
                 double targetMax = dataMax + minimalPadding;
-                
-                // Find clean interval based on data range only
-                double tickInterval = calculateNiceYInterval(targetMax);
-                
-                // Find the next clean tick above the target
-                double alignedMax = std::ceil(targetMax / tickInterval) * tickInterval;
-                
-                // Make sure we have at least one tick above data
-                if (alignedMax <= dataMax) {
-                    alignedMax += tickInterval;
+
+                // Use user-defined tick spacing if set, otherwise auto
+                double tickInterval;
+                if (m_plotSettings.yAxisTickSpacing > 0.0) {
+                    tickInterval = m_plotSettings.yAxisTickSpacing;
+                } else {
+                    tickInterval = calculateNiceYInterval(targetMax);
                 }
-                
-                // Set clean range and interval
-                valueAxis->setRange(0, alignedMax);
-                valueAxis->setTickInterval(tickInterval);
-                valueAxis->setMinorTickCount(4);
-                valueAxis->setMinorGridLineVisible(true);
-                
-                // Force tick count for better readability
+
+                // Snap max to a clean multiple of the interval so tick labels are always round
+                double alignedMax = std::ceil(targetMax / tickInterval) * tickInterval;
+                if (alignedMax <= dataMax) alignedMax += tickInterval;
+
+                // Qt Charts requires setRange + setTickCount to produce clean labels.
+                // setTickInterval alone is unreliable — Qt can override it internally.
+                // Strategy: snap range to exact multiples of tickInterval, then derive tickCount.
                 int tickCount = qRound(alignedMax / tickInterval) + 1;
-                if (tickCount < 8) tickCount = 8; // Minimum 8 ticks
+                if (tickCount < 3) tickCount = 3;
+
+                valueAxis->setRange(0, alignedMax);
                 valueAxis->setTickCount(tickCount);
-                
-                qDebug() << "PlotWidget::autoFitAxes() - Y-axis: data max=" << dataMax << "target=" << targetMax << "aligned=" << alignedMax << "interval=" << tickInterval << "ticks=" << tickCount;
+                valueAxis->setMinorTickCount(m_plotSettings.yAxisMinorTickCount);
+                valueAxis->setMinorGridLineVisible(true);
+
+                // Label format: user decimals or auto
+                if (m_plotSettings.yAxisDecimals >= 0)
+                    valueAxis->setLabelFormat(QString("%.%1f").arg(m_plotSettings.yAxisDecimals));
+                else
+                    valueAxis->setLabelFormat("%.0f");
+
+                qDebug() << "PlotWidget::autoFitAxes() - Y-axis: alignedMax=" << alignedMax << "interval=" << tickInterval << "tickCount=" << tickCount;
             }
         }
     }
@@ -975,8 +986,17 @@ void PlotWidget::autoFitAxes()
                 double lo = xAx->min(), hi = xAx->max();
                 if (m_plotSettings.useCustomXMin) lo = m_plotSettings.xAxisMin;
                 if (m_plotSettings.useCustomXMax) hi = m_plotSettings.xAxisMax;
-                if (m_plotSettings.useCustomXMin || m_plotSettings.useCustomXMax)
-                    xAx->setRange(lo, hi);
+                if (m_plotSettings.useCustomXMin || m_plotSettings.useCustomXMax) {
+                    double tickInterval = m_plotSettings.xAxisTickSpacing > 0.0
+                        ? m_plotSettings.xAxisTickSpacing
+                        : calculateNiceXInterval(hi - lo);
+                    double snappedLo = std::floor(lo / tickInterval) * tickInterval;
+                    double snappedHi = std::ceil(hi / tickInterval) * tickInterval;
+                    int tickCount = qRound((snappedHi - snappedLo) / tickInterval) + 1;
+                    if (tickCount < 3) tickCount = 3;
+                    xAx->setRange(snappedLo, snappedHi);
+                    xAx->setTickCount(tickCount);
+                }
             } else if (auto xDtAx = qobject_cast<QDateTimeAxis*>(hAxesAf.first())) {
                 QDateTime lo = xDtAx->min(), hi = xDtAx->max();
                 if (m_plotSettings.useCustomXMin) lo = QDateTime::fromMSecsSinceEpoch(static_cast<qint64>(m_plotSettings.xAxisMin));
@@ -990,8 +1010,20 @@ void PlotWidget::autoFitAxes()
                 double lo = yAx->min(), hi = yAx->max();
                 if (m_plotSettings.useCustomYMin) lo = m_plotSettings.yAxisMin;
                 if (m_plotSettings.useCustomYMax) hi = m_plotSettings.yAxisMax;
-                if (m_plotSettings.useCustomYMin || m_plotSettings.useCustomYMax)
-                    yAx->setRange(lo, hi);
+                if (m_plotSettings.useCustomYMin || m_plotSettings.useCustomYMax) {
+                    // Recalculate a clean tick interval for the new range so labels stay round
+                    double range = hi - lo;
+                    double tickInterval = m_plotSettings.yAxisTickSpacing > 0.0
+                        ? m_plotSettings.yAxisTickSpacing
+                        : calculateNiceYInterval(hi);
+                    // Snap hi up to the nearest clean multiple of the interval
+                    double snappedHi = std::ceil(hi / tickInterval) * tickInterval;
+                    double snappedLo = (lo == 0.0) ? 0.0 : std::floor(lo / tickInterval) * tickInterval;
+                    int tickCount = qRound((snappedHi - snappedLo) / tickInterval) + 1;
+                    if (tickCount < 3) tickCount = 3;
+                    yAx->setRange(snappedLo, snappedHi);
+                    yAx->setTickCount(tickCount);
+                }
             }
         }
     }
@@ -5412,6 +5444,16 @@ void PlotWidget::onSettingsButtonClicked()
         bool filterChanged = (m_plotSettings.excludedSeriesKeys != newSettings.excludedSeriesKeys);
         bool errorBarChanged = (m_plotSettings.showErrorBars != newSettings.showErrorBars) ||
                                (m_plotSettings.errorBarType != newSettings.errorBarType);
+        bool axisRangeChanged = (m_plotSettings.useCustomXMin != newSettings.useCustomXMin) ||
+                                (m_plotSettings.useCustomXMax != newSettings.useCustomXMax) ||
+                                (m_plotSettings.useCustomYMin != newSettings.useCustomYMin) ||
+                                (m_plotSettings.useCustomYMax != newSettings.useCustomYMax) ||
+                                (m_plotSettings.xAxisMin != newSettings.xAxisMin) ||
+                                (m_plotSettings.xAxisMax != newSettings.xAxisMax) ||
+                                (m_plotSettings.yAxisMin != newSettings.yAxisMin) ||
+                                (m_plotSettings.yAxisMax != newSettings.yAxisMax) ||
+                                (m_plotSettings.yAxisTickSpacing != newSettings.yAxisTickSpacing) ||
+                                (m_plotSettings.xAxisTickSpacing != newSettings.xAxisTickSpacing);
 
         applyPlotSettings(newSettings);
         m_plotSettings = newSettings;
@@ -5421,10 +5463,13 @@ void PlotWidget::onSettingsButtonClicked()
             // Always replot scatter — metrics selection, appearance, etc. all require rebuild
             DataTable dataCopy = m_simData;
             plotScatter(dataCopy, m_currentYVars);
-        } else if (!m_isScatterMode && (filterChanged || errorBarChanged) && m_simData.rowCount > 0) {
-            updatePlotWithScaling();
-            if (m_obsData.rowCount > 0) {
-                calculateMetrics();
+        } else if (!m_isScatterMode && m_simData.rowCount > 0) {
+            if (filterChanged || errorBarChanged) {
+                updatePlotWithScaling();
+                if (m_obsData.rowCount > 0)
+                    calculateMetrics();
+            } else if (axisRangeChanged) {
+                autoFitAxes();
             }
         }
     }
@@ -5481,33 +5526,47 @@ void PlotWidget::applyPlotSettings(const PlotSettings &settings)
         axis->setLabelsBrush(QBrush(Qt::black));
 
         if (auto valueAxis = qobject_cast<QValueAxis*>(axis)) {
-            valueAxis->setMinorTickCount(settings.minorTickCount);
             valueAxis->setMinorGridLineVisible(settings.showMinorGrid);
             valueAxis->setLabelsVisible(settings.showAxisLabels);
 
-            // Apply X-axis tick customization only to X-axis (skip for scatter)
-            if (!m_isScatterMode && !hAxes.isEmpty() && axis == hAxes.first()) {
-                if (settings.xAxisTickCount > 0) {
-                    valueAxis->setTickCount(settings.xAxisTickCount);
-                }
+            bool isXAxis = !hAxes.isEmpty() && axis == hAxes.first();
 
-                // If custom spacing is set (> 0), calculate and set tick interval
+            if (!m_isScatterMode && isXAxis) {
+                // X-axis tick customization
+                valueAxis->setMinorTickCount(settings.xAxisMinorTickCount);
                 if (settings.xAxisTickSpacing > 0.0) {
                     valueAxis->setTickInterval(settings.xAxisTickSpacing);
+                } else if (settings.xAxisTickCount > 0) {
+                    valueAxis->setTickCount(settings.xAxisTickCount);
                 }
+                // Label format
+                if (settings.xAxisDecimals >= 0) {
+                    valueAxis->setLabelFormat(QString("%.%1f").arg(settings.xAxisDecimals));
+                }
+            } else if (!m_isScatterMode && !isXAxis) {
+                // Y-axis tick customization
+                valueAxis->setMinorTickCount(settings.yAxisMinorTickCount);
+                if (settings.yAxisTickSpacing > 0.0) {
+                    valueAxis->setTickInterval(settings.yAxisTickSpacing);
+                } else if (settings.yAxisTickCount > 0) {
+                    valueAxis->setTickCount(settings.yAxisTickCount);
+                }
+                // Label format
+                if (settings.yAxisDecimals >= 0) {
+                    valueAxis->setLabelFormat(QString("%.%1f").arg(settings.yAxisDecimals));
+                }
+            } else {
+                // Scatter mode — keep existing minor tick count
+                valueAxis->setMinorTickCount(settings.xAxisMinorTickCount);
             }
         }
         else if (auto dateTimeAxis = qobject_cast<QDateTimeAxis*>(axis)) {
             dateTimeAxis->setLabelsVisible(settings.showAxisLabels);
 
-            // Apply X-axis tick customization only to X-axis (for DATE variables)
             if (!hAxes.isEmpty() && axis == hAxes.first()) {
                 if (settings.xAxisTickCount > 0) {
                     dateTimeAxis->setTickCount(settings.xAxisTickCount);
                 }
-
-                // Note: QDateTimeAxis doesn't support setTickInterval
-                // Tick spacing is controlled through setTickCount only
             }
         }
     }
