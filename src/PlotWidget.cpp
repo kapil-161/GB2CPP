@@ -961,11 +961,19 @@ void PlotWidget::autoFitAxes()
                 valueAxis->setMinorTickCount(m_plotSettings.yAxisMinorTickCount);
                 valueAxis->setMinorGridLineVisible(true);
 
-                // Label format: user decimals or auto
-                if (m_plotSettings.yAxisDecimals >= 0)
+                // Label format: user decimals or auto-detect from tick interval
+                if (m_plotSettings.yAxisDecimals >= 0) {
                     valueAxis->setLabelFormat(QString("%.%1f").arg(m_plotSettings.yAxisDecimals));
-                else
-                    valueAxis->setLabelFormat("%.0f");
+                } else {
+                    // Pick enough decimal places so tick labels are distinct and not truncated
+                    int autoDecimals = 0;
+                    if (tickInterval < 0.01)       autoDecimals = 4;
+                    else if (tickInterval < 0.1)   autoDecimals = 3;
+                    else if (tickInterval < 1.0)   autoDecimals = 2;
+                    else if (tickInterval < 10.0)  autoDecimals = 1;
+                    else                           autoDecimals = 0;
+                    valueAxis->setLabelFormat(QString("%.%1f").arg(autoDecimals));
+                }
 
                 qDebug() << "PlotWidget::autoFitAxes() - Y-axis: alignedMax=" << alignedMax << "interval=" << tickInterval << "tickCount=" << tickCount;
             }
