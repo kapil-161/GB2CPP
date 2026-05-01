@@ -30,6 +30,9 @@ struct PlotSettings {
     
     // Legend settings
     bool showLegend = true;
+    QString legendPosition = "outside-right";  // "outside-right", "inside-custom"
+    double legendX = 80.0;  // % from left of plot area
+    double legendY = 5.0;   // % from top of plot area
     
     // Error bar settings
     bool showErrorBars = false;
@@ -129,6 +132,9 @@ private:
     
     // Legend controls
     QCheckBox *m_showLegendCheckBox;
+    QComboBox *m_legendPositionComboBox;
+    QDoubleSpinBox *m_legendXSpinBox;
+    QDoubleSpinBox *m_legendYSpinBox;
     
     // Error bar controls
     QCheckBox *m_showErrorBarsCheckBox;

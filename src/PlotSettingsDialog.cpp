@@ -1,6 +1,8 @@
 #include "PlotSettingsDialog.h"
 #include "PlotWidget.h"
 #include <QDialogButtonBox>
+#include <QScrollArea>
+#include <QFrame>
 #include <QTabWidget>
 #include <QColorDialog>
 #include <QMessageBox>
@@ -40,6 +42,9 @@ PlotSettings PlotSettingsDialog::getSettings() const
     settings.showMinorGrid = m_showMinorGridCheckBox->isChecked();
     settings.minorTickCount = m_minorTickCountSpinBox->value();
     settings.showLegend = m_showLegendCheckBox->isChecked();
+    settings.legendPosition = m_legendPositionComboBox->currentData().toString();
+    settings.legendX = m_legendXSpinBox->value();
+    settings.legendY = m_legendYSpinBox->value();
     settings.showErrorBars = m_showErrorBarsCheckBox->isChecked();
     settings.errorBarType = m_errorBarTypeComboBox->currentData().toString();
     settings.lineWidth = m_lineWidthSpinBox->value();
@@ -298,7 +303,11 @@ void PlotSettingsDialog::setupUI()
     
     tabWidget->addTab(gridAxesTab, "Grid & Axes");
     
-    // Appearance Tab
+    // Appearance Tab — wrapped in a scroll area so all controls are reachable
+    QWidget *appearanceTabScroll = new QWidget();
+    QScrollArea *appearanceScrollArea = new QScrollArea();
+    appearanceScrollArea->setWidgetResizable(true);
+    appearanceScrollArea->setFrameShape(QFrame::NoFrame);
     QWidget *appearanceTab = new QWidget();
     QVBoxLayout *appearanceLayout = new QVBoxLayout(appearanceTab);
     
@@ -309,6 +318,40 @@ void PlotSettingsDialog::setupUI()
     m_showLegendCheckBox = new QCheckBox("Show Legend");
     m_showLegendCheckBox->setChecked(m_settings.showLegend);
     legendLayout->addWidget(m_showLegendCheckBox);
+
+    QHBoxLayout *legendPosLayout = new QHBoxLayout();
+    legendPosLayout->addWidget(new QLabel("Legend Position (export):"));
+    m_legendPositionComboBox = new QComboBox();
+    m_legendPositionComboBox->addItem("Outside Right", "outside-right");
+    m_legendPositionComboBox->addItem("Inside (custom X/Y)", "inside-custom");
+    int posIdx = m_legendPositionComboBox->findData(m_settings.legendPosition);
+    if (posIdx >= 0) m_legendPositionComboBox->setCurrentIndex(posIdx);
+    legendPosLayout->addWidget(m_legendPositionComboBox);
+    legendPosLayout->addStretch();
+    legendLayout->addLayout(legendPosLayout);
+
+    QHBoxLayout *legendXYLayout = new QHBoxLayout();
+    legendXYLayout->addWidget(new QLabel("X (%):"));
+    m_legendXSpinBox = new QDoubleSpinBox();
+    m_legendXSpinBox->setRange(0.0, 100.0);
+    m_legendXSpinBox->setDecimals(1);
+    m_legendXSpinBox->setSingleStep(1.0);
+    m_legendXSpinBox->setValue(m_settings.legendX);
+    m_legendXSpinBox->setToolTip("Horizontal position of legend as % of plot area width (0=left, 100=right)");
+    m_legendXSpinBox->setFixedWidth(70);
+    legendXYLayout->addWidget(m_legendXSpinBox);
+    legendXYLayout->addSpacing(12);
+    legendXYLayout->addWidget(new QLabel("Y (%):"));
+    m_legendYSpinBox = new QDoubleSpinBox();
+    m_legendYSpinBox->setRange(0.0, 100.0);
+    m_legendYSpinBox->setDecimals(1);
+    m_legendYSpinBox->setSingleStep(1.0);
+    m_legendYSpinBox->setValue(m_settings.legendY);
+    m_legendYSpinBox->setToolTip("Vertical position of legend as % of plot area height (0=top, 100=bottom)");
+    m_legendYSpinBox->setFixedWidth(70);
+    legendXYLayout->addWidget(m_legendYSpinBox);
+    legendXYLayout->addStretch();
+    legendLayout->addLayout(legendXYLayout);
     
     // Error bar settings
     m_showErrorBarsCheckBox = new QCheckBox("Show Error Bars (Mean ± SD/SE)");
@@ -372,8 +415,9 @@ void PlotSettingsDialog::setupUI()
     
     appearanceLayout->addWidget(plotGroup);
     appearanceLayout->addStretch();
-    
-    tabWidget->addTab(appearanceTab, "Appearance");
+
+    appearanceScrollArea->setWidget(appearanceTab);
+    tabWidget->addTab(appearanceScrollArea, "Appearance");
     
     // Lines & Markers Tab
     QWidget *linesMarkersTab = new QWidget();
@@ -558,6 +602,9 @@ void PlotSettingsDialog::onResetDefaults()
     m_showMinorGridCheckBox->setChecked(defaults.showMinorGrid);
     m_minorTickCountSpinBox->setValue(defaults.minorTickCount);
     m_showLegendCheckBox->setChecked(defaults.showLegend);
+    { int i = m_legendPositionComboBox->findData(defaults.legendPosition); if (i >= 0) m_legendPositionComboBox->setCurrentIndex(i); }
+    m_legendXSpinBox->setValue(defaults.legendX);
+    m_legendYSpinBox->setValue(defaults.legendY);
     m_showErrorBarsCheckBox->setChecked(defaults.showErrorBars);
     int defaultErrorBarIndex = m_errorBarTypeComboBox->findData(defaults.errorBarType);
     if (defaultErrorBarIndex >= 0) {
@@ -617,6 +664,9 @@ void PlotSettingsDialog::onPreviewSettings()
     m_settings.showMinorGrid = m_showMinorGridCheckBox->isChecked();
     m_settings.minorTickCount = m_minorTickCountSpinBox->value();
     m_settings.showLegend = m_showLegendCheckBox->isChecked();
+    m_settings.legendPosition = m_legendPositionComboBox->currentData().toString();
+    m_settings.legendX = m_legendXSpinBox->value();
+    m_settings.legendY = m_legendYSpinBox->value();
     m_settings.showErrorBars = m_showErrorBarsCheckBox->isChecked();
     m_settings.errorBarType = m_errorBarTypeComboBox->currentData().toString();
     m_settings.lineWidth = m_lineWidthSpinBox->value();

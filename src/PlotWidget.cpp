@@ -617,7 +617,7 @@ void PlotWidget::setupUI()
     m_legendScrollArea->setWidgetResizable(true);
     m_legendScrollArea->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     m_legendScrollArea->setFrameShape(QFrame::NoFrame);
-    m_legendScrollArea->setFixedWidth(140);
+    m_legendScrollArea->setFixedWidth(200);
 
     // Legend container
     m_legendWidget = new QWidget();
@@ -638,7 +638,7 @@ void PlotWidget::setupUI()
     // Legend stack: page 0 = treatment pre-selection, page 1 = legend
     setupPreplotPanel();
     m_legendStack = new QStackedWidget();
-    m_legendStack->setFixedWidth(140);
+    m_legendStack->setFixedWidth(200);
     m_legendStack->addWidget(m_preplotPanel);       // page 0 — shown before first plot
     m_legendStack->addWidget(m_legendScrollArea);   // page 1 — shown after plotting
     m_legendStack->setCurrentIndex(0);
@@ -950,11 +950,11 @@ void PlotWidget::autoFitAxes()
                 double alignedMax = std::ceil(targetMax / tickInterval) * tickInterval;
                 if (alignedMax <= dataMax) alignedMax += tickInterval;
 
-                // Qt Charts requires setRange + setTickCount to produce clean labels.
-                // setTickInterval alone is unreliable — Qt can override it internally.
-                // Strategy: snap range to exact multiples of tickInterval, then derive tickCount.
-                int tickCount = qRound(alignedMax / tickInterval) + 1;
-                if (tickCount < 3) tickCount = 3;
+                // Derive tickCount: number of ticks = number of intervals + 1
+                // e.g. range 0–10000, interval 1000 → 10 intervals → 11 ticks (0,1000,...,10000)
+                int numIntervals = qRound(alignedMax / tickInterval);
+                if (numIntervals < 2) numIntervals = 2;
+                int tickCount = numIntervals + 1;
 
                 valueAxis->setRange(0, alignedMax);
                 valueAxis->setTickCount(tickCount);
@@ -1118,7 +1118,7 @@ double PlotWidget::calculateNiceYInterval(double max)
     if (max <= 0) return 1;
     
     // Define clean Y-axis interval options
-    QVector<double> cleanIntervals = {0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1, 2, 5, 10, 20, 25, 50, 100, 200, 250, 500, 1000, 2000, 5000};
+    QVector<double> cleanIntervals = {0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1, 2, 5, 10, 20, 25, 50, 100, 200, 250, 500, 1000, 2000, 2500, 5000, 10000, 20000, 25000, 50000, 100000};
     
     // Target 8-12 ticks for Y-axis
     double targetTicks = 10.0;
@@ -3115,6 +3115,43 @@ QString PlotWidget::getScatterCSV() const
     return csv;
 }
 
+// xPct/yPct: top-left corner of legend as % of plot area (0=left/top, 100=right/bottom)
+static void overlayLegend(QPixmap &pixmap, QWidget *legendWidget, const QString &position,
+                          QRectF plotArea = QRectF(), double xPct = 80.0, double yPct = 5.0)
+{
+    if (!legendWidget || position == "outside-right") return;
+    // Constrain width so the grabbed pixmap reflects only legend content, not the full panel width
+    int savedMaxW = legendWidget->maximumWidth();
+    legendWidget->setMaximumWidth(200);
+    legendWidget->adjustSize();
+    QPixmap legendPx = legendWidget->grab();
+    legendWidget->setMaximumWidth(savedMaxW);
+    if (legendPx.isNull()) return;
+    int lw = legendPx.width();
+    int lh = legendPx.height();
+
+    // Use plot area if provided, otherwise full pixmap
+    double areaLeft   = plotArea.isValid() ? plotArea.left()   : 0;
+    double areaTop    = plotArea.isValid() ? plotArea.top()    : 0;
+    double areaWidth  = plotArea.isValid() ? plotArea.width()  : pixmap.width();
+    double areaHeight = plotArea.isValid() ? plotArea.height() : pixmap.height();
+
+    // Place legend top-left corner at (xPct%, yPct%) of the plot area
+    int x = qRound(areaLeft + (xPct / 100.0) * areaWidth);
+    int y = qRound(areaTop  + (yPct / 100.0) * areaHeight);
+
+    // Clamp so legend stays within plot area
+    x = qBound(qRound(areaLeft), x, qRound(areaLeft + areaWidth  - lw));
+    y = qBound(qRound(areaTop),  y, qRound(areaTop  + areaHeight - lh));
+
+    QPainter p(&pixmap);
+    p.fillRect(x - 4, y - 4, lw + 8, lh + 8, QColor(255, 255, 255, 230));
+    p.setPen(QColor(180, 180, 180));
+    p.drawRect(x - 4, y - 4, lw + 7, lh + 7);
+    p.drawPixmap(x, y, legendPx);
+    p.end();
+}
+
 void PlotWidget::exportPlot(const QString &filePath, const QString &format)
 {
     if (!this) return;
@@ -3129,10 +3166,17 @@ void PlotWidget::exportPlot(const QString &filePath, const QString &format)
     if (m_isScatterMode && m_scatterPanelContainer && m_legendWidget) {
         pixmap = grabScatterAtSize(400);
     } else {
-        if (m_legendScrollArea) {
-            m_legendScrollArea->setVisible(m_showLegend);
-            if (m_showLegend) m_legendScrollArea->update();
-        }
+        bool insideLegend = m_showLegend && m_plotSettings.legendPosition != "outside-right";
+
+        // For inside-legend mode, hide entire legend stack so the chart fills the full width
+        bool legendStackWasVisible = m_legendStack && m_legendStack->isVisible();
+        if (insideLegend && m_legendStack) m_legendStack->setVisible(false);
+
+        // Hide bottom button bar so it doesn't appear in the exported image
+        bool bottomWasVisible = m_bottomContainer && m_bottomContainer->isVisible();
+        if (m_bottomContainer) m_bottomContainer->setVisible(false);
+        QApplication::processEvents();
+
         pixmap = QPixmap(this->size());
         pixmap.fill(Qt::white);
         QPainter painter(&pixmap);
@@ -3141,11 +3185,27 @@ void PlotWidget::exportPlot(const QString &filePath, const QString &format)
         painter.setRenderHint(QPainter::SmoothPixmapTransform, true);
         this->render(&painter);
         painter.end();
+
+        if (insideLegend) {
+            if (m_legendStack) m_legendStack->setVisible(legendStackWasVisible);
+            QApplication::processEvents();
+            QRectF plotArea;
+            if (m_chart && m_chartView) {
+                QRectF pa = m_chart->plotArea();
+                QPointF offset = m_chartView->mapTo(this, QPoint(0, 0));
+                plotArea = pa.translated(offset);
+            }
+            overlayLegend(pixmap, m_legendWidget, m_plotSettings.legendPosition, plotArea, m_plotSettings.legendX, m_plotSettings.legendY);
+        }
+
+        if (m_legendStack && !insideLegend) m_legendStack->setVisible(legendStackWasVisible);
+        if (m_bottomContainer) m_bottomContainer->setVisible(bottomWasVisible);
     }
 
     pixmap.save(filePath, format.toUtf8().constData());
 }
 
+// Composite legend widget onto a pixmap at the position specified in m_plotSettings.legendPosition
 // Render scatter panels at a given panel size, composite with legend, return pixmap
 QPixmap PlotWidget::grabScatterAtSize(int panelSide)
 {
@@ -3202,9 +3262,26 @@ void PlotWidget::copyPlotToClipboard()
     if (m_isScatterMode && m_scatterPanelContainer && m_legendWidget) {
         pixmap = grabScatterAtSize(400); // 400px per panel for clipboard
     } else {
-        if (m_legendScrollArea)
-            m_legendScrollArea->setVisible(m_showLegend);
+        bool insideLegend = m_showLegend && m_plotSettings.legendPosition != "outside-right";
+        bool legendStackWasVisible = m_legendStack && m_legendStack->isVisible();
+        if (insideLegend && m_legendStack) m_legendStack->setVisible(false);
+        bool bottomWasVisible = m_bottomContainer && m_bottomContainer->isVisible();
+        if (m_bottomContainer) m_bottomContainer->setVisible(false);
+        QApplication::processEvents();
         pixmap = this->grab();
+        if (insideLegend) {
+            if (m_legendStack) m_legendStack->setVisible(legendStackWasVisible);
+            QApplication::processEvents();
+            QRectF plotArea;
+            if (m_chart && m_chartView) {
+                QRectF pa = m_chart->plotArea();
+                QPointF offset = m_chartView->mapTo(this, QPoint(0, 0));
+                plotArea = pa.translated(offset);
+            }
+            overlayLegend(pixmap, m_legendWidget, m_plotSettings.legendPosition, plotArea, m_plotSettings.legendX, m_plotSettings.legendY);
+        }
+        if (m_legendStack && !insideLegend) m_legendStack->setVisible(legendStackWasVisible);
+        if (m_bottomContainer) m_bottomContainer->setVisible(bottomWasVisible);
     }
 
     QClipboard *clipboard = QApplication::clipboard();
@@ -3263,11 +3340,40 @@ void PlotWidget::exportPlot(const QString &filePath, const QString &format, int 
         qDebug() << "Export: Using scale factor" << scale << "(scaleX:" << scaleX << "scaleY:" << scaleY << ")";
     }
     
+    // Hide bottom button bar so it doesn't appear in the exported image
+    bool bottomWasVisible = m_bottomContainer && m_bottomContainer->isVisible();
+    if (m_bottomContainer) m_bottomContainer->setVisible(false);
+
+    bool insideLegend = m_showLegend && m_plotSettings.legendPosition != "outside-right";
+    bool legendStackWasVisible = m_legendStack && m_legendStack->isVisible();
+    if (insideLegend && m_legendStack) m_legendStack->setVisible(false);
+
+    QApplication::processEvents();
+
     // Render the main widget with all its children
-    // This should include both the chart area and legend area
     this->render(&painter, QPoint(), this->rect(), QWidget::DrawChildren);
-    
+
+    if (m_bottomContainer) m_bottomContainer->setVisible(bottomWasVisible);
+    if (insideLegend && m_legendStack) m_legendStack->setVisible(legendStackWasVisible);
+
     painter.end();
+
+    // Composite legend overlay after scaling
+    if (insideLegend) {
+        QRectF plotArea;
+        if (m_chart && m_chartView) {
+            QSizeF actualSize = this->size();
+            double scaleX = (actualSize.width()  > 0) ? (double)width  / actualSize.width()  : 1.0;
+            double scaleY = (actualSize.height() > 0) ? (double)height / actualSize.height() : 1.0;
+            double scale  = qMin(scaleX, scaleY);
+            QRectF pa = m_chart->plotArea();
+            QPointF offset = m_chartView->mapTo(this, QPoint(0, 0));
+            QRectF widgetPlotArea = pa.translated(offset);
+            plotArea = QRectF(widgetPlotArea.left()  * scale, widgetPlotArea.top()    * scale,
+                              widgetPlotArea.width() * scale, widgetPlotArea.height() * scale);
+        }
+        overlayLegend(pixmap, m_legendWidget, m_plotSettings.legendPosition, plotArea, m_plotSettings.legendX, m_plotSettings.legendY);
+    }
     
     // Save the pixmap
     bool saved = pixmap.save(filePath, format.toUtf8().constData());
@@ -3805,10 +3911,6 @@ void PlotWidget::updateLegendAdvanced(const QMap<QString, QMap<QString, QVector<
     
     clearLegend();
     
-    // Add legend title (matching Python)
-    QLabel* legendTitle = new QLabel("<b>Legend</b>");
-    legendTitle->setAlignment(Qt::AlignCenter);
-    m_legendLayout->addWidget(legendTitle);
     
     // Create header row (matching Python)
     if (m_isScatterMode) {
@@ -4273,7 +4375,8 @@ void PlotWidget::createLegendRowFromData(const QMap<QString, QVariant>& treatmen
     }
     
     QLabel* trtLabel = new QLabel(legendDisplayName);
-    trtLabel->setAlignment(Qt::AlignLeft);
+    trtLabel->setAlignment(Qt::AlignLeft | Qt::AlignVCenter);
+    trtLabel->setWordWrap(true);
     trtLabel->setToolTip(QString("Treatment: %1\nVariable: %2")
                         .arg(legendDisplayName)
                         .arg(displayName));
@@ -4340,10 +4443,6 @@ void PlotWidget::createSimpleLegendRow(const LegendTreatmentData& treatmentData,
 
 void PlotWidget::createLegendHeader()
 {
-    // Legend title
-    QLabel* legendTitle = new QLabel("<b>Legend</b>");
-    legendTitle->setAlignment(Qt::AlignCenter);
-    m_legendLayout->addWidget(legendTitle);
     
     // Header row
     QWidget* headerWidget = new QWidget();
@@ -5559,9 +5658,8 @@ void PlotWidget::applyPlotSettings(const PlotSettings &settings)
                 valueAxis->setMinorTickCount(settings.yAxisMinorTickCount);
                 if (settings.yAxisTickSpacing > 0.0) {
                     valueAxis->setTickInterval(settings.yAxisTickSpacing);
-                } else if (settings.yAxisTickCount > 0) {
-                    valueAxis->setTickCount(settings.yAxisTickCount);
                 }
+                // Don't call setTickCount when auto — autoFitAxes already set clean round ticks
                 // Label format
                 if (settings.yAxisDecimals >= 0) {
                     valueAxis->setLabelFormat(QString("%.%1f").arg(settings.yAxisDecimals));
@@ -5736,7 +5834,10 @@ void PlotWidget::saveSettings() const
     s.setValue("minorTickCount", m_plotSettings.minorTickCount);
 
     // Legend
-    s.setValue("showLegend", m_plotSettings.showLegend);
+    s.setValue("showLegend",      m_plotSettings.showLegend);
+    s.setValue("legendPosition",  m_plotSettings.legendPosition);
+    s.setValue("legendX",         m_plotSettings.legendX);
+    s.setValue("legendY",         m_plotSettings.legendY);
 
     // Error bars
     s.setValue("showErrorBars", m_plotSettings.showErrorBars);
@@ -5787,7 +5888,10 @@ void PlotWidget::loadSettings()
     m_plotSettings.showMinorGrid  = s.value("showMinorGrid",  m_plotSettings.showMinorGrid).toBool();
     m_plotSettings.minorTickCount = s.value("minorTickCount", m_plotSettings.minorTickCount).toInt();
 
-    m_plotSettings.showLegend = s.value("showLegend", m_plotSettings.showLegend).toBool();
+    m_plotSettings.showLegend     = s.value("showLegend",     m_plotSettings.showLegend).toBool();
+    m_plotSettings.legendPosition = s.value("legendPosition", m_plotSettings.legendPosition).toString();
+    m_plotSettings.legendX        = s.value("legendX",        m_plotSettings.legendX).toDouble();
+    m_plotSettings.legendY        = s.value("legendY",        m_plotSettings.legendY).toDouble();
 
     m_plotSettings.showErrorBars = s.value("showErrorBars", m_plotSettings.showErrorBars).toBool();
     m_plotSettings.errorBarType  = s.value("errorBarType",  m_plotSettings.errorBarType).toString();
