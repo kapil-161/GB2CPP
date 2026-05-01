@@ -211,9 +211,7 @@ void CommandLineHandler::selectOutputFiles()
         if (selectedCount > 0) {
             QString message = QString("Loaded %1 with %2 output files")
                                 .arg(m_args.cropName).arg(selectedCount);
-            if (!m_args.headlessMode) {
-                QMessageBox::information(m_mainWindow, "Success", message);
-            }
+            qDebug() << "CommandLineHandler:" << message;
 
             // Load the first tab content
             QTimer::singleShot(100, this, &CommandLineHandler::loadInitialContent);

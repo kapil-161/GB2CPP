@@ -713,8 +713,8 @@ void PlotWidget::styleChart()
     // Add minor ticks
     xAxis->setMinorTickCount(4);
     yAxis->setMinorTickCount(4);
-    xAxis->setMinorGridLineVisible(true);
-    yAxis->setMinorGridLineVisible(true);
+    xAxis->setMinorGridLineVisible(m_plotSettings.showMinorGrid);
+    yAxis->setMinorGridLineVisible(m_plotSettings.showMinorGrid);
 
     m_chart->addAxis(xAxis, Qt::AlignBottom);
     m_chart->addAxis(yAxis, Qt::AlignLeft);
@@ -768,8 +768,8 @@ void PlotWidget::setupAxes(const QString &xVar)
         
         // Add minor ticks to X value axis
         valueAxis->setMinorTickCount(4);
-        valueAxis->setMinorGridLineVisible(true);
-        
+        valueAxis->setMinorGridLineVisible(m_plotSettings.showMinorGrid);
+
         xAxis = valueAxis;
         qDebug() << "PlotWidget::setupAxes() - Created QValueAxis for" << xVar;
     }
@@ -781,8 +781,8 @@ void PlotWidget::setupAxes(const QString &xVar)
     
     // Add minor ticks to Y axis
     yAxis->setMinorTickCount(4);
-    yAxis->setMinorGridLineVisible(true);
-    
+    yAxis->setMinorGridLineVisible(m_plotSettings.showMinorGrid);
+
     // Configure axis appearance
     xAxis->setGridLineVisible(m_showGrid);
     yAxis->setGridLineVisible(m_showGrid);
@@ -918,7 +918,7 @@ void PlotWidget::autoFitAxes()
                 }
 
                 valueAxis->setMinorTickCount(m_plotSettings.xAxisMinorTickCount);
-                valueAxis->setMinorGridLineVisible(true);
+                valueAxis->setMinorGridLineVisible(m_plotSettings.showMinorGrid);
                 qDebug() << "PlotWidget::autoFitAxes() - Set X ValueAxis range:" << (minX - xLeftPadding) << "to" << (maxX + xRightPadding);
             } else if (auto dateAxis = qobject_cast<QDateTimeAxis*>(axis)) {
                 QDateTime minDateTime = QDateTime::fromMSecsSinceEpoch(minX - xLeftPadding);
@@ -959,19 +959,22 @@ void PlotWidget::autoFitAxes()
                 valueAxis->setRange(0, alignedMax);
                 valueAxis->setTickCount(tickCount);
                 valueAxis->setMinorTickCount(m_plotSettings.yAxisMinorTickCount);
-                valueAxis->setMinorGridLineVisible(true);
+                valueAxis->setMinorGridLineVisible(m_plotSettings.showMinorGrid);
 
                 // Label format: user decimals or auto-detect from tick interval
                 if (m_plotSettings.yAxisDecimals >= 0) {
                     valueAxis->setLabelFormat(QString("%.%1f").arg(m_plotSettings.yAxisDecimals));
                 } else {
-                    // Pick enough decimal places so tick labels are distinct and not truncated
+                    // Pick enough decimal places so tick labels are distinct and not truncated.
+                    // Values >= 100 never need decimals regardless of tick interval.
                     int autoDecimals = 0;
-                    if (tickInterval < 0.01)       autoDecimals = 4;
-                    else if (tickInterval < 0.1)   autoDecimals = 3;
-                    else if (tickInterval < 1.0)   autoDecimals = 2;
-                    else if (tickInterval < 10.0)  autoDecimals = 1;
-                    else                           autoDecimals = 0;
+                    if (alignedMax < 100.0) {
+                        if (tickInterval < 0.01)       autoDecimals = 4;
+                        else if (tickInterval < 0.1)   autoDecimals = 3;
+                        else if (tickInterval < 1.0)   autoDecimals = 2;
+                        else if (tickInterval < 10.0)  autoDecimals = 1;
+                        else                           autoDecimals = 0;
+                    }
                     valueAxis->setLabelFormat(QString("%.%1f").arg(autoDecimals));
                 }
 
