@@ -110,6 +110,7 @@ private:
     
     void connectSignals();
     void loadFile(const QString &filePath);
+    DataTable parseCsvToDataTable(const QString &csv);
     void updateVariableComboBoxes();
     void updateTreatmentComboBox();
     void updatePlot();
@@ -209,6 +210,9 @@ private:
     QMap<int, bool> m_tabContentLoaded;
     bool m_dataNeedsRefresh;
     bool m_variableSelectionChanged;
+    bool m_suppressPlotClear;  // true during tab switches to prevent clearing the plot
+    QStringList m_savedYSelections;   // Y variable selections saved when leaving Time Series tab
+    QString m_savedXVar;              // X variable saved when leaving Time Series tab
     QMap<QString, QMap<QString, QString>> m_treatmentNames;
     bool m_selectingExperimentProgrammatically;
     bool m_selectingTreatmentsProgrammatically;

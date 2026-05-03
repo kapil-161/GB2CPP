@@ -38,6 +38,7 @@ MainWindow::MainWindow(QWidget *parent)
     , m_currentPlotType("Line")
     , m_dataNeedsRefresh(false)
     , m_variableSelectionChanged(false)
+    , m_suppressPlotClear(false)
     , m_selectingExperimentProgrammatically(false)
     , m_selectingTreatmentsProgrammatically(false)
     , m_warningShown(false)
@@ -410,6 +411,7 @@ void MainWindow::setupDataPanel()
     m_dataViewFileTypeComboBox = new QComboBox();
     m_dataViewFileTypeComboBox->addItem("Regular .OUT Files", "regular");
     m_dataViewFileTypeComboBox->addItem("EVALUATE.OUT Files", "evaluate");
+    m_dataViewFileTypeComboBox->addItem("Current Plot Data", "plot");
     m_dataViewFileTypeComboBox->setCurrentIndex(0); // Default to regular .OUT
     m_dataViewFileTypeComboBox->setEnabled(false); // Disabled until data is loaded
     dataSelectorLayout->addWidget(dataTypeLabel);
@@ -821,7 +823,7 @@ void MainWindow::onXVariableChanged()
 
     // Check if X variable is unselected (empty or invalid)
     QString xVar = m_xVariableComboBox ? m_xVariableComboBox->currentData(Qt::UserRole).toString() : QString();
-    if (xVar.isEmpty()) {
+    if (!m_suppressPlotClear && xVar.isEmpty()) {
         // Clear plots and metrics when X variable is unselected
         if (m_plotWidget) {
             m_plotWidget->clear();
@@ -852,7 +854,7 @@ void MainWindow::onYVariableChanged()
     markDataNeedsRefresh();
 
     // Check if no Y variables are selected and clear plots and metrics if so
-    if (m_yVariableComboBox && m_yVariableComboBox->selectedItems().isEmpty()) {
+    if (!m_suppressPlotClear && m_yVariableComboBox && m_yVariableComboBox->selectedItems().isEmpty()) {
         // Clear plots and metrics when Y variables are unselected
         if (m_plotWidget) {
             m_plotWidget->clear();
@@ -926,6 +928,19 @@ void MainWindow::onUpdatePlot()
 
 void MainWindow::onTabChanged(int index)
 {
+    // Save Y/X selections when leaving Time Series tab (index 0)
+    static int s_previousTab = 0;
+    if (s_previousTab == 0 && index != 0 && m_yVariableComboBox) {
+        m_savedYSelections.clear();
+        for (int i = 0; i < m_yVariableComboBox->count(); ++i) {
+            QListWidgetItem *it = m_yVariableComboBox->item(i);
+            if (it && it->isSelected())
+                m_savedYSelections << it->data(Qt::UserRole).toString();
+        }
+        m_savedXVar = m_xVariableComboBox ? m_xVariableComboBox->currentData().toString() : QString();
+    }
+    s_previousTab = index;
+
     // Handle tab switching - load data lazily like Python version
     if (index == 0) {
         // Time Series tab - don't auto-plot, wait for manual refresh
@@ -943,7 +958,23 @@ void MainWindow::onTabChanged(int index)
         }
         
         // Update variables to show time series variables (regular .OUT files)
+        m_suppressPlotClear = true;
         updateVariableComboBoxes();
+
+        // Restore Y/X selections that were saved when we left this tab
+        if (!m_savedYSelections.isEmpty() && m_yVariableComboBox) {
+            for (int i = 0; i < m_yVariableComboBox->count(); ++i) {
+                QListWidgetItem *it = m_yVariableComboBox->item(i);
+                if (it && m_savedYSelections.contains(it->data(Qt::UserRole).toString()))
+                    it->setSelected(true);
+            }
+        }
+        if (!m_savedXVar.isEmpty() && m_xVariableComboBox) {
+            int xi = m_xVariableComboBox->findData(m_savedXVar);
+            if (xi != -1)
+                m_xVariableComboBox->setCurrentIndex(xi);
+        }
+        m_suppressPlotClear = false;
 
         // Show prompt message if files are selected but plot needs refresh
         QList<QListWidgetItem*> selectedItems = m_fileListWidget ? m_fileListWidget->selectedItems() : QList<QListWidgetItem*>();
@@ -963,22 +994,14 @@ void MainWindow::onTabChanged(int index)
         if (m_dataViewFileTypeComboBox) {
             bool hasRegular = (m_currentData.rowCount > 0);
             bool hasEvaluate = (m_evaluateData.rowCount > 0);
-            
-            if (hasRegular && hasEvaluate) {
-                // Both available - enable selector
-                m_dataViewFileTypeComboBox->setEnabled(true);
-            } else if (hasEvaluate) {
-                // Only EVALUATE.OUT - disable selector and set to evaluate
-                m_dataViewFileTypeComboBox->setEnabled(false);
+            bool hasPlot = m_plotWidget && !m_plotWidget->getPlotCSV().isEmpty();
+            m_dataViewFileTypeComboBox->setEnabled(hasRegular || hasEvaluate || hasPlot);
+            if (hasPlot)
+                m_dataViewFileTypeComboBox->setCurrentIndex(2); // Current Plot Data
+            else if (!hasRegular && hasEvaluate)
                 m_dataViewFileTypeComboBox->setCurrentIndex(1); // EVALUATE.OUT
-            } else if (hasRegular) {
-                // Only regular .OUT - disable selector and set to regular
-                m_dataViewFileTypeComboBox->setEnabled(false);
+            else
                 m_dataViewFileTypeComboBox->setCurrentIndex(0); // Regular .OUT
-            } else {
-                // No data - disable selector
-                m_dataViewFileTypeComboBox->setEnabled(false);
-            }
         }
 
         // Refresh data table based on selected file type
@@ -1005,7 +1028,9 @@ void MainWindow::onTabChanged(int index)
         }
         
         // Update variables to show scatter plot variables (EVALUATE.OUT files)
+        m_suppressPlotClear = true;
         updateVariableComboBoxes();
+        m_suppressPlotClear = false;
         
         // Show prompt message if files are selected but plot needs refresh
         QList<QListWidgetItem*> selectedItems = m_fileListWidget ? m_fileListWidget->selectedItems() : QList<QListWidgetItem*>();
@@ -1121,15 +1146,18 @@ void MainWindow::loadFile(const QString &filePath)
 
 void MainWindow::updateVariableComboBoxes()
 {
+    if (m_xVariableComboBox) m_xVariableComboBox->blockSignals(true);
+    if (m_yVariableComboBox) m_yVariableComboBox->blockSignals(true);
+
     m_xVariableComboBox->clear();
     m_yVariableComboBox->clear();
-    
+
     // Determine which data to use based on current tab
     int currentTab = m_tabWidget ? m_tabWidget->currentIndex() : 0;
     bool isScatterTab = (currentTab == 2);
     bool isEvaluateFile = false;
     bool hasRegularFile = false;
-    
+
     // Check which file types are available
     if (m_fileListWidget) {
         QList<QListWidgetItem*> selectedItems = m_fileListWidget->selectedItems();
@@ -1142,30 +1170,24 @@ void MainWindow::updateVariableComboBoxes()
             }
         }
     }
-    
-    // Tab-dependent variable selection:
-    // - Scatter tab (index 2) → show EVALUATE.OUT variables
-    // - Time series tab (index 0) → show regular .OUT variables
+
+    auto unblockAll = [&]() {
+        if (m_xVariableComboBox) m_xVariableComboBox->blockSignals(false);
+        if (m_yVariableComboBox) m_yVariableComboBox->blockSignals(false);
+    };
+
     if (isScatterTab) {
-        // Scatter plot tab - use EVALUATE.OUT data
         isEvaluateFile = (m_evaluateData.rowCount > 0);
         if (!isEvaluateFile) {
             qDebug() << "MainWindow::updateVariableComboBoxes() - Scatter tab but no EVALUATE data";
-            m_xVariableComboBox->clear();
-            if (m_yVariableComboBox) {
-                m_yVariableComboBox->clear();
-            }
+            unblockAll();
             return;
         }
     } else {
-        // Time series tab - use regular .OUT data
         isEvaluateFile = false;
         if (m_currentData.rowCount == 0) {
             qDebug() << "MainWindow::updateVariableComboBoxes() - Time series tab but no regular data";
-            m_xVariableComboBox->clear();
-            if (m_yVariableComboBox) {
-                m_yVariableComboBox->clear();
-            }
+            unblockAll();
             return;
         }
     }
@@ -1231,6 +1253,7 @@ void MainWindow::updateVariableComboBoxes()
         }
 
         qDebug() << "MainWindow::updateVariableComboBoxes() - Scatter tab: populated" << baseNames.size() << "base variables";
+        unblockAll();
         return;
     }
     
@@ -1342,6 +1365,7 @@ void MainWindow::updateVariableComboBoxes()
     }
 
     // No default Y variable selection - user must manually select Y variables
+    unblockAll();
 }
 
 
@@ -2052,29 +2076,19 @@ void MainWindow::onFileSelectionChanged()
         
         // If we're on Data View tab, update file type selector and refresh data
         if (m_tabWidget && m_tabWidget->currentIndex() == 1) {
-            // Update file type selector based on available data
             if (m_dataViewFileTypeComboBox) {
                 bool hasRegular = (m_currentData.rowCount > 0);
                 bool hasEvaluate = (m_evaluateData.rowCount > 0);
-                
-                if (hasRegular && hasEvaluate) {
-                    // Both available - enable selector
-                    m_dataViewFileTypeComboBox->setEnabled(true);
-                } else if (hasEvaluate) {
-                    // Only EVALUATE.OUT - disable selector and set to evaluate
-                    m_dataViewFileTypeComboBox->setEnabled(false);
+                bool hasPlot = m_plotWidget && !m_plotWidget->getPlotCSV().isEmpty();
+                m_dataViewFileTypeComboBox->setEnabled(hasRegular || hasEvaluate || hasPlot);
+                if (hasPlot)
+                    m_dataViewFileTypeComboBox->setCurrentIndex(2); // Current Plot Data
+                else if (!hasRegular && hasEvaluate)
                     m_dataViewFileTypeComboBox->setCurrentIndex(1); // EVALUATE.OUT
-                } else if (hasRegular) {
-                    // Only regular .OUT - disable selector and set to regular
-                    m_dataViewFileTypeComboBox->setEnabled(false);
+                else
                     m_dataViewFileTypeComboBox->setCurrentIndex(0); // Regular .OUT
-                } else {
-                    // No data - disable selector
-                    m_dataViewFileTypeComboBox->setEnabled(false);
-                }
             }
-            
-            // Refresh data table based on selected file type
+
             if (m_dataTableWidget) {
                 onDataViewFileTypeChanged();
             }
@@ -2636,6 +2650,21 @@ void MainWindow::onDataViewFileTypeChanged()
         } else {
             qDebug() << "MainWindow::onDataViewFileTypeChanged() - No EVALUATE.OUT data available";
         }
+    } else if (selectedType == "plot") {
+        // Show current plot data
+        bool isScatterTab = (m_tabWidget && m_tabWidget->currentIndex() == 2);
+        QString csv = isScatterTab
+            ? (m_scatterPlotWidget ? m_scatterPlotWidget->getScatterCSV() : QString())
+            : (m_plotWidget ? m_plotWidget->getPlotCSV() : QString());
+        if (!csv.isEmpty()) {
+            DataTable plotTable = parseCsvToDataTable(csv);
+            DataTable emptyObs;
+            m_dataTableWidget->setData(plotTable, emptyObs);
+            qDebug() << "MainWindow::onDataViewFileTypeChanged() - Showing current plot data";
+        } else {
+            m_dataTableWidget->clear();
+            qDebug() << "MainWindow::onDataViewFileTypeChanged() - No plot data available";
+        }
     } else {
         // Show regular .OUT data (default)
         if (m_currentData.rowCount > 0) {
@@ -2645,4 +2674,31 @@ void MainWindow::onDataViewFileTypeChanged()
             qDebug() << "MainWindow::onDataViewFileTypeChanged() - No regular .OUT data available";
         }
     }
+}
+
+DataTable MainWindow::parseCsvToDataTable(const QString &csv)
+{
+    DataTable result;
+    QStringList lines = csv.split('\n', Qt::SkipEmptyParts);
+    if (lines.isEmpty())
+        return result;
+
+    QStringList headers = lines[0].split(',');
+    for (const QString &h : headers) {
+        DataColumn col(h.trimmed());
+        col.dataType = "string";
+        result.addColumn(col);
+    }
+
+    for (int i = 1; i < lines.size(); ++i) {
+        QStringList fields = lines[i].split(',');
+        for (int c = 0; c < headers.size(); ++c) {
+            DataColumn *col = result.getColumn(headers[c].trimmed());
+            if (!col) continue;
+            QString val = (c < fields.size()) ? fields[c].trimmed() : QString();
+            col->data.append(val.isEmpty() ? QVariant() : QVariant(val));
+        }
+        result.rowCount++;
+    }
+    return result;
 }
