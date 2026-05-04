@@ -151,6 +151,12 @@ void DataTableWidget::setData(const DataTable& simData, const DataTable& obsData
     onTabChanged(m_tabWidget->currentIndex());
 }
 
+void DataTableWidget::setTabsVisible(bool visible)
+{
+    if (m_tabWidget)
+        m_tabWidget->tabBar()->setVisible(visible);
+}
+
 void DataTableWidget::clear()
 {
     m_simData.clear();

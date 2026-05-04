@@ -25,6 +25,7 @@ public:
     explicit DataTableWidget(QWidget* parent = nullptr);
 
     void setData(const DataTable& simData = DataTable(), const DataTable& obsData = DataTable());
+    void setTabsVisible(bool visible);
     void clear();
 
 private slots:

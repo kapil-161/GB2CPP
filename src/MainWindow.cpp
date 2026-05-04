@@ -2642,36 +2642,25 @@ void MainWindow::onDataViewFileTypeChanged()
     qDebug() << "MainWindow::onDataViewFileTypeChanged() - Selected file type:" << selectedType;
     
     if (selectedType == "evaluate") {
-        // Show EVALUATE.OUT data
+        m_dataTableWidget->setTabsVisible(true);
         if (m_evaluateData.rowCount > 0) {
-            DataTable emptyObsData;
-            m_dataTableWidget->setData(m_evaluateData, emptyObsData);
+            m_dataTableWidget->setData(m_evaluateData, DataTable());
             qDebug() << "MainWindow::onDataViewFileTypeChanged() - Showing EVALUATE.OUT data";
-        } else {
-            qDebug() << "MainWindow::onDataViewFileTypeChanged() - No EVALUATE.OUT data available";
         }
     } else if (selectedType == "plot") {
-        // Show current plot data
-        bool isScatterTab = (m_tabWidget && m_tabWidget->currentIndex() == 2);
-        QString csv = isScatterTab
-            ? (m_scatterPlotWidget ? m_scatterPlotWidget->getScatterCSV() : QString())
-            : (m_plotWidget ? m_plotWidget->getPlotCSV() : QString());
+        m_dataTableWidget->setTabsVisible(false);
+        QString csv = m_plotWidget ? m_plotWidget->getPlotCSV() : QString();
         if (!csv.isEmpty()) {
-            DataTable plotTable = parseCsvToDataTable(csv);
-            DataTable emptyObs;
-            m_dataTableWidget->setData(plotTable, emptyObs);
+            m_dataTableWidget->setData(parseCsvToDataTable(csv), DataTable());
             qDebug() << "MainWindow::onDataViewFileTypeChanged() - Showing current plot data";
         } else {
             m_dataTableWidget->clear();
-            qDebug() << "MainWindow::onDataViewFileTypeChanged() - No plot data available";
         }
     } else {
-        // Show regular .OUT data (default)
+        m_dataTableWidget->setTabsVisible(true);
         if (m_currentData.rowCount > 0) {
             m_dataTableWidget->setData(m_currentData, m_currentObsData);
             qDebug() << "MainWindow::onDataViewFileTypeChanged() - Showing regular .OUT data";
-        } else {
-            qDebug() << "MainWindow::onDataViewFileTypeChanged() - No regular .OUT data available";
         }
     }
 }

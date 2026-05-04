@@ -33,7 +33,7 @@ QVariant PandasTableModel::data(const QModelIndex& index, int role) const
         const DataColumn* column = m_data.getColumn(columnName);
         
         if (!column || index.row() >= column->data.size()) {
-            return "NA";
+            return "";
         }
         
         const QVariant& value = column->data[index.row()];
@@ -135,13 +135,13 @@ void PandasTableModel::clear()
 QString PandasTableModel::formatValue(const QVariant& value) const
 {
     if (DataProcessor::isMissingValue(value)) {
-        return "NA";
+        return "";
     }
-    
+
     if (value.metaType() == QMetaType::fromType<double>()) {
         double doubleVal = value.toDouble();
         if (std::isnan(doubleVal) || std::isinf(doubleVal)) {
-            return "NA";
+            return "";
         }
         return QString::number(doubleVal, 'f', 4);
     }

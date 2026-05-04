@@ -3069,7 +3069,10 @@ QString PlotWidget::getPlotCSV() const
             if (!hasAny) continue;
 
             QStringList row;
-            row << QString::number(x) << crop << exp << trt;
+            QString xStr = (m_currentXVar == "DATE")
+                ? QDateTime::fromMSecsSinceEpoch(static_cast<qint64>(x)).toString("yyyy-MM-dd")
+                : QString::number(x);
+            row << xStr << crop << exp << trt;
 
             for (const QString &v : simVars) {
                 QString sk = crop+"|"+exp+"|"+trt+"|"+v+"|0";
