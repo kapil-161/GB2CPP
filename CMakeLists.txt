@@ -88,6 +88,7 @@ set(SOURCES
     src/PlotWidget_BoxPlot.cpp
     src/PlotWidget_Settings.cpp
     src/PlotWidget_Legend.cpp
+    src/PlotWidget_Scatter.cpp
     src/TableWidget.cpp
     src/MetricsCalculator.cpp
     src/MetricsTableWidget.cpp
