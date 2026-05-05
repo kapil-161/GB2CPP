@@ -100,6 +100,9 @@ public:
         int varCount = 1;      // total number of variables being plotted
     };
     void setBoxPlotData(const QVector<BoxPlotStats> &stats, double yMin, double yMax);
+    void setBoxPlotYBounds(double yMin, double yMax);
+    void setCategoryLabelFont(const QFont &font) { m_catLabelFont = font; update(); }
+    const QVector<BoxPlotStats> &boxPlotStats() const { return m_boxStats; }
     void clearBoxPlotMedians();
     void paintBoxPlotMedians(QPainter *painter);
     // Legacy — kept so setBoxPlotWhiskers callers still compile; no-op
@@ -120,6 +123,7 @@ private:
     QVector<BoxPlotStats> m_boxStats;
     double m_bpYMin  = 0.0;
     double m_bpYMax  = 0.0;
+    QFont  m_catLabelFont = QFont("Arial", 9);
     QVector<BreakInfo> m_axisBreaks;
     QVector<SegmentInfo> m_axisSegments;
     QColor m_axisLineColor = Qt::black;

@@ -60,6 +60,13 @@ void ErrorBarChartView::setBoxPlotData(const QVector<BoxPlotStats> &stats, doubl
     update();
 }
 
+void ErrorBarChartView::setBoxPlotYBounds(double yMin, double yMax)
+{
+    m_bpYMin = yMin;
+    m_bpYMax = yMax;
+    update();
+}
+
 void ErrorBarChartView::clearBoxPlotMedians()
 {
     m_boxStats.clear();
@@ -150,7 +157,7 @@ void ErrorBarChartView::paintBoxPlotMedians(QPainter *painter)
         if (!s.label.isEmpty() && s.varIndex == 0) {
             double slotCenter = plotArea.left() + (catIdx + 0.5) * slotW;
             painter->setPen(QPen(QColor(60, 60, 60)));
-            painter->setFont(QFont("Arial", 9));
+            painter->setFont(m_catLabelFont);
             if (nCats > 6) {
                 painter->save();
                 painter->translate(slotCenter, plotArea.bottom() + 6);
@@ -1201,6 +1208,8 @@ void PlotWidget::autoFitAxes()
                 valueAxis->setTickCount(tickCount);
                 valueAxis->setMinorTickCount(m_plotSettings.yAxisMinorTickCount);
                 valueAxis->setMinorGridLineVisible(m_plotSettings.showMinorGrid);
+                if (m_chartView && !m_chartView->boxPlotStats().isEmpty())
+                    m_chartView->setBoxPlotYBounds(0, alignedMax);
 
                 // Label format: user decimals or auto-detect from tick interval
                 if (m_plotSettings.yAxisDecimals >= 0) {
@@ -1277,6 +1286,8 @@ void PlotWidget::autoFitAxes()
                     if (tickCount < 3) tickCount = 3;
                     yAx->setRange(snappedLo, snappedHi);
                     yAx->setTickCount(tickCount);
+                    if (m_chartView && !m_chartView->boxPlotStats().isEmpty())
+                        m_chartView->setBoxPlotYBounds(snappedLo, snappedHi);
                 }
             }
         }
@@ -5589,6 +5600,12 @@ void PlotWidget::plotOsuBoxPlot(const DataTable &simData, const QStringList &yVa
     dummySeries->append(trtKeys.size(), globalMax);
     m_chart->addSeries(dummySeries);
 
+    QFont tickFont(m_plotSettings.fontFamily, m_plotSettings.axisTickFontSize);
+    QFont titleFont(m_plotSettings.fontFamily, m_plotSettings.axisLabelFontSize);
+    titleFont.setBold(m_plotSettings.boldAxisLabels);
+    QColor axisLineCol = m_plotSettings.axisLineColor.isValid()
+                         ? m_plotSettings.axisLineColor : Qt::black;
+
     // X axis — value axis so we control slot positions precisely (no QBarCategoryAxis padding)
     auto *xAxis = new QValueAxis();
     xAxis->setRange(0, trtKeys.size());
@@ -5596,21 +5613,26 @@ void PlotWidget::plotOsuBoxPlot(const DataTable &simData, const QStringList &yVa
     xAxis->setLabelsVisible(false);     // hide numeric labels — painter draws category names
     xAxis->setGridLineVisible(false);
     xAxis->setMinorGridLineVisible(false);
-    xAxis->setTitleText("Treatment");
-    xAxis->setLabelsFont(QFont("Arial", 9));
-    xAxis->setTitleFont(QFont("Arial", 9, QFont::Bold));
+    xAxis->setLabelsFont(tickFont);
+    xAxis->setTitleFont(titleFont);
     m_chart->addAxis(xAxis, Qt::AlignBottom);
-    xAxis->setLinePen(QPen(Qt::black));
-    xAxis->setLabelsBrush(QBrush(Qt::black));
+    xAxis->setLinePen(QPen(axisLineCol));
+    xAxis->setLabelsBrush(QBrush(axisLineCol));
 
     // Y axis
     double yPad = (globalMax - globalMin) * 0.08;
     double yMin = (globalMin >= 0.0) ? 0.0 : globalMin - yPad;
     double yMax = globalMax + yPad;
 
-    double tickInterval = calculateNiceYInterval(yMax);
+    double tickInterval = m_plotSettings.yAxisTickSpacing > 0.0
+                          ? m_plotSettings.yAxisTickSpacing
+                          : calculateNiceYInterval(yMax);
     double alignedMax   = std::ceil(yMax / tickInterval) * tickInterval;
     if (alignedMax <= globalMax) alignedMax += tickInterval;
+
+    QString yFmt = (m_plotSettings.yAxisDecimals >= 0)
+                   ? QString("%.%1f").arg(m_plotSettings.yAxisDecimals)
+                   : "%.0f";
 
     auto *yAxis = new QValueAxis();
     yAxis->setMin(yMin);
@@ -5619,22 +5641,33 @@ void PlotWidget::plotOsuBoxPlot(const DataTable &simData, const QStringList &yVa
     int tickCount = qRound(alignedMax / tickInterval) + 1;
     if (tickCount < 8) tickCount = 8;
     yAxis->setTickCount(tickCount);
-    yAxis->setLabelFormat("%.0f");
+    yAxis->setLabelFormat(yFmt);
     yAxis->setGridLineColor(QColor(220, 220, 220));
-    yAxis->setGridLineVisible(true);
-    yAxis->setMinorGridLineVisible(false);
-    yAxis->setLabelsFont(QFont("Arial", 9));
+    yAxis->setGridLineVisible(m_plotSettings.showGrid);
+    yAxis->setMinorGridLineVisible(m_plotSettings.showMinorGrid);
+    yAxis->setMinorTickCount(m_plotSettings.yAxisMinorTickCount);
+    yAxis->setLabelsFont(tickFont);
+    yAxis->setLabelsVisible(m_plotSettings.showAxisLabels);
     m_chart->addAxis(yAxis, Qt::AlignLeft);
-    yAxis->setLinePen(QPen(Qt::black));
-    yAxis->setLabelsBrush(QBrush(Qt::black));
+    yAxis->setLinePen(QPen(axisLineCol));
+    yAxis->setLabelsBrush(QBrush(axisLineCol));
+
+    if (m_chartView)
+        m_chartView->setCategoryLabelFont(tickFont);
 
     dummySeries->attachAxis(xAxis);
     dummySeries->attachAxis(yAxis);
 
-    m_chart->setTitle("");
+    m_chart->setTitle(m_plotSettings.plotTitle);
     int bottomMargin = (trtKeys.size() > 6) ? 80 : 20;
     m_chart->setMargins(QMargins(0, 0, 0, bottomMargin));
-    xAxis->setTitleText(trtKeys.size() > 6 ? "" : "Treatment");
+
+    QString xTitle = m_plotSettings.showAxisTitles
+                     ? (m_plotSettings.xAxisTitle.isEmpty() ? "Treatment" : m_plotSettings.xAxisTitle)
+                     : "";
+    QString yTitle = m_plotSettings.showAxisTitles ? m_plotSettings.yAxisTitle : "";
+    xAxis->setTitleText(trtKeys.size() > 6 ? "" : xTitle);
+    yAxis->setTitleText(yTitle);
 
     // Build interleaved painter stats: for each category, one entry per variable
     int nVars = perVarStats.size();
@@ -5984,6 +6017,15 @@ void PlotWidget::onSettingsButtonClicked()
             // Always replot scatter — metrics selection, appearance, etc. all require rebuild
             DataTable dataCopy = m_simData;
             plotScatter(dataCopy, m_currentYVars);
+        } else if (m_isBoxPlotMode && m_simData.rowCount > 0) {
+            // Box plot: tick spacing or decimals change requires a full replot; range change goes via autoFitAxes
+            bool boxReplot = (m_plotSettings.yAxisTickSpacing != newSettings.yAxisTickSpacing) ||
+                             (m_plotSettings.yAxisDecimals    != newSettings.yAxisDecimals);
+            if (boxReplot || filterChanged) {
+                updatePlotWithScaling();
+            } else if (axisRangeChanged) {
+                autoFitAxes();
+            }
         } else if (!m_isScatterMode && m_simData.rowCount > 0) {
             if (filterChanged || errorBarChanged) {
                 updatePlotWithScaling();
@@ -6232,6 +6274,42 @@ void PlotWidget::applyPlotSettings(const PlotSettings &settings)
             for (QLabel *lbl : m_legendWidget->findChildren<QLabel*>())
                 lbl->setFont(legendFont);
         }
+    }
+
+    // Box plot live-update: category label font and painter Y bounds
+    if (m_isBoxPlotMode && m_chartView && !m_chartView->boxPlotStats().isEmpty()) {
+        QFont tickFont(settings.fontFamily, settings.axisTickFontSize);
+        m_chartView->setCategoryLabelFont(tickFont);
+
+        // Sync Y bounds from current axis (range override may have changed them)
+        auto vAxesBp = m_chart->axes(Qt::Vertical);
+        if (!vAxesBp.isEmpty()) {
+            if (auto yAx = qobject_cast<QValueAxis*>(vAxesBp.first()))
+                m_chartView->setBoxPlotYBounds(yAx->min(), yAx->max());
+        }
+
+        // Axis line color on box plot axes
+        QColor axCol = settings.axisLineColor.isValid() ? settings.axisLineColor : Qt::black;
+        for (auto *axis : m_chart->axes()) {
+            axis->setLinePen(QPen(axCol));
+            axis->setLabelsBrush(QBrush(axCol));
+        }
+
+        // X title respects showAxisTitles (hide when many categories)
+        auto hAxesBp = m_chart->axes(Qt::Horizontal);
+        if (!hAxesBp.isEmpty()) {
+            QString xTitle = settings.showAxisTitles
+                             ? (settings.xAxisTitle.isEmpty() ? "Treatment" : settings.xAxisTitle)
+                             : "";
+            int nCats = m_chartView->boxPlotStats().isEmpty() ? 0
+                        : [&]() { int n = 0; for (auto &s : m_chartView->boxPlotStats()) if (s.varIndex == 0) ++n; return n; }();
+            hAxesBp.first()->setTitleText(nCats > 6 ? "" : xTitle);
+        }
+
+        // Y title
+        auto vAxesBp2 = m_chart->axes(Qt::Vertical);
+        if (!vAxesBp2.isEmpty())
+            vAxesBp2.first()->setTitleText(settings.showAxisTitles ? settings.yAxisTitle : "");
     }
 
     // Update internal settings
