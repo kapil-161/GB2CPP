@@ -84,6 +84,7 @@ set(SOURCES
     src/StatusWidget.cpp
     src/DataProcessor.cpp
     src/PlotWidget.cpp
+    src/PlotWidget_ErrorBar.cpp
     src/TableWidget.cpp
     src/MetricsCalculator.cpp
     src/MetricsTableWidget.cpp
