@@ -72,6 +72,25 @@ public:
     /** Draw error bars onto the given painter. Use viewportOffset when painting on full chart-view-sized pixmap (e.g. export). */
     void paintErrorBars(QPainter *painter, const QPoint &viewportOffset = QPoint(0, 0));
 
+    // Axis break rendering
+    struct BreakInfo {
+        double virtualX;  // virtual x coordinate of break centre
+        double realStart; // real msec at start of gap
+        double realEnd;   // real msec at end of gap
+    };
+    struct SegmentInfo {
+        double virtualStart; // virtual x of segment start
+        double virtualEnd;   // virtual x of segment end
+        double realStart;    // real msec at segment start
+        double realEnd;      // real msec at segment end
+    };
+    void setAxisBreaks(const QVector<BreakInfo> &breaks, const QVector<SegmentInfo> &segments) {
+        m_axisBreaks = breaks; m_axisSegments = segments;
+    }
+    void clearAxisBreaks() { m_axisBreaks.clear(); m_axisSegments.clear(); }
+    void setAxisLineColor(const QColor &c) { m_axisLineColor = c; update(); }
+    void paintAxisBorder(QPainter *painter, const QPoint &viewportOffset = QPoint(0, 0));
+
     // Box plot — all drawn via custom painter (no stacked bar series)
     struct BoxPlotStats {
         double q0, q1, q2, q3, q4;
@@ -92,10 +111,15 @@ private:
     void paintCustomMarkers(QPainter *painter);
 
 private:
+    void paintAxisBreaks(QPainter *painter);
+
     QMap<QAbstractSeries*, QVector<ErrorBarData>> m_errorBars;
     QVector<BoxPlotStats> m_boxStats;
     double m_bpYMin  = 0.0;
     double m_bpYMax  = 0.0;
+    QVector<BreakInfo> m_axisBreaks;
+    QVector<SegmentInfo> m_axisSegments;
+    QColor m_axisLineColor = Qt::black;
 };
 
 struct LegendTreatmentData {
@@ -252,6 +276,7 @@ private:
     QVector<ErrorBarData> aggregateReplicates(const QVector<QPointF> &points, const QString &xVar, double xTolerance = 0.01);
     void setupUI();
     void setupChart();
+    void enforceAxisColors();
     void addSeriesToPlot(const QVector<PlotData> &plotDataList);
     void updateScalingLabel(const QStringList &yVars);
     void updatePlotWithScaling();
@@ -385,10 +410,24 @@ private:
     
     // Optimization: Date parsing cache to avoid re-parsing same dates
     QMap<QString, qint64> m_dateCache;
-    
+
     // Optimization: Track pending auto-fit to avoid multiple calls
     bool m_autoFitPending;
     QTimer *m_autoFitTimer;
+
+    // Axis break support (DATE x-axis only)
+    // Each break: first = gap start (real msec), second = gap end (real msec)
+    struct AxisBreak { double gapStart; double gapEnd; };
+    QVector<AxisBreak> m_axisBreaks;
+    // Segments between (and around) breaks: list of {segStart, segEnd} in real msec
+    struct AxisSegment { double start; double end; double virtualStart; };
+    QVector<AxisSegment> m_axisSegments;
+    double m_virtualAxisMax = 0.0;       // total virtual range after remapping
+    static constexpr double BREAK_VIRTUAL_WIDTH = 60.0; // virtual units consumed by each break gap
+
+    void computeAxisBreaks(const QVector<PlotData> &plotDataList);
+    double remapX(double realMsec) const;   // real msec → virtual units
+    double unremapX(double virtualX) const; // virtual units → real msec
 };
 
 #endif // PLOTWIDGET_H

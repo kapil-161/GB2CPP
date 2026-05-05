@@ -228,14 +228,31 @@ void ErrorBarChartView::paintErrorBars(QPainter *painter, const QPoint &viewport
     painter->restore();
 }
 
+void ErrorBarChartView::paintAxisBorder(QPainter *painter, const QPoint &viewportOffset)
+{
+    if (!chart()) return;
+    QRectF pa = chart()->plotArea().translated(-viewportOffset);
+    QColor axisCol = m_axisLineColor.isValid() ? m_axisLineColor : Qt::black;
+    painter->save();
+    painter->setPen(QPen(axisCol, 1));
+    painter->drawLine(pa.bottomLeft(), pa.bottomRight()); // X axis
+    painter->drawLine(pa.bottomLeft(), pa.topLeft());     // Y axis
+    painter->restore();
+}
+
 void ErrorBarChartView::paintEvent(QPaintEvent *event)
 {
     QChartView::paintEvent(event);
 
-    if (m_errorBars.isEmpty() && !chart()) return;
+    if (!chart()) return;
 
     QPainter painter(this->viewport());
-    
+
+    // Draw axis border lines in the user-chosen color (Qt theme always draws them gray)
+    paintAxisBorder(&painter);
+
+    if (m_errorBars.isEmpty() && m_axisBreaks.isEmpty()) return;
+
     // Draw tick marks
     paintTickMarks(&painter);
 
@@ -247,6 +264,9 @@ void ErrorBarChartView::paintEvent(QPaintEvent *event)
     }
     if (!m_boxStats.isEmpty()) {
         paintBoxPlotMedians(&painter);
+    }
+    if (!m_axisBreaks.isEmpty()) {
+        paintAxisBreaks(&painter);
     }
 }
 
@@ -335,6 +355,147 @@ void ErrorBarChartView::paintTickMarks(QPainter *painter)
         }
     }
     
+    painter->restore();
+}
+
+void ErrorBarChartView::paintAxisBreaks(QPainter *painter)
+{
+    if (!chart() || m_axisBreaks.isEmpty()) return;
+
+    QRectF plotArea = chart()->plotArea();
+
+    QValueAxis *xAxis = nullptr;
+    for (QAbstractAxis *axis : chart()->axes(Qt::Horizontal)) {
+        if ((xAxis = qobject_cast<QValueAxis*>(axis))) break;
+    }
+    if (!xAxis) return;
+
+    double vMin = xAxis->min();
+    double vMax = xAxis->max();
+    if (vMax <= vMin) return;
+
+    painter->save();
+    painter->setRenderHint(QPainter::Antialiasing, true);
+
+    QColor bgColor = chart()->backgroundBrush().color();
+
+    QFont labelFont = painter->font();
+    labelFont.setPointSize(8);
+    painter->setFont(labelFont);
+    QFontMetrics fm(labelFont);
+
+    const double tickLen       = 6.0;
+    const double breakHalfWidth = 10.0;
+    const double slashHalfH    = 10.0;
+    const double slashOffset   =  4.0;
+    double py = plotArea.bottom();
+
+    // Helper: convert virtual x → pixel x
+    auto vToPixel = [&](double vx) {
+        return plotArea.left() + (vx - vMin) / (vMax - vMin) * plotArea.width();
+    };
+
+    // ── 1. Draw tick marks + date labels for each segment ──────────────────
+    const double msecPerDay   = 86400000.0;
+    const double msecPerMonth = 30.44  * msecPerDay;
+    const double msecPerYear  = 365.25 * msecPerDay;
+    const double minLabelPx   = 70.0;  // minimum pixel spacing between labels
+
+    for (const SegmentInfo &seg : m_axisSegments) {
+        double realSpanMsec = seg.realEnd - seg.realStart;
+        if (realSpanMsec <= 0) continue;
+
+        // Pixel width this segment occupies on screen
+        double segPxWidth = vToPixel(seg.virtualEnd) - vToPixel(seg.virtualStart);
+        if (segPxWidth <= 0) continue;
+
+        // How many ticks fit in this pixel width?
+        int maxTicks = qMax(2, static_cast<int>(segPxWidth / minLabelPx));
+
+        // Choose a "nice" tick interval in real time that produces <= maxTicks ticks
+        // Candidate intervals in ascending order
+        struct Candidate { double msec; int months; int years; QString fmt; };
+        QVector<Candidate> candidates = {
+            { 7  * msecPerDay,   0, 0, "MMM dd"   },
+            { 14 * msecPerDay,   0, 0, "MMM dd"   },
+            { msecPerMonth,      1, 0, "MMM yyyy" },
+            { 2  * msecPerMonth, 2, 0, "MMM yyyy" },
+            { 3  * msecPerMonth, 3, 0, "MMM yyyy" },
+            { 6  * msecPerMonth, 6, 0, "MMM yyyy" },
+            { msecPerYear,       0, 1, "MMM yyyy" },
+            { 2  * msecPerYear,  0, 2, "yyyy"     },
+            { 5  * msecPerYear,  0, 5, "yyyy"     },
+            { 10 * msecPerYear,  0,10, "yyyy"     },
+            { 20 * msecPerYear,  0,20, "yyyy"     },
+        };
+
+        Candidate chosen = candidates.last();
+        for (const Candidate &c : candidates) {
+            int approxTicks = static_cast<int>(realSpanMsec / c.msec) + 1;
+            if (approxTicks <= maxTicks) {
+                chosen = c;
+                break;
+            }
+        }
+
+        QDateTime dtStart = QDateTime::fromMSecsSinceEpoch(static_cast<qint64>(seg.realStart));
+        QDateTime dtEnd   = QDateTime::fromMSecsSinceEpoch(static_cast<qint64>(seg.realEnd));
+
+        // Snap first tick to a clean boundary
+        QDateTime tick;
+        if (chosen.years >= 1) {
+            int year = dtStart.date().year();
+            year = static_cast<int>(std::ceil(static_cast<double>(year) / chosen.years)) * chosen.years;
+            tick = QDateTime(QDate(year, 1, 1), QTime(0, 0));
+        } else if (chosen.months >= 1) {
+            int year  = dtStart.date().year();
+            int month = dtStart.date().month();
+            tick = QDateTime(QDate(year, month, 1), QTime(0, 0));
+            if (tick < dtStart) tick = tick.addMonths(chosen.months);
+            // Snap to multiple of interval from Jan
+            int monthOffset = (tick.date().month() - 1) % chosen.months;
+            if (monthOffset) tick = tick.addMonths(chosen.months - monthOffset);
+        } else {
+            tick = dtStart;
+        }
+
+        while (tick <= dtEnd) {
+            double realMsec = static_cast<double>(tick.toMSecsSinceEpoch());
+            double vx = seg.virtualStart + (realMsec - seg.realStart);
+            if (vx >= vMin - 1e6 && vx <= vMax + 1e6) {
+                double px = vToPixel(vx);
+                painter->setPen(QPen(Qt::black, 1));
+                painter->drawLine(QPointF(px, py), QPointF(px, py + tickLen));
+                QString label = tick.toString(chosen.fmt);
+                int lw = fm.horizontalAdvance(label);
+                painter->setPen(Qt::black);
+                painter->drawText(QPointF(px - lw / 2.0, py + tickLen + fm.ascent() + 2), label);
+            }
+            if (chosen.years >= 1)        tick = tick.addYears(chosen.years);
+            else if (chosen.months >= 1)  tick = tick.addMonths(chosen.months);
+            else                          tick = tick.addMSecs(static_cast<qint64>(chosen.msec));
+        }
+    }
+
+    // ── 2. Draw // break symbols ───────────────────────────────────────────
+    for (const BreakInfo &br : m_axisBreaks) {
+        double px = vToPixel(br.virtualX);
+
+        // Erase axis line under break
+        painter->setPen(Qt::NoPen);
+        painter->setBrush(bgColor);
+        painter->drawRect(QRectF(px - breakHalfWidth, py - 2, breakHalfWidth * 2, tickLen + 4));
+
+        // Draw //
+        QPen slashPen(Qt::black, 1.5);
+        painter->setPen(slashPen);
+        painter->setBrush(Qt::NoBrush);
+        painter->drawLine(QPointF(px - slashOffset - 2, py + slashHalfH),
+                          QPointF(px - slashOffset + 2, py - slashHalfH));
+        painter->drawLine(QPointF(px + slashOffset - 2, py + slashHalfH),
+                          QPointF(px + slashOffset + 2, py - slashHalfH));
+    }
+
     painter->restore();
 }
 
@@ -653,6 +814,7 @@ void PlotWidget::setupChart()
     }
     
     m_chart = new QChart();
+    m_chart->setTheme(QChart::ChartThemeLight);
     m_chartView = new ErrorBarChartView(m_chart);
     m_chartView->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
     
@@ -705,10 +867,6 @@ void PlotWidget::styleChart()
     yAxis->setGridLineVisible(m_showGrid);
     xAxis->setLabelsVisible(true);
     yAxis->setLabelsVisible(true);
-    xAxis->setLinePen(QPen(Qt::black));
-    yAxis->setLinePen(QPen(Qt::black));
-    xAxis->setLabelsBrush(QBrush(Qt::black));
-    yAxis->setLabelsBrush(QBrush(Qt::black));
 
     // Add minor ticks
     xAxis->setMinorTickCount(4);
@@ -718,6 +876,12 @@ void PlotWidget::styleChart()
 
     m_chart->addAxis(xAxis, Qt::AlignBottom);
     m_chart->addAxis(yAxis, Qt::AlignLeft);
+
+    // Set after addAxis — theme application on addAxis would otherwise override these
+    xAxis->setLinePen(QPen(Qt::black));
+    yAxis->setLinePen(QPen(Qt::black));
+    xAxis->setLabelsBrush(QBrush(Qt::black));
+    yAxis->setLabelsBrush(QBrush(Qt::black));
     
     m_chart->setTitle("");
 }
@@ -735,20 +899,24 @@ void PlotWidget::setupAxes(const QString &xVar)
     
     // Create appropriate X-axis based on variable type
     QAbstractAxis *xAxis = nullptr;
-    if (xVar == "DATE") {
+    if (xVar == "DATE" && m_axisBreaks.isEmpty()) {
         QDateTimeAxis *dateAxis = new QDateTimeAxis();
-        
-        // Use comprehensive format that shows year
-        // For agricultural data, this is important as growing seasons span years
         dateAxis->setFormat("MMM dd, yyyy");
         dateAxis->setTitleText("Date");
-        
-        // Set dynamic tick count based on plot size
         int optimalTicks = calculateOptimalDateTickCount();
         dateAxis->setTickCount(optimalTicks);
-        
         xAxis = dateAxis;
-        qDebug() << "PlotWidget::setupAxes() - Created QDateTimeAxis for DATE variable with format: MMM dd, yyyy and dynamic tickCount:" << optimalTicks;
+        qDebug() << "PlotWidget::setupAxes() - Created QDateTimeAxis for DATE variable";
+    } else if (xVar == "DATE" && !m_axisBreaks.isEmpty()) {
+        // Axis breaks active: use QValueAxis with hidden labels (we paint our own)
+        QValueAxis *valueAxis = new QValueAxis();
+        valueAxis->setTitleText("Date");
+        valueAxis->setLabelsVisible(false); // custom labels drawn in paintEvent
+        valueAxis->setTickCount(2);         // just endpoints; we paint our own ticks
+        valueAxis->setMinorTickCount(0);
+        valueAxis->setMinorGridLineVisible(false);
+        xAxis = valueAxis;
+        qDebug() << "PlotWidget::setupAxes() - Created QValueAxis (axis-break mode) for DATE variable";
     } else {
         QValueAxis *valueAxis = new QValueAxis();
         
@@ -788,16 +956,38 @@ void PlotWidget::setupAxes(const QString &xVar)
     yAxis->setGridLineVisible(m_showGrid);
     xAxis->setLabelsVisible(true);
     yAxis->setLabelsVisible(true);
-    xAxis->setLinePen(QPen(Qt::black));
-    yAxis->setLinePen(QPen(Qt::black));
-    xAxis->setLabelsBrush(QBrush(Qt::black));
-    yAxis->setLabelsBrush(QBrush(Qt::black));
 
-    // Add axes to chart
+    // Add axes to chart first — Qt theme is applied on addAxis and would override pens set before
     m_chart->addAxis(xAxis, Qt::AlignBottom);
     m_chart->addAxis(yAxis, Qt::AlignLeft);
+
+    // Set colors after addAxis so they are not overridden by the chart theme
+    if (auto *dtAxis = qobject_cast<QDateTimeAxis*>(xAxis)) {
+        dtAxis->setLinePen(QPen(Qt::black));
+        dtAxis->setLabelsBrush(QBrush(Qt::black));
+    } else {
+        xAxis->setLinePen(QPen(Qt::black));
+        xAxis->setLabelsBrush(QBrush(Qt::black));
+    }
+    yAxis->setLinePen(QPen(Qt::black));
+    yAxis->setLabelsBrush(QBrush(Qt::black));
     
     qDebug() << "PlotWidget::setupAxes() - Added axes for X variable:" << xVar;
+}
+
+void PlotWidget::enforceAxisColors()
+{
+    if (!m_chart) return;
+    QColor c = m_plotSettings.axisLineColor;
+    // Push color to the painter-drawn border lines (overrides Qt theme gray)
+    if (m_chartView)
+        m_chartView->setAxisLineColor(c);
+    // Also set on axis objects for tick marks and labels
+    for (auto axis : m_chart->axes()) {
+        axis->setLinePenColor(c);
+        axis->setLinePen(QPen(c, 1));
+        axis->setLabelsBrush(QBrush(Qt::black));
+    }
 }
 
 void PlotWidget::autoFitAxes()
@@ -883,11 +1073,42 @@ void PlotWidget::autoFitAxes()
     for (auto axis : axes) {
         if (axis->orientation() == Qt::Horizontal) {
             if (auto valueAxis = qobject_cast<QValueAxis*>(axis)) {
+                // In axis-break mode the x coords are virtual; just use tight range with no padding
+                if (!m_axisBreaks.isEmpty() && m_currentXVar == "DATE") {
+                    double vPad = m_virtualAxisMax * 0.02;
+                    valueAxis->setRange(minX - vPad, maxX + vPad);
+                    valueAxis->setTickCount(2);
+                    valueAxis->setLabelsVisible(false);
+                    // Pass break positions to chart view for painting
+                    if (m_chartView) {
+                        QVector<ErrorBarChartView::BreakInfo> breakInfos;
+                        for (int i = 0; i < m_axisBreaks.size(); ++i) {
+                            ErrorBarChartView::BreakInfo bi;
+                            double segVEnd = m_axisSegments[i].virtualStart + (m_axisSegments[i].end - m_axisSegments[i].start);
+                            bi.virtualX  = segVEnd + BREAK_VIRTUAL_WIDTH / 2.0;
+                            bi.realStart = m_axisBreaks[i].gapStart;
+                            bi.realEnd   = m_axisBreaks[i].gapEnd;
+                            breakInfos.append(bi);
+                        }
+                        QVector<ErrorBarChartView::SegmentInfo> segInfos;
+                        for (const AxisSegment &s : m_axisSegments) {
+                            ErrorBarChartView::SegmentInfo si;
+                            si.virtualStart = s.virtualStart;
+                            si.virtualEnd   = s.virtualStart + (s.end - s.start);
+                            si.realStart    = s.start;
+                            si.realEnd      = s.end;
+                            segInfos.append(si);
+                        }
+                        m_chartView->setAxisBreaks(breakInfos, segInfos);
+                    }
+                    continue;
+                }
+
                 valueAxis->setRange(minX - xLeftPadding, maxX + xRightPadding);
-                
+
                 // Check if this is a day-based variable (DAS, DAP, etc.)
                 QString xVarName = m_currentXVar.toUpper();
-                if (xVarName.contains("DAS") || xVarName.contains("DAP") || 
+                if (xVarName.contains("DAS") || xVarName.contains("DAP") ||
                     xVarName.contains("DAY") || xVarName.contains("DATE")) {
                     // For day variables, use clean round intervals
                     double dataRange = maxX - minX;
@@ -921,15 +1142,14 @@ void PlotWidget::autoFitAxes()
                 valueAxis->setMinorGridLineVisible(m_plotSettings.showMinorGrid);
                 qDebug() << "PlotWidget::autoFitAxes() - Set X ValueAxis range:" << (minX - xLeftPadding) << "to" << (maxX + xRightPadding);
             } else if (auto dateAxis = qobject_cast<QDateTimeAxis*>(axis)) {
-                QDateTime minDateTime = QDateTime::fromMSecsSinceEpoch(minX - xLeftPadding);
-                QDateTime maxDateTime = QDateTime::fromMSecsSinceEpoch(maxX + xRightPadding);
+                QDateTime minDateTime = QDateTime::fromMSecsSinceEpoch(static_cast<qint64>(minX - xLeftPadding));
+                QDateTime maxDateTime = QDateTime::fromMSecsSinceEpoch(static_cast<qint64>(maxX + xRightPadding));
                 dateAxis->setRange(minDateTime, maxDateTime);
-                
-                // Set dynamic tick count based on plot size
                 int optimalTicks = calculateOptimalDateTickCount();
                 dateAxis->setTickCount(optimalTicks);
-                
-                qDebug() << "PlotWidget::autoFitAxes() - Set X DateTimeAxis range:" << minDateTime.toString() << "to" << maxDateTime.toString() << "with dynamic tickCount:" << optimalTicks;
+                dateAxis->setLinePen(QPen(Qt::black));
+                dateAxis->setLabelsBrush(QBrush(Qt::black));
+                qDebug() << "PlotWidget::autoFitAxes() - Set X DateTimeAxis range:" << minDateTime.toString() << "to" << maxDateTime.toString();
             }
         } else if (axis->orientation() == Qt::Vertical) {
             if (auto valueAxis = qobject_cast<QValueAxis*>(axis)) {
@@ -1014,6 +1234,8 @@ void PlotWidget::autoFitAxes()
                 if (m_plotSettings.useCustomXMax) hi = QDateTime::fromMSecsSinceEpoch(static_cast<qint64>(m_plotSettings.xAxisMax));
                 if (m_plotSettings.useCustomXMin || m_plotSettings.useCustomXMax)
                     xDtAx->setRange(lo, hi);
+                xDtAx->setLinePen(QPen(Qt::black));
+                xDtAx->setLabelsBrush(QBrush(Qt::black));
             }
         }
         if (!vAxesAf.isEmpty()) {
@@ -1043,6 +1265,8 @@ void PlotWidget::autoFitAxes()
     if (m_chart) {
         m_chart->update();
     }
+
+    QTimer::singleShot(50, this, &PlotWidget::enforceAxisColors);
 }
 
 double PlotWidget::calculateNiceMax(double rawMax)
@@ -2198,7 +2422,26 @@ void PlotWidget::plotDatasets(const DataTable &simData, const DataTable &obsData
     }
     
     qDebug() << "plotDatasets: Generated" << plotDataList.size() << "plot data items before adding to chart";
-    
+
+    // Compute axis breaks (DATE x-axis only) — must happen before setupAxes so
+    // setupAxes can pick QValueAxis vs QDateTimeAxis based on whether breaks exist.
+    computeAxisBreaks(plotDataList);
+
+    // If breaks were found, re-run setupAxes now that m_axisBreaks is populated
+    // (the first call at the top of plotDatasets saw empty m_axisBreaks).
+    if (!m_axisBreaks.isEmpty()) {
+        // Remove axes created by the first setupAxes call
+        for (auto *axis : m_chart->axes())
+            m_chart->removeAxis(axis);
+        setupAxes(xVar);
+
+        // Remap all x-coordinates to virtual space
+        for (PlotData &pd : plotDataList) {
+            for (QPointF &pt : pd.points)
+                pt.setX(remapX(pt.x()));
+        }
+    }
+
     // Add series to chart
     addSeriesToPlot(plotDataList);
     
@@ -2498,13 +2741,14 @@ void PlotWidget::addSeriesToPlot(const QVector<PlotData> &plotDataList)
     qDebug() << "addSeriesToPlot: Chart has" << axes.count() << "axes";
     for (auto axis : axes) {
         axis->setGridLineVisible(m_showGrid);
-        if (auto valueAxis = qobject_cast<QValueAxis*>(axis)) {
-            // Don't override label format - it's set in autoFitAxes based on variable type
+        if (auto valueAxis = qobject_cast<QValueAxis*>(axis))
             qDebug() << "addSeriesToPlot: ValueAxis range:" << valueAxis->min() << "to" << valueAxis->max();
-        } else if (auto dateAxis = qobject_cast<QDateTimeAxis*>(axis)) {
+        else if (auto dateAxis = qobject_cast<QDateTimeAxis*>(axis))
             qDebug() << "addSeriesToPlot: DateTimeAxis range:" << dateAxis->min() << "to" << dateAxis->max();
-        }
     }
+
+    // Qt theme resets axis pens on every addAxis/attachAxis — defer to ensure we run last
+    QTimer::singleShot(50, this, &PlotWidget::enforceAxisColors);
 }
 
 void PlotWidget::updateLegend(const QVector<PlotData> &plotDataList)
@@ -2906,11 +3150,15 @@ void PlotWidget::clearChart()
     m_scalingLabel->clear();
     m_plotDataList.clear(); // Clear unique_ptrs
     
-    // Clear error bars when chart is cleared
+    // Clear error bars and axis breaks when chart is cleared
     if (m_chartView) {
         m_chartView->setErrorBarData(QMap<QAbstractSeries*, QVector<ErrorBarData>>());
         m_chartView->clearBoxPlotMedians();
+        m_chartView->clearAxisBreaks();
     }
+    m_axisBreaks.clear();
+    m_axisSegments.clear();
+    m_virtualAxisMax = 0.0;
 
     // Clear axis labels when chart is cleared
     setAxisTitles("", "");
@@ -2985,6 +3233,104 @@ bool PlotWidget::parseDateCached(const QString &dateStr, double &timestamp, bool
         qDebug() << "PlotWidget: Failed to parse observed DATE string:" << dateStr;
     }
     return false;
+}
+
+void PlotWidget::computeAxisBreaks(const QVector<PlotData> &plotDataList)
+{
+    m_axisBreaks.clear();
+    m_axisSegments.clear();
+    m_virtualAxisMax = 0.0;
+
+    if (m_currentXVar != "DATE") return;
+
+    // Gather all unique real x-values across all series
+    QVector<double> allX;
+    for (const PlotData &pd : plotDataList) {
+        for (const QPointF &pt : pd.points)
+            allX.append(pt.x());
+    }
+    if (allX.isEmpty()) return;
+
+    std::sort(allX.begin(), allX.end());
+    allX.erase(std::unique(allX.begin(), allX.end()), allX.end());
+
+    const double ONE_YEAR_MSEC = 365.25 * 24.0 * 3600.0 * 1000.0;
+
+    // Find gaps > 3 years between consecutive unique x values
+    QVector<QPair<double,double>> gaps;
+    for (int i = 1; i < allX.size(); ++i) {
+        double gap = allX[i] - allX[i-1];
+        if (gap > 3.0 * ONE_YEAR_MSEC)
+            gaps.append({allX[i-1], allX[i]});
+    }
+
+    if (gaps.isEmpty()) return; // no breaks needed
+
+    // Build segments: the real data segments separated by breaks
+    double segStart = allX.first();
+    double virtualCursor = 0.0;
+
+    for (const auto &gap : gaps) {
+        // Segment ends at gap start
+        AxisSegment seg;
+        seg.start = segStart;
+        seg.end = gap.first;
+        seg.virtualStart = virtualCursor;
+        double segLen = seg.end - seg.start;
+        m_axisSegments.append(seg);
+        virtualCursor += segLen;
+        virtualCursor += BREAK_VIRTUAL_WIDTH; // gap takes fixed virtual width
+
+        // Record the break
+        AxisBreak br;
+        br.gapStart = gap.first;
+        br.gapEnd   = gap.second;
+        m_axisBreaks.append(br);
+
+        segStart = gap.second;
+    }
+    // Final segment
+    AxisSegment lastSeg;
+    lastSeg.start = segStart;
+    lastSeg.end = allX.last();
+    lastSeg.virtualStart = virtualCursor;
+    m_axisSegments.append(lastSeg);
+    virtualCursor += lastSeg.end - lastSeg.start;
+    m_virtualAxisMax = virtualCursor;
+}
+
+double PlotWidget::remapX(double realMsec) const
+{
+    if (m_axisSegments.isEmpty()) return realMsec;
+
+    for (int i = 0; i < m_axisSegments.size(); ++i) {
+        const AxisSegment &seg = m_axisSegments[i];
+        // Last segment: include the right endpoint
+        if (i == m_axisSegments.size() - 1) {
+            if (realMsec >= seg.start - 1e6 && realMsec <= seg.end + 1e6)
+                return seg.virtualStart + (realMsec - seg.start);
+        } else {
+            if (realMsec >= seg.start - 1e6 && realMsec < m_axisBreaks[i].gapStart + 1e6)
+                return seg.virtualStart + (realMsec - seg.start);
+        }
+    }
+    // Fallback: clamp to last segment
+    const AxisSegment &last = m_axisSegments.last();
+    return last.virtualStart + (realMsec - last.start);
+}
+
+double PlotWidget::unremapX(double virtualX) const
+{
+    if (m_axisSegments.isEmpty()) return virtualX;
+
+    for (int i = 0; i < m_axisSegments.size(); ++i) {
+        const AxisSegment &seg = m_axisSegments[i];
+        double segVirtualLen = seg.end - seg.start;
+        double vEnd = seg.virtualStart + segVirtualLen;
+        if (virtualX <= vEnd || i == m_axisSegments.size() - 1)
+            return seg.start + (virtualX - seg.virtualStart);
+    }
+    return virtualX;
 }
 
 QString PlotWidget::getPlotCSV() const
@@ -3069,9 +3415,13 @@ QString PlotWidget::getPlotCSV() const
             if (!hasAny) continue;
 
             QStringList row;
-            QString xStr = (m_currentXVar == "DATE")
-                ? QDateTime::fromMSecsSinceEpoch(static_cast<qint64>(x)).toString("yyyy-MM-dd")
-                : QString::number(x);
+            QString xStr;
+            if (m_currentXVar == "DATE") {
+                double realX = m_axisBreaks.isEmpty() ? x : unremapX(x);
+                xStr = QDateTime::fromMSecsSinceEpoch(static_cast<qint64>(realX)).toString("yyyy-MM-dd");
+            } else {
+                xStr = QString::number(x);
+            }
             row << xStr << crop << exp << trt;
 
             for (const QString &v : simVars) {
@@ -3452,8 +3802,9 @@ void PlotWidget::exportPlotComposite(const QString &filePath, const QString &for
     m_chartView->render(&chartPainter);
     chartPainter.end();
 
-    // Draw error bars on top of the chart pixmap so composite export includes them
+    // Draw axis border lines and error bars on top (bypassed when using render() directly)
     chartPainter.begin(&chartPixmap);
+    m_chartView->paintAxisBorder(&chartPainter, m_chartView->viewport()->pos());
     m_chartView->paintErrorBars(&chartPainter, m_chartView->viewport()->pos());
     chartPainter.end();
 
@@ -5207,10 +5558,11 @@ void PlotWidget::plotOsuBoxPlot(const DataTable &simData, const QStringList &yVa
     xAxis->setGridLineVisible(false);
     xAxis->setMinorGridLineVisible(false);
     xAxis->setTitleText("Treatment");
-    xAxis->setLinePen(QPen(QColor(180, 180, 180)));
     xAxis->setLabelsFont(QFont("Arial", 9));
     xAxis->setTitleFont(QFont("Arial", 9, QFont::Bold));
     m_chart->addAxis(xAxis, Qt::AlignBottom);
+    xAxis->setLinePen(QPen(Qt::black));
+    xAxis->setLabelsBrush(QBrush(Qt::black));
 
     // Y axis
     double yPad = (globalMax - globalMin) * 0.08;
@@ -5232,9 +5584,10 @@ void PlotWidget::plotOsuBoxPlot(const DataTable &simData, const QStringList &yVa
     yAxis->setGridLineColor(QColor(220, 220, 220));
     yAxis->setGridLineVisible(true);
     yAxis->setMinorGridLineVisible(false);
-    yAxis->setLinePen(QPen(QColor(180, 180, 180)));
     yAxis->setLabelsFont(QFont("Arial", 9));
     m_chart->addAxis(yAxis, Qt::AlignLeft);
+    yAxis->setLinePen(QPen(Qt::black));
+    yAxis->setLabelsBrush(QBrush(Qt::black));
 
     dummySeries->attachAxis(xAxis);
     dummySeries->attachAxis(yAxis);
@@ -5673,6 +6026,8 @@ void PlotWidget::applyPlotSettings(const PlotSettings &settings)
             }
         }
         else if (auto dateTimeAxis = qobject_cast<QDateTimeAxis*>(axis)) {
+            dateTimeAxis->setLinePen(QPen(Qt::black));
+            dateTimeAxis->setLabelsBrush(QBrush(Qt::black));
             dateTimeAxis->setLabelsVisible(settings.showAxisLabels);
 
             if (!hAxes.isEmpty() && axis == hAxes.first()) {
@@ -5823,6 +6178,8 @@ void PlotWidget::applyPlotSettings(const PlotSettings &settings)
     // before m_plotSettings is overwritten
     m_plotSettings = settings;
 
+    QTimer::singleShot(50, this, &PlotWidget::enforceAxisColors);
+
     qDebug() << "PlotWidget: Plot settings applied successfully";
 }
 
@@ -5862,6 +6219,7 @@ void PlotWidget::saveSettings() const
     s.setValue("plotTitle",        m_plotSettings.plotTitle);
     s.setValue("backgroundColor",  m_plotSettings.backgroundColor.name());
     s.setValue("plotAreaColor",    m_plotSettings.plotAreaColor.name());
+    s.setValue("axisLineColor",    m_plotSettings.axisLineColor.name());
 
     // Export
     s.setValue("exportWidth",  m_plotSettings.exportWidth);
@@ -5912,6 +6270,7 @@ void PlotWidget::loadSettings()
     m_plotSettings.plotTitle     = s.value("plotTitle",     m_plotSettings.plotTitle).toString();
     m_plotSettings.backgroundColor = QColor(s.value("backgroundColor", m_plotSettings.backgroundColor.name()).toString());
     m_plotSettings.plotAreaColor   = QColor(s.value("plotAreaColor",   m_plotSettings.plotAreaColor.name()).toString());
+    m_plotSettings.axisLineColor   = QColor(s.value("axisLineColor",   m_plotSettings.axisLineColor.name()).toString());
 
     m_plotSettings.exportWidth  = s.value("exportWidth",  m_plotSettings.exportWidth).toInt();
     m_plotSettings.exportHeight = s.value("exportHeight", m_plotSettings.exportHeight).toInt();

@@ -412,6 +412,13 @@ void PlotSettingsDialog::setupUI()
     updateColorButton(m_plotAreaColorButton, m_settings.plotAreaColor);
     connect(m_plotAreaColorButton, &QPushButton::clicked, this, &PlotSettingsDialog::onPlotAreaColorClicked);
     plotLayout->addWidget(m_plotAreaColorButton, 2, 1);
+
+    plotLayout->addWidget(new QLabel("Axis Line Color:"), 3, 0);
+    m_axisLineColorButton = new QPushButton();
+    m_axisLineColorButton->setFixedSize(50, 30);
+    updateColorButton(m_axisLineColorButton, m_settings.axisLineColor);
+    connect(m_axisLineColorButton, &QPushButton::clicked, this, &PlotSettingsDialog::onAxisLineColorClicked);
+    plotLayout->addWidget(m_axisLineColorButton, 3, 1);
     
     appearanceLayout->addWidget(plotGroup);
     appearanceLayout->addStretch();
@@ -592,6 +599,15 @@ void PlotSettingsDialog::onPlotAreaColorClicked()
     }
 }
 
+void PlotSettingsDialog::onAxisLineColorClicked()
+{
+    QColor color = QColorDialog::getColor(m_settings.axisLineColor, this, "Select Axis Line Color");
+    if (color.isValid()) {
+        m_settings.axisLineColor = color;
+        updateColorButton(m_axisLineColorButton, color);
+    }
+}
+
 void PlotSettingsDialog::onResetDefaults()
 {
     PlotSettings defaults;
@@ -641,6 +657,7 @@ void PlotSettingsDialog::onResetDefaults()
     m_plotTitleEdit->setText(defaults.plotTitle);
     updateColorButton(m_backgroundColorButton, defaults.backgroundColor);
     updateColorButton(m_plotAreaColorButton, defaults.plotAreaColor);
+    updateColorButton(m_axisLineColorButton, defaults.axisLineColor);
     m_exportWidthSpinBox->setValue(defaults.exportWidth);
     m_exportHeightSpinBox->setValue(defaults.exportHeight);
     m_exportDpiSpinBox->setValue(defaults.exportDpi);

@@ -73,6 +73,7 @@ struct PlotSettings {
     QString plotTitle = "";
     QColor backgroundColor = Qt::white;
     QColor plotAreaColor = Qt::white;
+    QColor axisLineColor = Qt::black;
     
     // Export settings
     int exportWidth = 800;
@@ -114,6 +115,7 @@ public:
 private slots:
     void onBackgroundColorClicked();
     void onPlotAreaColorClicked();
+    void onAxisLineColorClicked();
     void onResetDefaults();
     void onPreviewSettings();
     void onExportPlot();
@@ -176,6 +178,7 @@ private:
     QLineEdit *m_plotTitleEdit;
     QPushButton *m_backgroundColorButton;
     QPushButton *m_plotAreaColorButton;
+    QPushButton *m_axisLineColorButton;
     
     // Export controls
     QSpinBox *m_exportWidthSpinBox;
