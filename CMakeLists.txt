@@ -87,6 +87,7 @@ set(SOURCES
     src/PlotWidget_ErrorBar.cpp
     src/PlotWidget_BoxPlot.cpp
     src/PlotWidget_Settings.cpp
+    src/PlotWidget_Legend.cpp
     src/TableWidget.cpp
     src/MetricsCalculator.cpp
     src/MetricsTableWidget.cpp
