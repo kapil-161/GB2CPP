@@ -76,52 +76,63 @@ void ErrorBarChartView::paintBoxPlotMedians(QPainter *painter)
     painter->setRenderHint(QPainter::Antialiasing, true);
 
     QRectF plotArea = chart()->plotArea();
-    int nCats = m_boxStats.size();
 
-    // Each category occupies an equal slot; box takes 50% of slot width
-    double slotW  = plotArea.width() / nCats;
-    double boxHalf = slotW * 0.25;   // box half-width = 50% of slot
-    double capHalf = slotW * 0.12;   // whisker cap half-width
+    // Number of treatment categories = unique labels (first varIndex==0 entries)
+    int nCats = 0;
+    for (const BoxPlotStats &s : m_boxStats)
+        if (s.varIndex == 0) ++nCats;
+    if (nCats == 0) nCats = m_boxStats.size();
+    int nVars = m_boxStats.isEmpty() ? 1 : m_boxStats.first().varCount;
+    if (nVars < 1) nVars = 1;
+
+    double slotW   = plotArea.width() / nCats;
+    // Each variable sub-box occupies (0.8/nVars) of the slot
+    double subW    = slotW * 0.8 / nVars;
+    double boxHalf = subW * 0.5;
+    double capHalf = subW * 0.4;
 
     auto yToPixel = [&](double val) -> double {
         double ratio = (val - m_bpYMin) / yRange;
         return plotArea.top() + (1.0 - ratio) * plotArea.height();
     };
 
-    const QColor boxFill(70, 130, 180, 180);     // steel blue, semi-transparent
-    const QColor boxBorder(45, 90, 130);
     const QColor whiskerColor(60, 60, 60);
     const QColor medianColor(255, 255, 255);
     const QColor outlierColor(220, 60, 60);
 
-    for (int i = 0; i < nCats; ++i) {
+    // Track which category index each entry belongs to (based on varIndex==0 entries)
+    int catIdx = -1;
+    for (int i = 0; i < m_boxStats.size(); ++i) {
         const BoxPlotStats &s = m_boxStats[i];
-        double cx   = plotArea.left() + (i + 0.5) * slotW;  // center x of category
-        double yQ0  = yToPixel(s.q0);
-        double yQ1  = yToPixel(s.q1);
-        double yQ2  = yToPixel(s.q2);
-        double yQ3  = yToPixel(s.q3);
-        double yQ4  = yToPixel(s.q4);
+        if (s.varIndex == 0) ++catIdx;
 
-        // --- Whisker: vertical spine Q0 → Q1 (lower) and Q3 → Q4 (upper) ---
+        // Center of slot, then offset for this variable's sub-box
+        double slotCenter = plotArea.left() + (catIdx + 0.5) * slotW;
+        double subOffset  = (s.varIndex - (nVars - 1) * 0.5) * subW;
+        double cx = slotCenter + subOffset;
+
+        double yQ0 = yToPixel(s.q0);
+        double yQ1 = yToPixel(s.q1);
+        double yQ2 = yToPixel(s.q2);
+        double yQ3 = yToPixel(s.q3);
+        double yQ4 = yToPixel(s.q4);
+
+        QColor fill   = s.color.isValid() ? s.color : QColor(70, 130, 180, 180);
+        QColor border = fill.darker(150);
+
+        // --- Whisker ---
         QPen whiskerPen(whiskerColor, 1.5, Qt::SolidLine, Qt::FlatCap);
         painter->setPen(whiskerPen);
         painter->setBrush(Qt::NoBrush);
-
-        // Lower whisker (Q1 down to Q0)
         painter->drawLine(QPointF(cx, yQ1), QPointF(cx, yQ0));
-        // Lower cap
         painter->drawLine(QPointF(cx - capHalf, yQ0), QPointF(cx + capHalf, yQ0));
-
-        // Upper whisker (Q3 up to Q4)
         painter->drawLine(QPointF(cx, yQ3), QPointF(cx, yQ4));
-        // Upper cap
         painter->drawLine(QPointF(cx - capHalf, yQ4), QPointF(cx + capHalf, yQ4));
 
-        // --- IQR Box (Q1 to Q3) ---
+        // --- IQR Box ---
         QRectF boxRect(cx - boxHalf, yQ3, boxHalf * 2.0, yQ1 - yQ3);
-        painter->setPen(QPen(boxBorder, 1.5));
-        painter->setBrush(QBrush(boxFill));
+        painter->setPen(QPen(border, 1.5));
+        painter->setBrush(QBrush(fill));
         painter->drawRect(boxRect);
 
         // --- Median line ---
@@ -135,12 +146,21 @@ void ErrorBarChartView::paintBoxPlotMedians(QPainter *painter)
             painter->drawEllipse(QPointF(cx, yQ2), 4.0, 4.0);
         }
 
-        // --- X category label centered below the plot area ---
-        if (!s.label.isEmpty()) {
+        // --- X category label below the plot area (draw once per category, centered on slot) ---
+        if (!s.label.isEmpty() && s.varIndex == 0) {
+            double slotCenter = plotArea.left() + (catIdx + 0.5) * slotW;
             painter->setPen(QPen(QColor(60, 60, 60)));
             painter->setFont(QFont("Arial", 9));
-            QRectF labelRect(cx - slotW * 0.5, plotArea.bottom() + 4, slotW, 32);
-            painter->drawText(labelRect, Qt::AlignHCenter | Qt::AlignTop, s.label);
+            if (nCats > 6) {
+                painter->save();
+                painter->translate(slotCenter, plotArea.bottom() + 6);
+                painter->rotate(45);
+                painter->drawText(QRectF(0, 0, slotW * 2, 20), Qt::AlignLeft | Qt::AlignVCenter, s.label);
+                painter->restore();
+            } else {
+                QRectF labelRect(slotCenter - slotW * 0.5, plotArea.bottom() + 4, slotW, 32);
+                painter->drawText(labelRect, Qt::AlignHCenter | Qt::AlignTop, s.label);
+            }
         }
     }
 
@@ -251,7 +271,7 @@ void ErrorBarChartView::paintEvent(QPaintEvent *event)
     // Draw axis border lines in the user-chosen color (Qt theme always draws them gray)
     paintAxisBorder(&painter);
 
-    if (m_errorBars.isEmpty() && m_axisBreaks.isEmpty()) return;
+    if (m_errorBars.isEmpty() && m_axisBreaks.isEmpty() && m_boxStats.isEmpty()) return;
 
     // Draw tick marks
     paintTickMarks(&painter);
@@ -1109,7 +1129,8 @@ void PlotWidget::autoFitAxes()
                 // Check if this is a day-based variable (DAS, DAP, etc.)
                 QString xVarName = m_currentXVar.toUpper();
                 if (xVarName.contains("DAS") || xVarName.contains("DAP") ||
-                    xVarName.contains("DAY") || xVarName.contains("DATE")) {
+                    xVarName.contains("DAY") || xVarName.contains("DATE") ||
+                    xVarName == "WYEAR") {
                     // For day variables, use clean round intervals
                     double dataRange = maxX - minX;
                     double tickInterval = calculateNiceXInterval(dataRange);
@@ -3802,10 +3823,11 @@ void PlotWidget::exportPlotComposite(const QString &filePath, const QString &for
     m_chartView->render(&chartPainter);
     chartPainter.end();
 
-    // Draw axis border lines and error bars on top (bypassed when using render() directly)
+    // Draw axis border lines, error bars, and box plots on top (bypassed when using render() directly)
     chartPainter.begin(&chartPixmap);
     m_chartView->paintAxisBorder(&chartPainter, m_chartView->viewport()->pos());
     m_chartView->paintErrorBars(&chartPainter, m_chartView->viewport()->pos());
+    m_chartView->paintBoxPlotMedians(&chartPainter);
     chartPainter.end();
 
     QPixmap legendPixmap;
@@ -5372,6 +5394,16 @@ void PlotWidget::onBoxPlotButtonClicked()
     updatePlotWithScaling();
 }
 
+void PlotWidget::setBoxPlotMode(bool enabled)
+{
+    m_isBoxPlotMode = enabled;
+    if (m_boxPlotButton) {
+        m_boxPlotButton->setChecked(enabled);
+        m_boxPlotButton->setText(enabled ? "Line Plot" : "Box Plot");
+    }
+    if (m_chartView) m_chartView->clearBoxPlotMedians();
+}
+
 // ---------------------------------------------------------------------------
 // OSU seasonal box plot
 // ---------------------------------------------------------------------------
@@ -5380,23 +5412,15 @@ void PlotWidget::plotOsuBoxPlot(const DataTable &simData, const QStringList &yVa
 {
     if (!m_chart || yVars.isEmpty()) return;
 
-    // Only one Y variable at a time for box plots (first selected)
-    const QString &yVar = yVars.first();
-
     const DataColumn *trtColumn  = simData.getColumn("TRT");
-    const DataColumn *yColumn    = simData.getColumn(yVar);
     const DataColumn *expColumn  = simData.getColumn("EXPERIMENT");
     const DataColumn *tnameCol   = simData.getColumn("TNAME");
+    const DataColumn *cropColumn = simData.getColumn("CROP");
+    const DataColumn *mdatCol    = simData.getColumn("MDAT");
 
-    if (!trtColumn || !yColumn) {
-        qWarning() << "PlotOsuBoxPlot: missing TRT or" << yVar << "column";
-        return;
-    }
+    if (!trtColumn) { qWarning() << "PlotOsuBoxPlot: missing TRT column"; return; }
 
     // Determine if multiple experiments or multiple crops are present
-    // (sequence OSU files have TRT=1 always but vary by CROP code)
-    const DataColumn *cropColumn = simData.getColumn("CROP");
-
     QSet<QString> expSet, cropSet;
     for (int row = 0; row < simData.rowCount; ++row) {
         if (expColumn && row < expColumn->data.size()) {
@@ -5410,101 +5434,7 @@ void PlotWidget::plotOsuBoxPlot(const DataTable &simData, const QStringList &yVa
     }
     if (expSet.isEmpty()) expSet.insert(selectedExperiment);
     bool multiExp  = expSet.size() > 1;
-    bool multiCrop = cropSet.size() > 1;   // sequence file: crop varies, trt is always 1
-
-    // Collect Y values keyed by a compound identifier that mirrors plotDatasets:
-    //   sequence:  crop::exp::trt   (crop is the primary differentiator)
-    //   multi-exp: exp::trt
-    //   single:    trt
-    QMap<QString, QVector<double>> trtValues;
-    QMap<QString, QString>         keyToLabel;
-
-    for (int row = 0; row < simData.rowCount; ++row) {
-        if (row >= trtColumn->data.size() || row >= yColumn->data.size()) continue;
-
-        QString trt = trtColumn->data[row].toString();
-
-        QString experiment = selectedExperiment;
-        if (expColumn && row < expColumn->data.size()) {
-            QString e = expColumn->data[row].toString();
-            if (!e.isEmpty()) experiment = e;
-        }
-
-        QString crop = "XX";
-        if (cropColumn && row < cropColumn->data.size()) {
-            QString c = cropColumn->data[row].toString();
-            if (!c.isEmpty()) crop = c;
-        }
-
-        // Treatment filter: accept plain trt OR compound exp::trt
-        // For sequence (multiCrop) the treatment panel shows trt=1 entries, so this still works
-        if (!treatments.isEmpty() && !treatments.contains("All")
-            && !treatments.contains(trt)
-            && !treatments.contains(experiment + "::" + trt)) {
-            continue;
-        }
-
-        QVariant yVal = yColumn->data[row];
-        if (DataProcessor::isMissingValue(yVal)) continue;
-        bool ok;
-        double y = yVal.toDouble(&ok);
-        if (!ok) continue;
-
-        // Build group key matching plotDatasets logic
-        QString key;
-        if (multiCrop)
-            key = crop + "::" + experiment + "::" + trt;   // sequence
-        else if (multiExp)
-            key = experiment + "::" + trt;                  // multi-experiment seasonal
-        else
-            key = trt;                                       // single experiment seasonal
-
-        trtValues[key].append(y);
-
-        if (!keyToLabel.contains(key)) {
-            QString tname;
-            if (tnameCol && row < tnameCol->data.size())
-                tname = tnameCol->data[row].toString();
-
-            if (multiCrop) {
-                // For sequence: label is the crop code (and exp if multi-exp)
-                keyToLabel[key] = multiExp
-                    ? QString("%1·%2").arg(crop, experiment)
-                    : crop;
-            } else if (multiExp) {
-                keyToLabel[key] = tname.isEmpty()
-                    ? QString("%1·%2").arg(trt, experiment)
-                    : QString("%1·%2").arg(trt, tname);
-            } else {
-                keyToLabel[key] = tname.isEmpty() ? trt
-                    : QString("%1-%2").arg(trt, tname);
-            }
-        }
-    }
-
-    if (trtValues.isEmpty()) return;
-
-    // Sort keys: crop→exp→trt for sequence, exp→trt for multi-exp, numeric trt for single
-    QStringList trtKeys = trtValues.keys();
-    std::sort(trtKeys.begin(), trtKeys.end(), [&](const QString &a, const QString &b) {
-        QStringList pa = a.split("::"), pb = b.split("::");
-        // Compare segment by segment; numeric segments compared as integers
-        int n = qMax(pa.size(), pb.size());
-        for (int i = 0; i < n; ++i) {
-            QString sa = (i < pa.size()) ? pa[i] : QString();
-            QString sb = (i < pb.size()) ? pb[i] : QString();
-            if (sa == sb) continue;
-            bool aOk, bOk;
-            int ai = sa.toInt(&aOk), bi = sb.toInt(&bOk);
-            return (aOk && bOk) ? ai < bi : sa < sb;
-        }
-        return false;
-    });
-
-    // Category labels for the bar chart x-axis
-    QStringList categories;
-    for (const QString &k : trtKeys)
-        categories.append(keyToLabel.value(k, k));
+    bool multiCrop = cropSet.size() > 1;
 
     // Quantile helper
     auto quantile = [](QVector<double> &sorted, double p) -> double {
@@ -5518,34 +5448,143 @@ void PlotWidget::plotOsuBoxPlot(const DataTable &simData, const QStringList &yVa
         return sorted[lo] + (pos - lo) * (sorted[hi] - sorted[lo]);
     };
 
-    // Compute quartiles
+    // Distinct colors per variable
+    const QVector<QColor> varColors = {
+        QColor(70,  130, 180, 180),   // steel blue
+        QColor(210, 105,  30, 180),   // chocolate
+        QColor( 60, 160,  60, 180),   // green
+        QColor(180,  60,  60, 180),   // red
+        QColor(130,  60, 180, 180),   // purple
+        QColor(180, 160,  40, 180),   // olive
+    };
+
+    // Collect per-variable stats and shared category keys
     struct BoxStats { double q0, q1, q2, q3, q4; };
-    QVector<BoxStats> stats;
+    // perVarStats[vi] = vector of BoxStats (one per trtKey)
+    QVector<QVector<BoxStats>> perVarStats;
+    QStringList trtKeys;
+    QMap<QString, QString> keyToLabel;
     double globalMin =  std::numeric_limits<double>::max();
     double globalMax = -std::numeric_limits<double>::max();
 
-    for (int i = 0; i < trtKeys.size(); ++i) {
-        QVector<double> vals = trtValues[trtKeys[i]];
-        std::sort(vals.begin(), vals.end());
-        BoxStats s;
-        s.q0 = vals.first();
-        s.q1 = quantile(vals, 0.25);
-        s.q2 = quantile(vals, 0.50);
-        s.q3 = quantile(vals, 0.75);
-        s.q4 = vals.last();
-        stats.append(s);
-        globalMin = std::min(globalMin, s.q0);
-        globalMax = std::max(globalMax, s.q4);
+    // Filter yVars to those present in data
+    QStringList validYVars;
+    for (const QString &yv : yVars)
+        if (simData.getColumn(yv)) validYVars.append(yv);
+    if (validYVars.isEmpty()) return;
+
+    for (int vi = 0; vi < validYVars.size(); ++vi) {
+        const QString &yVar = validYVars[vi];
+        const DataColumn *yColumn = simData.getColumn(yVar);
+
+        QMap<QString, QVector<double>> trtValues;
+
+        for (int row = 0; row < simData.rowCount; ++row) {
+            if (row >= trtColumn->data.size()) continue;
+
+            QString trt = trtColumn->data[row].toString();
+            QString experiment = selectedExperiment;
+            if (expColumn && row < expColumn->data.size()) {
+                QString e = expColumn->data[row].toString();
+                if (!e.isEmpty()) experiment = e;
+            }
+            QString crop = "XX";
+            if (cropColumn && row < cropColumn->data.size()) {
+                QString c = cropColumn->data[row].toString();
+                if (!c.isEmpty()) crop = c;
+            }
+
+            if (!treatments.isEmpty() && !treatments.contains("All")
+                && !treatments.contains(trt)
+                && !treatments.contains(experiment + "::" + trt))
+                continue;
+
+            if (row >= yColumn->data.size()) continue;
+            QVariant yVal = yColumn->data[row];
+            if (DataProcessor::isMissingValue(yVal)) continue;
+            bool ok;
+            double y = yVal.toDouble(&ok);
+            if (!ok) continue;
+
+            // Skip crop-failure rows (y==0 and MDAT missing)
+            if (qFuzzyIsNull(y) && mdatCol && row < mdatCol->data.size()
+                && DataProcessor::isMissingValue(mdatCol->data[row]))
+                continue;
+
+            QString key;
+            if (multiCrop)      key = crop + "::" + experiment + "::" + trt;
+            else if (multiExp)  key = experiment + "::" + trt;
+            else                key = trt;
+
+            trtValues[key].append(y);
+
+            if (!keyToLabel.contains(key)) {
+                QString tname;
+                if (tnameCol && row < tnameCol->data.size())
+                    tname = tnameCol->data[row].toString();
+                if (multiCrop)
+                    keyToLabel[key] = multiExp ? QString("%1·%2").arg(crop, experiment) : crop;
+                else if (multiExp)
+                    keyToLabel[key] = tname.isEmpty() ? QString("%1·%2").arg(trt, experiment)
+                                                       : QString("%1·%2").arg(trt, tname);
+                else
+                    keyToLabel[key] = tname.isEmpty() ? trt : QString("%1-%2").arg(trt, tname);
+            }
+        }
+
+        if (trtValues.isEmpty()) continue;
+
+        // Build sorted key list from first valid variable
+        if (trtKeys.isEmpty()) {
+            trtKeys = trtValues.keys();
+            std::sort(trtKeys.begin(), trtKeys.end(), [&](const QString &a, const QString &b) {
+                QStringList pa = a.split("::"), pb = b.split("::");
+                int n = qMax(pa.size(), pb.size());
+                for (int i = 0; i < n; ++i) {
+                    QString sa = (i < pa.size()) ? pa[i] : QString();
+                    QString sb = (i < pb.size()) ? pb[i] : QString();
+                    if (sa == sb) continue;
+                    bool aOk, bOk;
+                    int ai = sa.toInt(&aOk), bi = sb.toInt(&bOk);
+                    return (aOk && bOk) ? ai < bi : sa < sb;
+                }
+                return false;
+            });
+        }
+
+        QVector<BoxStats> vstats;
+        for (const QString &k : trtKeys) {
+            QVector<double> vals = trtValues.value(k);
+            std::sort(vals.begin(), vals.end());
+            if (vals.isEmpty()) {
+                vstats.append({0,0,0,0,0});
+                continue;
+            }
+            BoxStats s;
+            s.q0 = vals.first();
+            s.q1 = quantile(vals, 0.25);
+            s.q2 = quantile(vals, 0.50);
+            s.q3 = quantile(vals, 0.75);
+            s.q4 = vals.last();
+            vstats.append(s);
+            globalMin = std::min(globalMin, s.q0);
+            globalMax = std::max(globalMax, s.q4);
+        }
+        perVarStats.append(vstats);
     }
+
+    if (trtKeys.isEmpty() || perVarStats.isEmpty()) return;
+
+    QStringList categories;
+    for (const QString &k : trtKeys)
+        categories.append(keyToLabel.value(k, k));
 
     m_chart->removeAllSeries();
     for (auto *axis : m_chart->axes())
         m_chart->removeAxis(axis);
 
-    // Use an invisible scatter series as axis anchor (Qt Charts needs ≥1 series on axes)
     auto *dummySeries = new QScatterSeries();
     dummySeries->setOpacity(0.0);
-    // X range: 0..nCats so each category occupies exactly one unit, no padding
     dummySeries->append(0, globalMin);
     dummySeries->append(trtKeys.size(), globalMax);
     m_chart->addSeries(dummySeries);
@@ -5592,62 +5631,78 @@ void PlotWidget::plotOsuBoxPlot(const DataTable &simData, const QStringList &yVa
     dummySeries->attachAxis(xAxis);
     dummySeries->attachAxis(yAxis);
 
-    // Chart title
-    QPair<QString, QString> varInfo = DataProcessor::getVariableInfo(yVar);
-    QString yLabel = varInfo.first.isEmpty() ? yVar : varInfo.first;
-    if (!varInfo.second.isEmpty()) yLabel += " (" + varInfo.second + ")";
     m_chart->setTitle("");
-    // Extra bottom margin so painter-drawn category labels aren't clipped by the widget edge
-    m_chart->setMargins(QMargins(0, 0, 0, 20));
+    int bottomMargin = (trtKeys.size() > 6) ? 80 : 20;
+    m_chart->setMargins(QMargins(0, 0, 0, bottomMargin));
+    xAxis->setTitleText(trtKeys.size() > 6 ? "" : "Treatment");
 
-    // Build painter stats vector
+    // Build interleaved painter stats: for each category, one entry per variable
+    int nVars = perVarStats.size();
     QVector<ErrorBarChartView::BoxPlotStats> bpStats;
-    for (int i = 0; i < trtKeys.size(); ++i) {
-        ErrorBarChartView::BoxPlotStats bp;
-        bp.q0    = stats[i].q0;
-        bp.q1    = stats[i].q1;
-        bp.q2    = stats[i].q2;
-        bp.q3    = stats[i].q3;
-        bp.q4    = stats[i].q4;
-        bp.label = categories[i];
-        bpStats.append(bp);
+    for (int ci = 0; ci < trtKeys.size(); ++ci) {
+        for (int vi = 0; vi < nVars; ++vi) {
+            ErrorBarChartView::BoxPlotStats bp;
+            const auto &s = perVarStats[vi][ci];
+            bp.q0       = s.q0;  bp.q1 = s.q1;  bp.q2 = s.q2;
+            bp.q3       = s.q3;  bp.q4 = s.q4;
+            bp.label    = (vi == 0) ? categories[ci] : QString();
+            bp.color    = varColors[vi % varColors.size()];
+            bp.varIndex = vi;
+            bp.varCount = nVars;
+            bpStats.append(bp);
+        }
     }
     if (m_chartView)
         m_chartView->setBoxPlotData(bpStats, yMin, alignedMax);
 
-    // Legend panel
+    // Legend panel — matches time series style (Sim. | Variable)
     clearLegend();
-    QLabel *legHeader = new QLabel("Box Plot Key");
-    legHeader->setStyleSheet("font-size: 10px; font-weight: bold; color: #444; "
-                             "padding: 4px 0px 4px 4px; border-bottom: 1px solid #ddd;");
-    m_legendLayout->addWidget(legHeader);
 
-    struct LegRow { QString css; QString label; };
-    const QColor boxFill(70, 130, 180, 180);
-    const QColor boxBorder(45, 90, 130);
-    const QVector<LegRow> rows = {
-        { QString("background:#3c3c3c; border:none; min-height:2px; max-height:2px;"), "Whisker (Min/Max)" },
-        { QString("background-color:rgba(%1,%2,%3,%4); border:1px solid %5;")
-              .arg(boxFill.red()).arg(boxFill.green()).arg(boxFill.blue()).arg(boxFill.alpha())
-              .arg(boxBorder.name()),                                                   "IQR Box (25–75%)" },
-        { QString("background:white; border:2px solid #2d5a82; min-height:2px; max-height:2px;"), "Median" },
-        { QString("background:#dc3c3c; border-radius:3px; min-width:6px; max-width:6px; "
-                  "min-height:6px; max-height:6px;"),                                  "Single data point" },
-    };
-    for (const LegRow &r : rows) {
+    // Header row
+    QWidget *hdrWidget = new QWidget();
+    QHBoxLayout *hdrLayout = new QHBoxLayout(hdrWidget);
+    hdrLayout->setContentsMargins(0, 2, 0, 2);
+    hdrLayout->setSpacing(5);
+    QLabel *simHdr = new QLabel("<b>Sim.</b>");
+    simHdr->setAlignment(Qt::AlignCenter);
+    simHdr->setFixedWidth(30);
+    QLabel *varHdr = new QLabel("<b>Variable</b>");
+    varHdr->setAlignment(Qt::AlignLeft);
+    hdrLayout->addWidget(simHdr);
+    hdrLayout->addWidget(varHdr, 1);
+    m_legendLayout->addWidget(hdrWidget);
+
+    QFrame *sep = new QFrame();
+    sep->setFrameShape(QFrame::HLine);
+    sep->setFrameShadow(QFrame::Plain);
+    m_legendLayout->addWidget(sep);
+
+    // One row per Y variable
+    for (int vi = 0; vi < validYVars.size(); ++vi) {
+        const QString &yv = validYVars[vi];
+        QPair<QString, QString> vinfo = DataProcessor::getVariableInfo(yv);
+        QString lbl = vinfo.first.isEmpty() ? yv : vinfo.first;
+        QColor boxFill = varColors[vi % varColors.size()];
+        QColor boxBorder = boxFill.darker(150);
+
         QWidget *row = new QWidget();
         QHBoxLayout *rl = new QHBoxLayout(row);
-        rl->setContentsMargins(4, 4, 4, 4);
-        rl->setSpacing(8);
+        rl->setContentsMargins(2, 3, 2, 3);
+        rl->setSpacing(5);
+
+        // Sim swatch — box color
         QLabel *sw = new QLabel();
-        sw->setFixedSize(22, 14);
-        sw->setStyleSheet(r.css);
+        sw->setFixedSize(30, 14);
+        sw->setStyleSheet(QString("background-color:rgba(%1,%2,%3,%4); border:1px solid %5;")
+            .arg(boxFill.red()).arg(boxFill.green()).arg(boxFill.blue()).arg(boxFill.alpha())
+            .arg(boxBorder.name()));
+        sw->setAlignment(Qt::AlignCenter);
         rl->addWidget(sw);
-        QLabel *lbl = new QLabel(r.label);
-        lbl->setFont(QFont("Arial", 9));
-        lbl->setStyleSheet("color:#333;");
-        rl->addWidget(lbl);
-        rl->addStretch();
+
+        QLabel *name = new QLabel(lbl);
+        name->setFont(QFont("Arial", 9));
+        name->setWordWrap(true);
+        rl->addWidget(name, 1);
         m_legendLayout->addWidget(row);
     }
     m_legendLayout->addStretch();
@@ -6088,6 +6143,16 @@ void PlotWidget::applyPlotSettings(const PlotSettings &settings)
         }
     }
     
+    // Apply legend background color
+    if (m_legendScrollArea) {
+        QColor bg = settings.legendBackgroundColor;
+        QString ss = QString("background-color: rgba(%1,%2,%3,%4);")
+                         .arg(bg.red()).arg(bg.green()).arg(bg.blue()).arg(bg.alpha());
+        m_legendScrollArea->setStyleSheet(ss);
+        if (m_legendScrollArea->widget())
+            m_legendScrollArea->widget()->setStyleSheet(ss);
+    }
+
     // Apply legend font (to custom legend widget, not chart legend)
     if (m_legendWidget) {
         QFont legendFont(settings.fontFamily, settings.legendFontSize);
@@ -6219,7 +6284,8 @@ void PlotWidget::saveSettings() const
     s.setValue("plotTitle",        m_plotSettings.plotTitle);
     s.setValue("backgroundColor",  m_plotSettings.backgroundColor.name());
     s.setValue("plotAreaColor",    m_plotSettings.plotAreaColor.name());
-    s.setValue("axisLineColor",    m_plotSettings.axisLineColor.name());
+    s.setValue("axisLineColor",          m_plotSettings.axisLineColor.name());
+    s.setValue("legendBackgroundColor",  m_plotSettings.legendBackgroundColor.name(QColor::HexArgb));
 
     // Export
     s.setValue("exportWidth",  m_plotSettings.exportWidth);
@@ -6270,7 +6336,8 @@ void PlotWidget::loadSettings()
     m_plotSettings.plotTitle     = s.value("plotTitle",     m_plotSettings.plotTitle).toString();
     m_plotSettings.backgroundColor = QColor(s.value("backgroundColor", m_plotSettings.backgroundColor.name()).toString());
     m_plotSettings.plotAreaColor   = QColor(s.value("plotAreaColor",   m_plotSettings.plotAreaColor.name()).toString());
-    m_plotSettings.axisLineColor   = QColor(s.value("axisLineColor",   m_plotSettings.axisLineColor.name()).toString());
+    m_plotSettings.axisLineColor         = QColor(s.value("axisLineColor",         m_plotSettings.axisLineColor.name()).toString());
+    m_plotSettings.legendBackgroundColor = QColor(s.value("legendBackgroundColor", m_plotSettings.legendBackgroundColor.name(QColor::HexArgb)).toString());
 
     m_plotSettings.exportWidth  = s.value("exportWidth",  m_plotSettings.exportWidth).toInt();
     m_plotSettings.exportHeight = s.value("exportHeight", m_plotSettings.exportHeight).toInt();

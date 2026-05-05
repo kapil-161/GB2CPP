@@ -26,6 +26,8 @@ struct CommandLineArgs {
     bool scatterMode = false;        // --scatter
     QStringList scatterVars;         // --scatter-vars ADAP,CWAM
     QStringList scatterMetrics;      // --scatter-metrics "RMSE,R2,d-stat"
+
+    bool boxPlotMode = false;        // --boxplot
 };
 
 class CommandLineHandler : public QObject

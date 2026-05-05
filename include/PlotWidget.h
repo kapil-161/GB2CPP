@@ -95,6 +95,9 @@ public:
     struct BoxPlotStats {
         double q0, q1, q2, q3, q4;
         QString label;
+        QColor color;          // fill color (distinct per variable)
+        int varIndex = 0;      // which variable this box belongs to (for side-by-side offset)
+        int varCount = 1;      // total number of variables being plotted
     };
     void setBoxPlotData(const QVector<BoxPlotStats> &stats, double yMin, double yMax);
     void clearBoxPlotMedians();
@@ -226,6 +229,7 @@ public:
     void setAxisTitles(const QString &xTitle, const QString &yTitle);
     void setXAxisButtonsVisible(bool visible);  // Show/hide DAS, DAP, DATE buttons
     void setBoxPlotButtonVisible(bool visible); // Show/hide Box Plot toggle button
+    void setBoxPlotMode(bool enabled);          // Programmatically enable/disable box plot mode
     void setPreplotPanelVisible(bool visible);  // Show/hide treatment pre-selection panel and button
 
     // Treatment pre-selection panel (shown in white area before first plot)

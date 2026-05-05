@@ -419,7 +419,14 @@ void PlotSettingsDialog::setupUI()
     updateColorButton(m_axisLineColorButton, m_settings.axisLineColor);
     connect(m_axisLineColorButton, &QPushButton::clicked, this, &PlotSettingsDialog::onAxisLineColorClicked);
     plotLayout->addWidget(m_axisLineColorButton, 3, 1);
-    
+
+    plotLayout->addWidget(new QLabel("Legend Background:"), 4, 0);
+    m_legendBackgroundColorButton = new QPushButton();
+    m_legendBackgroundColorButton->setFixedSize(50, 30);
+    updateColorButton(m_legendBackgroundColorButton, m_settings.legendBackgroundColor);
+    connect(m_legendBackgroundColorButton, &QPushButton::clicked, this, &PlotSettingsDialog::onLegendBackgroundColorClicked);
+    plotLayout->addWidget(m_legendBackgroundColorButton, 4, 1);
+
     appearanceLayout->addWidget(plotGroup);
     appearanceLayout->addStretch();
 
@@ -605,6 +612,16 @@ void PlotSettingsDialog::onAxisLineColorClicked()
     if (color.isValid()) {
         m_settings.axisLineColor = color;
         updateColorButton(m_axisLineColorButton, color);
+    }
+}
+
+void PlotSettingsDialog::onLegendBackgroundColorClicked()
+{
+    QColor color = QColorDialog::getColor(m_settings.legendBackgroundColor, this, "Select Legend Background Color",
+                                          QColorDialog::ShowAlphaChannel);
+    if (color.isValid()) {
+        m_settings.legendBackgroundColor = color;
+        updateColorButton(m_legendBackgroundColorButton, color);
     }
 }
 

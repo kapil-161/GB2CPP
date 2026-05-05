@@ -74,7 +74,8 @@ struct PlotSettings {
     QColor backgroundColor = Qt::white;
     QColor plotAreaColor = Qt::white;
     QColor axisLineColor = Qt::black;
-    
+    QColor legendBackgroundColor = QColor(0, 0, 0, 0);  // transparent by default
+
     // Export settings
     int exportWidth = 800;
     int exportHeight = 600;
@@ -116,6 +117,7 @@ private slots:
     void onBackgroundColorClicked();
     void onPlotAreaColorClicked();
     void onAxisLineColorClicked();
+    void onLegendBackgroundColorClicked();
     void onResetDefaults();
     void onPreviewSettings();
     void onExportPlot();
@@ -179,7 +181,8 @@ private:
     QPushButton *m_backgroundColorButton;
     QPushButton *m_plotAreaColorButton;
     QPushButton *m_axisLineColorButton;
-    
+    QPushButton *m_legendBackgroundColorButton;
+
     // Export controls
     QSpinBox *m_exportWidthSpinBox;
     QSpinBox *m_exportHeightSpinBox;

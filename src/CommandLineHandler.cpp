@@ -39,6 +39,8 @@ CommandLineArgs CommandLineHandler::parseCommandLineArgs(const QStringList &args
                 result.headlessMode = true;
             } else if (tok == "--metrics" && i + 1 < tokens.size()) {
                 result.saveMetricsPath = tokens[++i];
+            } else if (tok == "--boxplot") {
+                result.boxPlotMode = true;
             } else if (tok == "--scatter") {
                 result.scatterMode = true;
                 result.headlessMode = true;
@@ -348,6 +350,12 @@ void CommandLineHandler::headlessAutoPlot()
         if (n == 0) {
             qWarning() << "CommandLineHandler (headless): no yvar matched:" << m_args.yVars;
         }
+    }
+
+    // Enable box plot mode if requested
+    if (m_args.boxPlotMode) {
+        PlotWidget *pw = m_mainWindow->getPlotWidget();
+        if (pw) pw->setBoxPlotMode(true);
     }
 
     // Trigger plot update
