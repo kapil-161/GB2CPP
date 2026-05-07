@@ -1379,55 +1379,97 @@ void MainWindow::updateTreatmentComboBox()
 
     QStringList sortedTreatments;
 
-    // Look for treatment columns
-    QStringList treatmentCols = {"TRT", "TRNO", "TR"};
-    for (const QString &colName : treatmentCols) {
-        if (m_currentData.columnNames.contains(colName)) {
-            const DataColumn *col = m_currentData.getColumn(colName);
-            const DataColumn *expCol = m_currentData.getColumn("EXPERIMENT");
-            if (col) {
-                // Determine if multiple experiments are present
-                bool multiExp = false;
-                if (expCol) {
-                    QSet<QString> uniqueExps;
-                    for (const QVariant &v : expCol->data) {
-                        QString e = v.toString().trimmed();
-                        if (!e.isEmpty() && e != "DEFAULT") uniqueExps.insert(e);
+    // Detect sequence OSU files: all TRT values identical but R# column present with multiple values
+    const DataColumn *trtColCheck = m_currentData.getColumn("TRT");
+    const DataColumn *rseqColCheck = m_currentData.getColumn("R#");
+    bool isSequenceFile = false;
+    if (trtColCheck && rseqColCheck && trtColCheck->data.size() > 0) {
+        QSet<QString> uniqueTrts;
+        for (const QVariant &v : trtColCheck->data)
+            uniqueTrts.insert(v.toString().trimmed());
+        QSet<QString> uniqueRseq;
+        for (const QVariant &v : rseqColCheck->data)
+            uniqueRseq.insert(v.toString().trimmed());
+        isSequenceFile = (uniqueTrts.size() == 1) && (uniqueRseq.size() > 1);
+    }
+
+    if (isSequenceFile) {
+        // For sequence OSU files, group by R# (sequence slot) — each slot is a crop in the rotation
+        const DataColumn *cropCol = m_currentData.getColumn("CROP");
+        const DataColumn *tnameCol = m_currentData.getColumn("TNAME");
+        struct TrtEntry { QString key, rseq, cropName; };
+        QList<TrtEntry> entries;
+        QSet<QString> seenKeys;
+        for (int i = 0; i < rseqColCheck->data.size(); ++i) {
+            QString rseq = rseqColCheck->data[i].toString().trimmed();
+            if (rseq.isEmpty()) continue;
+            if (seenKeys.contains(rseq)) continue;
+            seenKeys.insert(rseq);
+            QString cropName = rseq;
+            if (tnameCol && i < tnameCol->data.size())
+                cropName = tnameCol->data[i].toString().trimmed();
+            if (cropName.isEmpty() && cropCol && i < cropCol->data.size())
+                cropName = cropCol->data[i].toString().trimmed();
+            entries.append({rseq, rseq, cropName});
+        }
+        std::sort(entries.begin(), entries.end(), [](const TrtEntry &a, const TrtEntry &b) {
+            bool aOk, bOk;
+            int ai = a.rseq.toInt(&aOk), bi = b.rseq.toInt(&bOk);
+            return (aOk && bOk) ? (ai < bi) : (a.rseq < b.rseq);
+        });
+        for (const TrtEntry &e : entries) {
+            sortedTreatments.append("R#::" + e.key);
+            QString label = e.cropName.isEmpty() ? e.key : QString("%1 - %2").arg(e.key, e.cropName);
+            m_treatmentComboBox->addItem(label);
+        }
+    } else {
+        // Look for treatment columns (normal case)
+        QStringList treatmentCols = {"TRT", "TRNO", "TR"};
+        for (const QString &colName : treatmentCols) {
+            if (m_currentData.columnNames.contains(colName)) {
+                const DataColumn *col = m_currentData.getColumn(colName);
+                const DataColumn *expCol = m_currentData.getColumn("EXPERIMENT");
+                if (col) {
+                    bool multiExp = false;
+                    if (expCol) {
+                        QSet<QString> uniqueExps;
+                        for (const QVariant &v : expCol->data) {
+                            QString e = v.toString().trimmed();
+                            if (!e.isEmpty() && e != "DEFAULT") uniqueExps.insert(e);
+                        }
+                        multiExp = uniqueExps.size() > 1;
                     }
-                    multiExp = uniqueExps.size() > 1;
-                }
 
-                // Collect unique (exp, trt) pairs
-                struct TrtEntry { QString key, exp, trt; };
-                QList<TrtEntry> entries;
-                QSet<QString> seenKeys;
-                for (int i = 0; i < col->data.size(); ++i) {
-                    if (DataProcessor::isMissingValue(col->data[i])) continue;
-                    QString trt = col->data[i].toString();
-                    QString exp;
-                    if (expCol && i < expCol->data.size())
-                        exp = expCol->data[i].toString().trimmed();
-                    QString key = (multiExp && !exp.isEmpty()) ? (exp + "::" + trt) : trt;
-                    if (!seenKeys.contains(key)) {
-                        seenKeys.insert(key);
-                        entries.append({key, exp, trt});
+                    struct TrtEntry { QString key, exp, trt; };
+                    QList<TrtEntry> entries;
+                    QSet<QString> seenKeys;
+                    for (int i = 0; i < col->data.size(); ++i) {
+                        if (DataProcessor::isMissingValue(col->data[i])) continue;
+                        QString trt = col->data[i].toString();
+                        QString exp;
+                        if (expCol && i < expCol->data.size())
+                            exp = expCol->data[i].toString().trimmed();
+                        QString key = (multiExp && !exp.isEmpty()) ? (exp + "::" + trt) : trt;
+                        if (!seenKeys.contains(key)) {
+                            seenKeys.insert(key);
+                            entries.append({key, exp, trt});
+                        }
+                    }
+
+                    std::sort(entries.begin(), entries.end(), [](const TrtEntry &a, const TrtEntry &b) {
+                        if (a.exp != b.exp) return a.exp < b.exp;
+                        bool aOk, bOk;
+                        int ai = a.trt.toInt(&aOk), bi = b.trt.toInt(&bOk);
+                        return (aOk && bOk) ? (ai < bi) : (a.trt < b.trt);
+                    });
+
+                    for (const TrtEntry &e : entries) {
+                        sortedTreatments.append(e.key);
+                        m_treatmentComboBox->addItem(e.key);
                     }
                 }
-
-                // Sort by exp then trt numerically
-                std::sort(entries.begin(), entries.end(), [](const TrtEntry &a, const TrtEntry &b) {
-                    if (a.exp != b.exp) return a.exp < b.exp;
-                    bool aOk, bOk;
-                    int ai = a.trt.toInt(&aOk), bi = b.trt.toInt(&bOk);
-                    return (aOk && bOk) ? (ai < bi) : (a.trt < b.trt);
-                });
-
-                for (const TrtEntry &e : entries) {
-                    sortedTreatments.append(e.key);
-                    m_treatmentComboBox->addItem(e.key);
-                }
+                break;
             }
-            break;
         }
     }
 

@@ -20,6 +20,25 @@ void PlotWidget::plotOsuBoxPlot(const DataTable &simData, const QStringList &yVa
     const DataColumn *tnameCol   = simData.getColumn("TNAME");
     const DataColumn *cropColumn = simData.getColumn("CROP");
     const DataColumn *mdatCol    = simData.getColumn("MDAT");
+    const DataColumn *rseqColumn = simData.getColumn("R#");  // sequence slot (rotation position)
+
+    // Detect sequence OSU: all TRT values are identical but R# has multiple unique values
+    bool isSequenceMode = false;
+    if (trtColumn && rseqColumn) {
+        QSet<QString> uniqueTrts, uniqueRseq;
+        for (const QVariant &v : trtColumn->data) uniqueTrts.insert(v.toString().trimmed());
+        for (const QVariant &v : rseqColumn->data) uniqueRseq.insert(v.toString().trimmed());
+        isSequenceMode = (uniqueTrts.size() == 1) && (uniqueRseq.size() > 1);
+    }
+
+    // In sequence mode, treatments list uses "R#::<slot>" keys — extract allowed slots
+    QSet<QString> allowedRseqSlots;
+    bool filterByRseq = false;
+    if (isSequenceMode && !treatments.isEmpty() && !treatments.contains("All")) {
+        filterByRseq = true;
+        for (const QString &t : treatments)
+            if (t.startsWith("R#::")) allowedRseqSlots.insert(t.mid(4));
+    }
 
     if (!trtColumn) { qWarning() << "PlotOsuBoxPlot: missing TRT column"; return; }
 
@@ -97,10 +116,19 @@ void PlotWidget::plotOsuBoxPlot(const DataTable &simData, const QStringList &yVa
                 if (!c.isEmpty()) crop = c;
             }
 
-            if (!treatments.isEmpty() && !treatments.contains("All")
-                && !treatments.contains(trt)
-                && !treatments.contains(experiment + "::" + trt))
-                continue;
+            QString rseq;
+            if (rseqColumn && row < rseqColumn->data.size())
+                rseq = rseqColumn->data[row].toString().trimmed();
+
+            // Filter rows
+            if (isSequenceMode) {
+                if (filterByRseq && !allowedRseqSlots.contains(rseq)) continue;
+            } else {
+                if (!treatments.isEmpty() && !treatments.contains("All")
+                    && !treatments.contains(trt)
+                    && !treatments.contains(experiment + "::" + trt))
+                    continue;
+            }
 
             if (row >= yColumn->data.size()) continue;
             QVariant yVal = yColumn->data[row];
@@ -115,23 +143,33 @@ void PlotWidget::plotOsuBoxPlot(const DataTable &simData, const QStringList &yVa
                 continue;
 
             QString key;
-            if (multiCrop)      key = crop + "::" + experiment + "::" + trt;
-            else if (multiExp)  key = experiment + "::" + trt;
-            else                key = trt;
+            if (isSequenceMode) {
+                key = "R#::" + rseq;
+            } else if (multiCrop) {
+                key = crop + "::" + rseq + "::" + experiment + "::" + trt;
+            } else if (multiExp) {
+                key = experiment + "::" + trt;
+            } else {
+                key = trt;
+            }
 
             trtValues[key].append(y);
 
             if (!keyToLabel.contains(key)) {
                 QString tname;
                 if (tnameCol && row < tnameCol->data.size())
-                    tname = tnameCol->data[row].toString();
-                if (multiCrop)
-                    keyToLabel[key] = multiExp ? QString("%1·%2").arg(crop, experiment) : crop;
-                else if (multiExp)
+                    tname = tnameCol->data[row].toString().trimmed();
+                if (isSequenceMode) {
+                    // Label: "Crop (slot)" e.g. "Bean" or "BN·1"
+                    keyToLabel[key] = tname.isEmpty() ? crop : tname;
+                } else if (multiCrop) {
+                    keyToLabel[key] = tname.isEmpty() ? crop : tname;
+                } else if (multiExp) {
                     keyToLabel[key] = tname.isEmpty() ? QString("%1·%2").arg(trt, experiment)
-                                                       : QString("%1·%2").arg(trt, tname);
-                else
+                                                      : QString("%1·%2").arg(trt, tname);
+                } else {
                     keyToLabel[key] = tname.isEmpty() ? trt : QString("%1-%2").arg(trt, tname);
+                }
             }
         }
 
@@ -153,6 +191,20 @@ void PlotWidget::plotOsuBoxPlot(const DataTable &simData, const QStringList &yVa
                 }
                 return false;
             });
+        }
+
+        // In sequence mode, suffix duplicate crop names with their slot number
+        if (isSequenceMode && vi == 0) {
+            QMap<QString, int> labelCount;
+            for (const QString &k : trtKeys)
+                labelCount[keyToLabel.value(k)]++;
+            for (const QString &k : trtKeys) {
+                if (labelCount.value(keyToLabel.value(k)) > 1) {
+                    // Extract slot number from key "R#::<n>"
+                    QString slot = k.startsWith("R#::") ? k.mid(4) : k;
+                    keyToLabel[k] = QString("%1 (%2)").arg(keyToLabel.value(k), slot);
+                }
+            }
         }
 
         QVector<BoxStats> vstats;
