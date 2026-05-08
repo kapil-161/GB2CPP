@@ -145,11 +145,13 @@ void PlotSettingsDialog::setupUI()
     axisLayout->addWidget(m_showAxisTitlesCheckBox, 1, 0, 1, 2);
     
     axisLayout->addWidget(new QLabel("X-Axis Title:"), 2, 0);
-    m_xAxisTitleEdit = new QLineEdit(m_settings.xAxisTitle);
+    m_xAxisTitleEdit = new QLineEdit();
+    m_xAxisTitleEdit->setText(m_settings.xAxisTitle);
     axisLayout->addWidget(m_xAxisTitleEdit, 2, 1);
-    
+
     axisLayout->addWidget(new QLabel("Y-Axis Title:"), 3, 0);
-    m_yAxisTitleEdit = new QLineEdit(m_settings.yAxisTitle);
+    m_yAxisTitleEdit = new QLineEdit();
+    m_yAxisTitleEdit->setText(m_settings.yAxisTitle);
     axisLayout->addWidget(m_yAxisTitleEdit, 3, 1);
     
     axisLayout->addWidget(new QLabel("X-Axis Tick Count:"), 4, 0);
@@ -396,7 +398,8 @@ void PlotSettingsDialog::setupUI()
     QGridLayout *plotLayout = new QGridLayout(plotGroup);
     
     plotLayout->addWidget(new QLabel("Plot Title:"), 0, 0);
-    m_plotTitleEdit = new QLineEdit(m_settings.plotTitle);
+    m_plotTitleEdit = new QLineEdit();
+    m_plotTitleEdit->setText(m_settings.plotTitle);
     plotLayout->addWidget(m_plotTitleEdit, 0, 1);
     
     plotLayout->addWidget(new QLabel("Background Color:"), 1, 0);

@@ -159,12 +159,18 @@ elseif(APPLE)
     find_library(COREGRAPHICS_FRAMEWORK CoreGraphics)
     find_library(FOUNDATION_FRAMEWORK Foundation)
     
-    target_link_libraries(GB2 
+    target_link_libraries(GB2
         ${COCOA_FRAMEWORK}
         ${OPENGL_FRAMEWORK}
         ${COREGRAPHICS_FRAMEWORK}
         ${FOUNDATION_FRAMEWORK}
     )
+    # AGL was removed from the macOS 26+ SDK; add the 15.4 SDK framework path so the linker
+    # can still resolve the AGL stub injected by Qt's OpenGL modules.
+    if(EXISTS "/Library/Developer/CommandLineTools/SDKs/MacOSX15.4.sdk/System/Library/Frameworks/AGL.framework")
+        target_link_options(GB2 PRIVATE
+            "-F/Library/Developer/CommandLineTools/SDKs/MacOSX15.4.sdk/System/Library/Frameworks")
+    endif()
 else()
     # Linux/Unix plugins
     qt_import_plugins(GB2
