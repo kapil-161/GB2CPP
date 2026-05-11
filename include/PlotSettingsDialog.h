@@ -37,6 +37,7 @@ struct PlotSettings {
     // Error bar settings
     bool showErrorBars = false;
     QString errorBarType = "SD";  // "SD" or "SE"
+    bool plotMeanReps = false;    // average replicates into one line (sequence OSU)
     
     // Line settings
     int lineWidth = 2;
@@ -75,11 +76,6 @@ struct PlotSettings {
     QColor plotAreaColor = Qt::white;
     QColor axisLineColor = Qt::black;
     QColor legendBackgroundColor = QColor(0, 0, 0, 0);  // transparent by default
-
-    // Export settings
-    int exportWidth = 800;
-    int exportHeight = 600;
-    int exportDpi = 300;
 
     // Font settings
     QString fontFamily = "Arial";
@@ -120,7 +116,6 @@ private slots:
     void onLegendBackgroundColorClicked();
     void onResetDefaults();
     void onPreviewSettings();
-    void onExportPlot();
 
 private:
     void setupUI();
@@ -143,6 +138,7 @@ private:
     // Error bar controls
     QCheckBox *m_showErrorBarsCheckBox;
     QComboBox *m_errorBarTypeComboBox;
+    QCheckBox *m_plotMeanRepsCheckBox;
     
     // Line controls
     QSpinBox *m_lineWidthSpinBox;
@@ -183,11 +179,6 @@ private:
     QPushButton *m_axisLineColorButton;
     QPushButton *m_legendBackgroundColorButton;
 
-    // Export controls
-    QSpinBox *m_exportWidthSpinBox;
-    QSpinBox *m_exportHeightSpinBox;
-    QSpinBox *m_exportDpiSpinBox;
-
     // Font controls
     QComboBox *m_fontFamilyComboBox;
     QSpinBox *m_titleFontSizeSpinBox;
@@ -203,7 +194,6 @@ private:
     // Buttons
     QPushButton *m_resetButton;
     QPushButton *m_previewButton;
-    QPushButton *m_exportButton;
     QPushButton *m_okButton;
     QPushButton *m_cancelButton;
 };

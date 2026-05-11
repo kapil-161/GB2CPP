@@ -469,11 +469,6 @@ void PlotWidget::saveSettings() const
     s.setValue("axisLineColor",          m_plotSettings.axisLineColor.name());
     s.setValue("legendBackgroundColor",  m_plotSettings.legendBackgroundColor.name(QColor::HexArgb));
 
-    // Export
-    s.setValue("exportWidth",  m_plotSettings.exportWidth);
-    s.setValue("exportHeight", m_plotSettings.exportHeight);
-    s.setValue("exportDpi",    m_plotSettings.exportDpi);
-
     // Fonts
     s.setValue("fontFamily",        m_plotSettings.fontFamily);
     s.setValue("titleFontSize",     m_plotSettings.titleFontSize);
@@ -520,10 +515,6 @@ void PlotWidget::loadSettings()
     m_plotSettings.plotAreaColor   = QColor(s.value("plotAreaColor",   m_plotSettings.plotAreaColor.name()).toString());
     m_plotSettings.axisLineColor         = QColor(s.value("axisLineColor",         m_plotSettings.axisLineColor.name()).toString());
     m_plotSettings.legendBackgroundColor = QColor(s.value("legendBackgroundColor", m_plotSettings.legendBackgroundColor.name(QColor::HexArgb)).toString());
-
-    m_plotSettings.exportWidth  = s.value("exportWidth",  m_plotSettings.exportWidth).toInt();
-    m_plotSettings.exportHeight = s.value("exportHeight", m_plotSettings.exportHeight).toInt();
-    m_plotSettings.exportDpi    = s.value("exportDpi",    m_plotSettings.exportDpi).toInt();
 
     m_plotSettings.fontFamily        = s.value("fontFamily",        m_plotSettings.fontFamily).toString();
     m_plotSettings.titleFontSize     = s.value("titleFontSize",     m_plotSettings.titleFontSize).toInt();

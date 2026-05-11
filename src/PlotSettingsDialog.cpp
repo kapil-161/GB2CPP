@@ -45,6 +45,7 @@ PlotSettings PlotSettingsDialog::getSettings() const
     settings.legendPosition = m_legendPositionComboBox->currentData().toString();
     settings.legendX = m_legendXSpinBox->value();
     settings.legendY = m_legendYSpinBox->value();
+    settings.plotMeanReps = m_plotMeanRepsCheckBox->isChecked();
     settings.showErrorBars = m_showErrorBarsCheckBox->isChecked();
     settings.errorBarType = m_errorBarTypeComboBox->currentData().toString();
     settings.lineWidth = m_lineWidthSpinBox->value();
@@ -74,9 +75,6 @@ PlotSettings PlotSettingsDialog::getSettings() const
     settings.useCustomYMax = m_useCustomYMaxCheckBox->isChecked();
     settings.yAxisMax = m_yAxisMaxSpinBox->value();
     settings.plotTitle = m_plotTitleEdit->text();
-    settings.exportWidth = m_exportWidthSpinBox->value();
-    settings.exportHeight = m_exportHeightSpinBox->value();
-    settings.exportDpi = m_exportDpiSpinBox->value();
     settings.fontFamily = m_fontFamilyComboBox->currentText();
     settings.titleFontSize = m_titleFontSizeSpinBox->value();
     settings.axisLabelFontSize = m_axisLabelFontSizeSpinBox->value();
@@ -355,6 +353,12 @@ void PlotSettingsDialog::setupUI()
     legendXYLayout->addStretch();
     legendLayout->addLayout(legendXYLayout);
     
+    // Plot mean of replicates
+    m_plotMeanRepsCheckBox = new QCheckBox("Plot Mean of Replicates (sequence OSU)");
+    m_plotMeanRepsCheckBox->setChecked(m_settings.plotMeanReps);
+    m_plotMeanRepsCheckBox->setToolTip("Average P# replicates into one line per R# slot");
+    legendLayout->addWidget(m_plotMeanRepsCheckBox);
+
     // Error bar settings
     m_showErrorBarsCheckBox = new QCheckBox("Show Error Bars (Mean ± SD/SE)");
     m_showErrorBarsCheckBox->setChecked(m_settings.showErrorBars);
@@ -467,35 +471,6 @@ void PlotSettingsDialog::setupUI()
     
     tabWidget->addTab(linesMarkersTab, "Lines & Markers");
     
-    // Export Tab
-    QWidget *exportTab = new QWidget();
-    QVBoxLayout *exportLayout = new QVBoxLayout(exportTab);
-    
-    QGroupBox *exportGroup = new QGroupBox("Export Settings");
-    QGridLayout *exportGridLayout = new QGridLayout(exportGroup);
-    
-    exportGridLayout->addWidget(new QLabel("Width (pixels):"), 0, 0);
-    m_exportWidthSpinBox = new QSpinBox();
-    m_exportWidthSpinBox->setRange(100, 5000);
-    m_exportWidthSpinBox->setValue(m_settings.exportWidth);
-    exportGridLayout->addWidget(m_exportWidthSpinBox, 0, 1);
-    
-    exportGridLayout->addWidget(new QLabel("Height (pixels):"), 1, 0);
-    m_exportHeightSpinBox = new QSpinBox();
-    m_exportHeightSpinBox->setRange(100, 5000);
-    m_exportHeightSpinBox->setValue(m_settings.exportHeight);
-    exportGridLayout->addWidget(m_exportHeightSpinBox, 1, 1);
-    
-    exportGridLayout->addWidget(new QLabel("DPI:"), 2, 0);
-    m_exportDpiSpinBox = new QSpinBox();
-    m_exportDpiSpinBox->setRange(72, 600);
-    m_exportDpiSpinBox->setValue(m_settings.exportDpi);
-    exportGridLayout->addWidget(m_exportDpiSpinBox, 2, 1);
-    
-    exportLayout->addWidget(exportGroup);
-    exportLayout->addStretch();
-    
-    tabWidget->addTab(exportTab, "Export");
 
     // Font Tab
     QWidget *fontTab = new QWidget();
@@ -570,9 +545,6 @@ void PlotSettingsDialog::setupUI()
     connect(m_previewButton, &QPushButton::clicked, this, &PlotSettingsDialog::onPreviewSettings);
     buttonLayout->addWidget(m_previewButton);
     
-    m_exportButton = new QPushButton("Export Plot");
-    connect(m_exportButton, &QPushButton::clicked, this, &PlotSettingsDialog::onExportPlot);
-    buttonLayout->addWidget(m_exportButton);
     
     buttonLayout->addStretch();
     
@@ -678,9 +650,6 @@ void PlotSettingsDialog::onResetDefaults()
     updateColorButton(m_backgroundColorButton, defaults.backgroundColor);
     updateColorButton(m_plotAreaColorButton, defaults.plotAreaColor);
     updateColorButton(m_axisLineColorButton, defaults.axisLineColor);
-    m_exportWidthSpinBox->setValue(defaults.exportWidth);
-    m_exportHeightSpinBox->setValue(defaults.exportHeight);
-    m_exportDpiSpinBox->setValue(defaults.exportDpi);
     int defaultFontIndex = m_fontFamilyComboBox->findText(defaults.fontFamily);
     if (defaultFontIndex >= 0) {
         m_fontFamilyComboBox->setCurrentIndex(defaultFontIndex);
@@ -715,9 +684,6 @@ void PlotSettingsDialog::onPreviewSettings()
     m_settings.xAxisTickCount = m_xAxisTickCountSpinBox->value();
     m_settings.xAxisTickSpacing = m_xAxisTickSpacingSpinBox->value();
     m_settings.plotTitle = m_plotTitleEdit->text();
-    m_settings.exportWidth = m_exportWidthSpinBox->value();
-    m_settings.exportHeight = m_exportHeightSpinBox->value();
-    m_settings.exportDpi = m_exportDpiSpinBox->value();
     
     // Show a preview message for now
     QMessageBox::information(this, "Preview", 
@@ -736,62 +702,4 @@ void PlotSettingsDialog::onPreviewSettings()
                             .arg(m_settings.markerSize));
 }
 
-void PlotSettingsDialog::onExportPlot()
-{
-    if (!m_plotWidget) {
-        QMessageBox::warning(this, "Export Error", "No plot widget available for export.");
-        return;
-    }
-    
-    // Get export settings from the dialog
-    int width = m_exportWidthSpinBox->value();
-    int height = m_exportHeightSpinBox->value();
-    int dpi = m_exportDpiSpinBox->value();
-    
-    // Open file dialog to choose export location and format
-    QString defaultPath = QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation);
-    QString fileName = QFileDialog::getSaveFileName(this, 
-        "Export Plot", 
-        defaultPath + "/plot.png",
-        "PNG Image (*.png);;JPEG Image (*.jpg);;BMP Image (*.bmp);;PDF Document (*.pdf)");
-    
-    if (fileName.isEmpty()) {
-        return; // User cancelled
-    }
-    
-    // Determine format from file extension
-    QString format = "PNG";
-    if (fileName.toLower().endsWith(".jpg") || fileName.toLower().endsWith(".jpeg")) {
-        format = "JPG";
-    } else if (fileName.toLower().endsWith(".bmp")) {
-        format = "BMP";
-    } else if (fileName.toLower().endsWith(".pdf")) {
-        format = "PDF";
-    }
-    
-    // Try the composite export method first
-    m_plotWidget->exportPlotComposite(fileName, format, width, height, dpi);
-    
-    // Create message box with OK and View buttons
-    QMessageBox msgBox(this);
-    msgBox.setWindowTitle("Export Complete");
-    msgBox.setText(QString("Plot exported successfully to:\n%1\n\nDimensions: %2 x %3 pixels\nDPI: %4")
-                   .arg(fileName)
-                   .arg(width)
-                   .arg(height)
-                   .arg(dpi));
-    msgBox.setIcon(QMessageBox::Information);
-    
-    // Add View button
-    QPushButton *viewButton = msgBox.addButton("View", QMessageBox::ActionRole);
-    QPushButton *okButton = msgBox.addButton(QMessageBox::Ok);
-    
-    // Execute the message box
-    msgBox.exec();
-    
-    // If View button was clicked, open the file
-    if (msgBox.clickedButton() == viewButton) {
-        QDesktopServices::openUrl(QUrl::fromLocalFile(fileName));
-    }
-}
 

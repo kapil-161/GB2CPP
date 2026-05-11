@@ -18,6 +18,9 @@
 #include <QTimer>
 #include <QFile>
 #include <QTextStream>
+#include <QTextBrowser>
+#include <QDialog>
+#include <QDialogButtonBox>
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -146,6 +149,9 @@ void MainWindow::setupMenuBar()
     QAction *cdeCodesAction = helpMenu->addAction("CDE &Codes Reference...");
     cdeCodesAction->setStatusTip("Search and browse DSSAT variable codes (CDE, label, description)");
     connect(cdeCodesAction, &QAction::triggered, this, &MainWindow::onCDECodesReference);
+
+    QAction *userManualAction = helpMenu->addAction("&User Manual...");
+    connect(userManualAction, &QAction::triggered, this, &MainWindow::onUserManual);
 
     QAction *aboutAction = helpMenu->addAction("&About");
     connect(aboutAction, &QAction::triggered, this, &MainWindow::onAbout);
@@ -438,7 +444,7 @@ void MainWindow::setupDataPanel()
     scatterPlotLayout->addWidget(m_scatterPlotWidget);
     
     m_tabWidget->addTab(scatterPlotWidget, "Scatter Plot");
-    
+
     m_mainSplitter->addWidget(m_tabWidget);
     
     // Connect tab changed signal
@@ -747,19 +753,34 @@ void MainWindow::onCopyPlotData()
 
 void MainWindow::onExportPlot()
 {
+    QString selectedFilter;
     QString fileName = QFileDialog::getSaveFileName(
         this,
         "Export Plot",
         QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation),
-        "PNG Files (*.png);;JPG Files (*.jpg);;PDF Files (*.pdf);;All Files (*)"
+        "PNG Files (*.png);;JPG Files (*.jpg);;PDF Files (*.pdf);;All Files (*)",
+        &selectedFilter
     );
 
     if (fileName.isEmpty()) return;
 
+    // Determine format and ensure extension is present
+    QString format = "PNG";
+    QString ext;
+    if (selectedFilter.contains("pdf", Qt::CaseInsensitive))      { format = "PDF"; ext = ".pdf"; }
+    else if (selectedFilter.contains("jpg", Qt::CaseInsensitive)) { format = "JPG"; ext = ".jpg"; }
+    else                                                           { format = "PNG"; ext = ".png"; }
+
+    QFileInfo fi(fileName);
+    if (fi.suffix().isEmpty())
+        fileName += ext;
+
+    qDebug() << "ExportPlot: fileName=" << fileName << "format=" << format << "selectedFilter=" << selectedFilter;
+
     bool isScatterTab = (m_tabWidget && m_tabWidget->currentIndex() == 2);
     PlotWidget *activeWidget = (isScatterTab && m_scatterPlotWidget) ? m_scatterPlotWidget : m_plotWidget;
     if (activeWidget) {
-        activeWidget->exportPlot(fileName);
+        activeWidget->exportPlot(fileName, format);
         m_statusWidget->showSuccess("Plot exported successfully");
     }
 }
@@ -791,6 +812,116 @@ void MainWindow::onCopyMetrics()
     m_statusWidget->showSuccess("Metrics copied to clipboard");
 }
 
+
+void MainWindow::onUserManual()
+{
+    QDialog *dlg = new QDialog(this);
+    dlg->setWindowTitle("User Manual");
+    dlg->resize(820, 640);
+    dlg->setAttribute(Qt::WA_DeleteOnClose);
+
+    QVBoxLayout *layout = new QVBoxLayout(dlg);
+    layout->setContentsMargins(0, 0, 0, 0);
+
+    QTextBrowser *browser = new QTextBrowser(dlg);
+    browser->setOpenExternalLinks(true);
+    browser->setHtml(R"(
+<html><body style="font-family:Arial,sans-serif; font-size:13px; margin:16px; color:#222;">
+
+<h1 style="color:#1565C0;">GB2 — User Manual</h1>
+<p>GB2 is a visualization tool for DSSAT crop model output files. Use the left panel to browse and load output files, then configure X/Y variables and click <b>Refresh Plot</b>.</p>
+<hr/>
+
+<h2 style="color:#1565C0;">1. Loading Files</h2>
+<ul>
+  <li>Click <b>Open File</b> or use <b>File → Open</b> to load a DSSAT output file.</li>
+  <li>Supported file types: <code>.OUT</code>, <code>.OSU</code>, <code>.OPG</code>, <code>.CSV</code>, <code>EVALUATE.OUT</code>.</li>
+  <li>Multiple files can be selected in the file list to overlay plots.</li>
+  <li>EVALUATE.OUT files automatically switch to the <b>Scatter Plot</b> tab.</li>
+</ul>
+
+<h2 style="color:#1565C0;">2. Time Series Tab</h2>
+<ul>
+  <li>Select an <b>X variable</b> (e.g. DATE, DAS, DAP, WYEAR) and one or more <b>Y variables</b>.</li>
+  <li>Click <b>Refresh Plot</b> to render the plot.</li>
+  <li>Use the <b>DAS / DAP / DATE</b> buttons to quickly switch the X axis.</li>
+  <li>The <b>Treatments</b> panel lets you check/uncheck individual treatments before plotting.</li>
+  <li>Click a legend entry to highlight that series; click again to reset.</li>
+</ul>
+
+<h2 style="color:#1565C0;">3. OSU Seasonal Summary Files</h2>
+<ul>
+  <li>OSU files contain one row per treatment × year. The default X axis is <b>WYEAR</b>.</li>
+  <li>Use the <b>Box Plot</b> button to switch between line plot and box plot view.</li>
+  <li><b>Sequence OSU</b> files (rotation experiments) show one series per rotation slot (R#).</li>
+  <li>In Plot Settings, enable <b>Plot Mean of Replicates</b> to average replicates into one line per slot.</li>
+</ul>
+
+<h2 style="color:#1565C0;">4. Scatter Plot Tab</h2>
+<ul>
+  <li>Load an <code>EVALUATE.OUT</code> file — the app will auto-switch to this tab.</li>
+  <li>Simulated vs. observed values are plotted with a 1:1 reference line.</li>
+  <li>Statistics (RMSE, R², d-stat, BIAS, N) are shown inside each panel.</li>
+  <li>Configure which stats are shown via <b>Plot Settings → Scatter Panel Metrics</b>.</li>
+</ul>
+
+<h2 style="color:#1565C0;">5. Data View Tab</h2>
+<ul>
+  <li>Displays the raw loaded data as a table.</li>
+  <li>Switch between Regular .OUT, EVALUATE.OUT, or Current Plot Data using the dropdown.</li>
+</ul>
+
+<h2 style="color:#1565C0;">6. Saving &amp; Exporting</h2>
+<table border="1" cellpadding="4" cellspacing="0" style="border-collapse:collapse;">
+  <tr style="background:#E3F2FD;"><th>Action</th><th>Shortcut</th><th>Description</th></tr>
+  <tr><td>Save Data</td><td>Ctrl+S</td><td>Saves simulated and observed data as CSV</td></tr>
+  <tr><td>Save Plot Data</td><td>Ctrl+Shift+S</td><td>Saves merged plot data as a single CSV</td></tr>
+  <tr><td>Export Plot Image</td><td>Ctrl+E</td><td>Exports the current plot as PNG/SVG</td></tr>
+</table>
+
+<h2 style="color:#1565C0;">7. Plot Settings</h2>
+<ul>
+  <li>Grid lines, legend position, axis titles and tick spacing</li>
+  <li>Line width and marker size</li>
+  <li>Axis range overrides (custom min/max)</li>
+  <li>Error bars (SD or SE) for replicated experiments</li>
+  <li>Plot Mean of Replicates (sequence OSU files)</li>
+  <li>Scatter panel metrics selection</li>
+</ul>
+
+<h2 style="color:#1565C0;">8. Keyboard Shortcuts</h2>
+<table border="1" cellpadding="4" cellspacing="0" style="border-collapse:collapse;">
+  <tr style="background:#E3F2FD;"><th>Shortcut</th><th>Action</th></tr>
+  <tr><td>Ctrl+O</td><td>Open file</td></tr>
+  <tr><td>Ctrl+S</td><td>Save data CSV</td></tr>
+  <tr><td>Ctrl+Shift+S</td><td>Save plot data CSV</td></tr>
+  <tr><td>Ctrl+E</td><td>Export plot image</td></tr>
+  <tr><td>Ctrl+Z / Ctrl+Y</td><td>Undo / Redo axis zoom</td></tr>
+  <tr><td>Scroll wheel</td><td>Zoom plot</td></tr>
+  <tr><td>Right-click drag</td><td>Pan plot</td></tr>
+</table>
+
+<h2 style="color:#1565C0;">9. DSSAT File Types</h2>
+<table border="1" cellpadding="4" cellspacing="0" style="border-collapse:collapse;">
+  <tr style="background:#E3F2FD;"><th>Extension</th><th>Type</th><th>X Axis</th></tr>
+  <tr><td>.OUT</td><td>Time series</td><td>DATE / DAS / DAP</td></tr>
+  <tr><td>.OSU</td><td>Seasonal summary</td><td>WYEAR</td></tr>
+  <tr><td>.OPG</td><td>Plant growth</td><td>DATE</td></tr>
+  <tr><td>.CSV</td><td>Comma-separated output</td><td>DATE</td></tr>
+  <tr><td>EVALUATE.OUT</td><td>Simulated vs Observed</td><td>—</td></tr>
+</table>
+
+</body></html>
+    )");
+
+    layout->addWidget(browser);
+
+    QDialogButtonBox *buttons = new QDialogButtonBox(QDialogButtonBox::Close, dlg);
+    connect(buttons, &QDialogButtonBox::rejected, dlg, &QDialog::accept);
+    layout->addWidget(buttons);
+
+    dlg->show();
+}
 
 void MainWindow::onAbout()
 {
@@ -1396,7 +1527,10 @@ void MainWindow::updateTreatmentComboBox()
     if (isSequenceFile) {
         // For sequence OSU files, group by R# (sequence slot) — each slot is a crop in the rotation
         const DataColumn *cropCol = m_currentData.getColumn("CROP");
-        const DataColumn *tnameCol = m_currentData.getColumn("TNAME");
+        // Build crop code -> full name map from DETAIL.CDE
+        QMap<QString, QString> cropCodeToName;
+        for (const CropDetails &cd : DataProcessor::getCropDetails())
+            cropCodeToName[cd.cropCode.toUpper()] = cd.cropName;
         struct TrtEntry { QString key, rseq, cropName; };
         QList<TrtEntry> entries;
         QSet<QString> seenKeys;
@@ -1405,11 +1539,9 @@ void MainWindow::updateTreatmentComboBox()
             if (rseq.isEmpty()) continue;
             if (seenKeys.contains(rseq)) continue;
             seenKeys.insert(rseq);
-            QString cropName = rseq;
-            if (tnameCol && i < tnameCol->data.size())
-                cropName = tnameCol->data[i].toString().trimmed();
-            if (cropName.isEmpty() && cropCol && i < cropCol->data.size())
-                cropName = cropCol->data[i].toString().trimmed();
+            QString cropCode = (cropCol && i < cropCol->data.size()) ? cropCol->data[i].toString().trimmed() : QString();
+            QString cropName = cropCodeToName.value(cropCode.toUpper(), cropCode);
+            if (cropName.isEmpty()) cropName = rseq;
             entries.append({rseq, rseq, cropName});
         }
         std::sort(entries.begin(), entries.end(), [](const TrtEntry &a, const TrtEntry &b) {
@@ -1418,7 +1550,9 @@ void MainWindow::updateTreatmentComboBox()
             return (aOk && bOk) ? (ai < bi) : (a.rseq < b.rseq);
         });
         for (const TrtEntry &e : entries) {
-            sortedTreatments.append("R#::" + e.key);
+            // Embed crop name as "R#::slotNum::cropName" so setAvailableTreatments can display it
+            QString key = e.cropName.isEmpty() ? ("R#::" + e.key) : ("R#::" + e.key + "::" + e.cropName);
+            sortedTreatments.append(key);
             QString label = e.cropName.isEmpty() ? e.key : QString("%1 - %2").arg(e.key, e.cropName);
             m_treatmentComboBox->addItem(label);
         }
@@ -2012,33 +2146,36 @@ void MainWindow::onFileSelectionChanged()
             } else {
                 // Regular crop folder - try to get crop code from the selected folder name by matching with crop details
                 QVector<CropDetails> allCropDetails = m_dataProcessor->getCropDetails();
-                qDebug() << "MainWindow: Selected folder:" << m_selectedFolder;
-                qDebug() << "MainWindow: Found" << allCropDetails.size() << "crop details";
+                QString selectedFolderLower = m_selectedFolder.toLower();
+
+                // Two-pass: exact matches first, then partial (to avoid "Pea" matching before "Peanut")
+                QString partialCode;
                 for (const CropDetails& crop : allCropDetails) {
                     QString dirName = QFileInfo(crop.directory).fileName().toLower();
                     QString cropNameLower = crop.cropName.toLower();
-                    QString selectedFolderLower = m_selectedFolder.toLower();
-                    
-                    // Check multiple matching strategies:
-                    // 1. Directory name matches (e.g., "drybean" == "drybean")
-                    // 2. Crop name matches (e.g., "dry bean" == "dry bean")
-                    // 3. Directory path contains folder name
-                    // 4. Crop name contains folder name or vice versa (for partial matches)
+
                     bool dirNameMatch = (dirName == selectedFolderLower);
                     bool cropNameMatch = (cropNameLower == selectedFolderLower);
-                    bool pathContainsFolder = crop.directory.toLower().contains("/" + selectedFolderLower) || 
-                                            crop.directory.toLower().contains("\\" + selectedFolderLower);
-                    bool cropNameContains = cropNameLower.contains(selectedFolderLower) || 
-                                          selectedFolderLower.contains(cropNameLower);
-                    
-                    qDebug() << "MainWindow: Checking crop:" << crop.cropCode << "name:" << crop.cropName << "dir:" << crop.directory << "dirName:" << dirName << "pathContains:" << pathContainsFolder;
-                    
-                    if (dirNameMatch || cropNameMatch || pathContainsFolder || cropNameContains) {
+                    bool pathContainsFolder = crop.directory.toLower().contains("/" + selectedFolderLower) ||
+                                             crop.directory.toLower().contains("\\" + selectedFolderLower);
+
+                    if (dirNameMatch || cropNameMatch || pathContainsFolder) {
                         cropCode = crop.cropCode.toUpper();
-                        qDebug() << "MainWindow: MATCHED! Setting cropCode to:" << cropCode << "(match type: dirName=" << dirNameMatch << " cropName=" << cropNameMatch << " pathContains=" << pathContainsFolder << " nameContains=" << cropNameContains << ")";
                         break;
                     }
+
+                    // Partial match: only keep first candidate, don't break
+                    if (partialCode.isEmpty()) {
+                        bool cropNameContains = cropNameLower.contains(selectedFolderLower) ||
+                                               selectedFolderLower.contains(cropNameLower);
+                        if (cropNameContains)
+                            partialCode = crop.cropCode.toUpper();
+                    }
                 }
+
+                // Fall back to partial match only if no exact match found
+                if (cropCode == "XX" && !partialCode.isEmpty())
+                    cropCode = partialCode;
             }
             qDebug() << "MainWindow: Determined Crop Code:" << cropCode;
 
@@ -2468,8 +2605,6 @@ bool MainWindow::selectCropFolder(const QString &cropName)
         if (folderText.compare(cropName, Qt::CaseInsensitive) == 0) {
             m_fileComboBox->setCurrentIndex(i);
             m_selectedFolder = folderText;
-            qDebug() << "MainWindow: Selected crop folder:" << folderText;
-            
             // Trigger folder selection change
             onFolderSelectionChanged();
             return true;
@@ -2507,17 +2642,18 @@ int MainWindow::selectOutputFiles(const QStringList &fileNames)
     
     // Clear current selections
     m_fileListWidget->clearSelection();
-    
+
+
     int selectedCount = 0;
-    
+
     for (const QString &fileName : fileNames) {
         for (int i = 0; i < m_fileListWidget->count(); ++i) {
             QListWidgetItem *item = m_fileListWidget->item(i);
             if (!item) continue;
-            
+
             QString itemText = item->text();
             QString itemData = item->data(Qt::UserRole).toString();
-            
+
             // Check both display text and user data
             if (itemText.compare(fileName, Qt::CaseInsensitive) == 0 ||
                 itemData.compare(fileName, Qt::CaseInsensitive) == 0) {

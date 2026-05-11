@@ -7,7 +7,7 @@ set QT_QPA_PLATFORM=offscreen
 set QT_QPA_FONTDIR=C:\Windows\Fonts
 
 echo Running GB2...
-"C:\DSSAT48-lettuce\Tools\GB2CPP\build_win\bin\GB2.exe" %*
+"C:\DSSAT48\Tools\GB2CPP\build_win\bin\GB2.exe" %*
 echo.
 echo EXIT CODE: %ERRORLEVEL%
 endlocal

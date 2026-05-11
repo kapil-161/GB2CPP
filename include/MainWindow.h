@@ -78,6 +78,7 @@ private slots:
     void onCopyPlot();
     void onCopyMetrics();
     void onAbout();
+    void onUserManual();
     void onCDECodesReference();
     void onDataFileChanged();
     void onXVariableChanged();

@@ -1439,8 +1439,6 @@ QStringList DataProcessor::prepareOutFiles(const QString &folderName)
         }
     }
     
-    qDebug() << "prepareOutFiles: After filtering, found" << outFiles.size() << "plottable files:" << outFiles;
-    
     return outFiles;
 }
 
@@ -1539,11 +1537,7 @@ bool DataProcessor::isFilePlottable(const QString &filePath)
     // 2. Time-series columns (YEAR/DOY/DAP/DAS)
     // 3. Multiple data rows (>= 3 for time series)
     bool isPlottable = hasDataTable && hasTimeColumns && dataRowCount >= 3;
-    
-    qDebug() << "isFilePlottable:" << filePath << "-> hasDataTable:" << hasDataTable 
-             << "hasTimeColumns:" << hasTimeColumns << "dataRowCount:" << dataRowCount 
-             << "isPlottable:" << isPlottable;
-    
+
     return isPlottable;
 }
 

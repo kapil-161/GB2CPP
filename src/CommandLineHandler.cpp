@@ -209,7 +209,6 @@ void CommandLineHandler::selectOutputFiles()
     
     try {
         int selectedCount = m_mainWindow->selectOutputFiles(m_args.outputFiles);
-        
         if (selectedCount > 0) {
             QString message = QString("Loaded %1 with %2 output files")
                                 .arg(m_args.cropName).arg(selectedCount);
@@ -283,25 +282,20 @@ QString CommandLineHandler::extractCropNameFromPath(const QString &cropDirPath)
             QDir providedDir(cropDirPath);
             QString canonicalProvidedDir = providedDir.canonicalPath();
 
-            qDebug() << "CommandLineHandler: Comparing paths:";
-            qDebug() << "  Crop directory from DSSATPRO:" << crop.directory;
-            qDebug() << "  Canonical crop dir:" << canonicalCropDir;
-            qDebug() << "  Provided path:" << cropDirPath;
-            qDebug() << "  Canonical provided dir:" << canonicalProvidedDir;
-
-            // Check if provided path starts with or equals the crop directory
+            // Exact match or provided path is a subdirectory of the crop dir
             if (!canonicalProvidedDir.isEmpty() && !canonicalCropDir.isEmpty() &&
-                canonicalProvidedDir.startsWith(canonicalCropDir, Qt::CaseInsensitive)) {
-                qDebug() << "CommandLineHandler: Matched crop directory:" << crop.directory
-                         << "for path:" << cropDirPath << "-> crop name:" << crop.cropName;
+                (canonicalProvidedDir.compare(canonicalCropDir, Qt::CaseInsensitive) == 0 ||
+                 canonicalProvidedDir.startsWith(canonicalCropDir + "/", Qt::CaseInsensitive))) {
                 return crop.cropName;
             }
 
             // Fallback: try non-canonical path comparison for cases where canonicalization fails
-            if (cropDirPath.startsWith(crop.directory, Qt::CaseInsensitive) ||
-                crop.directory.startsWith(cropDirPath, Qt::CaseInsensitive)) {
-                qDebug() << "CommandLineHandler: Fallback matched crop directory:" << crop.directory
-                         << "for path:" << cropDirPath << "-> crop name:" << crop.cropName;
+            QString normalizedCropDir = crop.directory;
+            normalizedCropDir.replace('\\', '/');
+            QString normalizedProvidedDir = cropDirPath;
+            normalizedProvidedDir.replace('\\', '/');
+            if (normalizedProvidedDir.compare(normalizedCropDir, Qt::CaseInsensitive) == 0 ||
+                normalizedProvidedDir.startsWith(normalizedCropDir + "/", Qt::CaseInsensitive)) {
                 return crop.cropName;
             }
         }

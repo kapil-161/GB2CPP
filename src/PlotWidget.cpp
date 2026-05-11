@@ -35,6 +35,7 @@
 #include <QAction>
 #include <QClipboard>
 #include <QApplication>
+#include <QPdfWriter>
 #include <QEnterEvent>
 #include <QContextMenuEvent>
 #include <algorithm>
@@ -1485,12 +1486,30 @@ void PlotWidget::plotDatasets(const DataTable &simData, const DataTable &obsData
                             !simData.columnNames.contains("DAS") &&
                             !simData.columnNames.contains("DAP");
 
+        // Detect sequence OSU: all TRT values identical but R# column has multiple unique values.
+        // For these files each R# slot is a distinct crop in the rotation.
+        const DataColumn *rseqColumn = simData.getColumn("R#");
+        const DataColumn *tnameColumnSim = simData.getColumn("TNAME");
+        bool isSequenceOsu = false;
+        if (isSummaryOsu && rseqColumn) {
+            QSet<QString> uniqueTrts, uniqueRseq;
+            for (const QVariant &v : trtColumn->data) uniqueTrts.insert(v.toString().trimmed());
+            for (const QVariant &v : rseqColumn->data) uniqueRseq.insert(v.toString().trimmed());
+            isSequenceOsu = (uniqueTrts.size() == 1) && (uniqueRseq.size() > 1);
+        }
+
         for (int row = 0; row < simData.rowCount; ++row) {
             if (row >= xColumn->data.size() || row >= yColumn->data.size() || row >= trtColumn->data.size()) {
                 continue;
             }
 
             QString trt = trtColumn->data[row].toString();
+
+            // For sequence OSU, use R# slot as the effective treatment key
+            QString rseqSlot;
+            if (isSequenceOsu && rseqColumn && row < rseqColumn->data.size())
+                rseqSlot = rseqColumn->data[row].toString().trimmed();
+            QString effectiveTrt = isSequenceOsu ? rseqSlot : trt;
 
             // Get experiment for this row, or use selectedExperiment as fallback
             QString experiment = selectedExperiment;
@@ -1501,18 +1520,20 @@ void PlotWidget::plotDatasets(const DataTable &simData, const DataTable &obsData
                 }
             }
 
-            // Treatment filter: match plain trt or compound exp::trt key
-            if (!treatments.isEmpty() && !treatments.contains("All")
-                && !treatments.contains(trt)
-                && !treatments.contains(experiment + "::" + trt)) {
-                continue;
+            // Treatment filter: match plain trt/slot or compound R#::slot key
+            if (!treatments.isEmpty() && !treatments.contains("All")) {
+                if (isSequenceOsu) {
+                    if (!treatments.contains("R#::" + effectiveTrt)) continue;
+                } else {
+                    if (!treatments.contains(trt) && !treatments.contains(experiment + "::" + trt)) continue;
+                }
             }
 
             // Per-variable filter: skip if this var::exp::trt is excluded
-            if (m_plotSettings.excludedSeriesKeys.contains(yVar + "::" + experiment + "::" + trt)) {
+            if (m_plotSettings.excludedSeriesKeys.contains(yVar + "::" + experiment + "::" + effectiveTrt)) {
                 continue;
             }
-            
+
             // Get crop for this row if available
             QString crop = "XX";  // Default crop code
             const DataColumn* cropColumn = simData.getColumn("CROP");
@@ -1522,7 +1543,7 @@ void PlotWidget::plotDatasets(const DataTable &simData, const DataTable &obsData
                     crop = cropFromData;
                 }
             }
-            
+
             // Create unique key for crop-experiment-treatment(+run) combination
             QString runStr;
             const DataColumn* runColumn = simData.getColumn("RUN");
@@ -1532,11 +1553,26 @@ void PlotWidget::plotDatasets(const DataTable &simData, const DataTable &obsData
                     runStr = QString("RUN%1").arg(rv);
                 }
             }
-            // For summary OSU files each row is one year; don't split by RUN or every
-            // year becomes its own single-point series and no line is drawn.
-            QString expTrtKey = (runStr.isEmpty() || isSummaryOsu)
-                ? QString("%1__%2__%3").arg(crop).arg(experiment).arg(trt)
-                : QString("%1__%2__%3__%4").arg(crop).arg(experiment).arg(trt).arg(runStr);
+            // For summary OSU files each row is one year; don't split by RUN.
+            // For sequence OSU, split by P# (rep) unless plotMeanReps is on.
+            QString expTrtKey;
+            if (isSequenceOsu) {
+                if (m_plotSettings.plotMeanReps) {
+                    // Merge all reps into one key per R# slot — will be averaged below
+                    expTrtKey = QString("%1__%2__%3").arg(crop).arg(experiment).arg(effectiveTrt);
+                } else {
+                    const DataColumn* pnumCol = simData.getColumn("P#");
+                    QString pnum = (pnumCol && row < pnumCol->data.size())
+                        ? pnumCol->data[row].toString().trimmed() : QString();
+                    expTrtKey = pnum.isEmpty()
+                        ? QString("%1__%2__%3").arg(crop).arg(experiment).arg(effectiveTrt)
+                        : QString("%1__%2__%3__P%4").arg(crop).arg(experiment).arg(effectiveTrt).arg(pnum);
+                }
+            } else {
+                expTrtKey = (runStr.isEmpty() || isSummaryOsu)
+                    ? QString("%1__%2__%3").arg(crop).arg(experiment).arg(effectiveTrt)
+                    : QString("%1__%2__%3__%4").arg(crop).arg(experiment).arg(effectiveTrt).arg(runStr);
+            }
             
             QVariant xVal = xColumn->data[row];
             QVariant yVal = yColumn->data[row];
@@ -1611,9 +1647,23 @@ void PlotWidget::plotDatasets(const DataTable &simData, const DataTable &obsData
             }
             
             experimentTreatmentData[expTrtKey].append(QPointF(x, y));
-            // Removed excessive POINT ADDED logging (was generating 333+ log entries per plot)
         }
-        
+
+        // If plotting mean of reps, average duplicate x-values within each key
+        if (isSequenceOsu && m_plotSettings.plotMeanReps) {
+            for (auto it = experimentTreatmentData.begin(); it != experimentTreatmentData.end(); ++it) {
+                QMap<double, QPair<double, int>> xToSumCount;
+                for (const QPointF &pt : it.value()) {
+                    xToSumCount[pt.x()].first  += pt.y();
+                    xToSumCount[pt.x()].second += 1;
+                }
+                QVector<QPointF> averaged;
+                for (auto jt = xToSumCount.begin(); jt != xToSumCount.end(); ++jt)
+                    averaged.append(QPointF(jt.key(), jt.value().first / jt.value().second));
+                it.value() = averaged;
+            }
+        }
+
         qDebug() << "PlotWidget: Selected treatments filter:" << treatments;
         
         // Collect treatment keys from this variable's data (including run when present).
@@ -1661,9 +1711,17 @@ void PlotWidget::plotDatasets(const DataTable &simData, const DataTable &obsData
             plotData.crop = crop;
             plotData.treatment = treatment;
             plotData.experiment = experiment;
-            // Always use getTreatmentDisplayName for consistency with observed data
-            // This will add experiment name when multiple experiments exist and crop name when multiple crops exist
-            plotData.treatmentName = getTreatmentDisplayName(treatment, experiment, crop);
+            // For sequence OSU, label by crop name + R# slot only (e.g. "Dry bean (R#1)")
+            // P# reps share the same legend entry — only the series data differs
+            if (isSequenceOsu) {
+                QString cropName = getCropNameFromCode(crop);
+                if (cropName.isEmpty() || cropName == crop)
+                    plotData.treatmentName = QString("%1 (R#%2)").arg(crop).arg(treatment);
+                else
+                    plotData.treatmentName = QString("%1 (R#%2)").arg(cropName).arg(treatment);
+            } else {
+                plotData.treatmentName = getTreatmentDisplayName(treatment, experiment, crop);
+            }
             // Only append RUN if there are multiple runs under the same crop+experiment+treatment
             QString baseKey = QString("%1__%2__%3").arg(crop).arg(experiment).arg(treatment);
             if (!runPart.isEmpty() && baseKeyToRunCount.value(baseKey, 0) > 1) {
@@ -2080,13 +2138,21 @@ void PlotWidget::addSeriesToPlot(const QVector<PlotData> &plotDataList)
             
             // Disable OpenGL to enable all line styles (QTBUG-59881)
             lineSeries->setUseOpenGL(false);
-            // Include crop in name if it's not the default XX
             QString seriesName;
-            if (sharedPlotData->crop != "XX") {
-                // For same experiment, same treatment, different crops: use TNAME - CROP format
+            // If treatmentName is a real word (not just a number), use it as the primary label.
+            // This covers sequence OSU where TNAME is "Bean"/"Fallow"/"Soybean" etc.
+            bool ok;
+            sharedPlotData->treatmentName.toInt(&ok);
+            bool trtNameMeaningful = !sharedPlotData->treatmentName.isEmpty() && !ok;
+            if (trtNameMeaningful) {
+                seriesName = QString("%1 - %2 (Simulated)")
+                           .arg(sharedPlotData->treatmentName)
+                           .arg(sharedPlotData->variable);
+            } else if (sharedPlotData->crop != "XX") {
+                // Multiple crops, no meaningful treatment name: label by crop code
                 QString cropName = getCropNameFromCode(sharedPlotData->crop);
                 seriesName = QString("%1 - %2 (%3-Simulated)")
-                           .arg(cropName)  // Use crop name instead of treatment name
+                           .arg(cropName)
                            .arg(sharedPlotData->variable)
                            .arg(sharedPlotData->crop);
             } else {
@@ -3004,7 +3070,43 @@ void PlotWidget::exportPlot(const QString &filePath, const QString &format)
         if (m_bottomContainer) m_bottomContainer->setVisible(bottomWasVisible);
     }
 
-    pixmap.save(filePath, format.toUtf8().constData());
+    qDebug() << "exportPlot: filePath=" << filePath << "format=" << format << "pixmap=" << pixmap.size();
+    bool ok = false;
+    if (filePath.endsWith(".pdf", Qt::CaseInsensitive)) {
+        // Verify the path is writable before handing to QPdfWriter
+        QFile testFile(filePath);
+        if (!testFile.open(QIODevice::WriteOnly)) {
+            QMessageBox::critical(nullptr, "Export Failed",
+                QString("Cannot write to:\n%1\n\n%2").arg(filePath, testFile.errorString()));
+            return;
+        }
+        testFile.close();
+        testFile.remove();
+
+        if (pixmap.isNull() || pixmap.width() <= 0 || pixmap.height() <= 0) {
+            QMessageBox::critical(nullptr, "Export Failed", "Nothing to export — plot pixmap is empty.");
+            return;
+        }
+        QPdfWriter writer(filePath);
+        // Use 150 DPI — gives a clean A4-ish page for typical plot sizes
+        const int pdfDpi = 150;
+        QSizeF sizeMm(pixmap.width() * 25.4 / pdfDpi, pixmap.height() * 25.4 / pdfDpi);
+        writer.setPageSize(QPageSize(sizeMm, QPageSize::Millimeter));
+        writer.setPageMargins(QMarginsF(0, 0, 0, 0));
+        writer.setResolution(pdfDpi);
+        QPainter pdfPainter(&writer);
+        ok = pdfPainter.isActive();
+        qDebug() << "exportPlot PDF: painter active=" << ok << "writer size=" << writer.width() << "x" << writer.height();
+        if (ok) {
+            pdfPainter.drawPixmap(0, 0, writer.width(), writer.height(), pixmap);
+            pdfPainter.end();
+        }
+    } else {
+        ok = pixmap.save(filePath, format.toUtf8().constData());
+    }
+    if (!ok)
+        QMessageBox::critical(nullptr, "Export Failed",
+            QString("Could not save plot to:\n%1\n\nCheck the path is writable.").arg(filePath));
 }
 
 // Composite legend widget onto a pixmap at the position specified in m_plotSettings.legendPosition
@@ -4108,38 +4210,50 @@ void PlotWidget::setAvailableTreatments(const QStringList &treatments,
     m_treatmentSelectList->clear();
 
     for (const QString &key : treatments) {
-        // Parse compound "exp::trt" keys (used when multiple experiments are loaded)
-        QString expPrefix, trtId;
-        if (key.contains("::")) {
-            expPrefix = key.section("::", 0, 0);
-            trtId     = key.section("::", 1);
+        // Parse compound keys:
+        //   "R#::slot::cropName"  — sequence OSU slot
+        //   "exp::trt"            — multi-experiment regular file
+        //   "trt"                 — single experiment
+        QString expPrefix, trtId, displayName;
+        QStringList parts = key.split("::");
+        if (parts.size() >= 2 && parts[0] == "R#") {
+            // Sequence OSU: "R#::slot" or "R#::slot::cropName"
+            trtId       = parts[1];
+            displayName = parts.size() >= 3 ? parts.mid(2).join("::") : QString();
+        } else if (parts.size() == 2) {
+            expPrefix = parts[0];
+            trtId     = parts[1];
         } else {
             trtId = key;
         }
 
-        // Find display name: prefer exact experiment match, then any experiment
-        QString displayName;
-        if (!expPrefix.isEmpty() && treatmentNames.contains(expPrefix))
-            displayName = treatmentNames[expPrefix].value(trtId);
+        // For regular files, look up display name from treatmentNames map
         if (displayName.isEmpty()) {
-            for (auto it = treatmentNames.constBegin(); it != treatmentNames.constEnd(); ++it) {
-                if (it.value().contains(trtId)) {
-                    displayName = it.value().value(trtId);
-                    break;
+            if (!expPrefix.isEmpty() && treatmentNames.contains(expPrefix))
+                displayName = treatmentNames[expPrefix].value(trtId);
+            if (displayName.isEmpty()) {
+                for (auto it = treatmentNames.constBegin(); it != treatmentNames.constEnd(); ++it) {
+                    if (it.value().contains(trtId)) {
+                        displayName = it.value().value(trtId);
+                        break;
+                    }
                 }
             }
         }
 
         QString label;
-        if (!expPrefix.isEmpty())
+        if (!expPrefix.isEmpty()) {
             label = displayName.isEmpty()
                 ? QString("%1 · %2").arg(trtId, expPrefix)
                 : QString("%1 - %2 · %3").arg(trtId, displayName, expPrefix);
-        else
+        } else {
             label = displayName.isEmpty() ? trtId : QString("%1 - %2").arg(trtId, displayName);
+        }
 
         QListWidgetItem *item = new QListWidgetItem(label);
-        item->setData(Qt::UserRole, key);
+        // Store only the "R#::slot" part as the functional key (crop name is display-only)
+        QString storeKey = (parts.size() >= 3 && parts[0] == "R#") ? ("R#::" + trtId) : key;
+        item->setData(Qt::UserRole, storeKey);
         item->setFlags(item->flags() | Qt::ItemIsUserCheckable);
         item->setCheckState(Qt::Checked);
         m_treatmentSelectList->addItem(item);
