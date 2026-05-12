@@ -141,7 +141,7 @@ void CommandLineHandler::setupCommandLineIntegration(MainWindow *mainWindow, con
         qDebug() << "Processing command line arguments...";
         // UI is already hidden in main.cpp before window is shown
         // Use a timer to apply args after UI is fully initialized
-        QTimer::singleShot(500, this, &CommandLineHandler::applyCommandLineArgsToUI);
+        QTimer::singleShot(0, this, &CommandLineHandler::applyCommandLineArgsToUI);
     } else {
         qDebug() << "No valid command line arguments provided, starting normally";
     }
@@ -184,7 +184,7 @@ void CommandLineHandler::applyCommandLineArgsToUI()
         // Step 2: Select output files (with delay to ensure file list is populated)
         // Note: selectCropFolder() already populated files via onFolderSelectionChanged(),
         // so we just need to wait for UI to be ready before selecting files
-        QTimer::singleShot(200, this, &CommandLineHandler::selectOutputFiles);
+        QTimer::singleShot(0, this, &CommandLineHandler::selectOutputFiles);
         
     } catch (const std::exception &e) {
         QString message = QString("Failed to apply parameters: %1").arg(e.what());

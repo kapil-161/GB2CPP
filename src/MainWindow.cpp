@@ -73,20 +73,19 @@ MainWindow::MainWindow(QWidget *parent)
     setupUI();
     connectSignals();
     centerWindow();
-    
-    // Initialize with default state
     resetInterface();
-    
-    // Populate folders after UI is set up
-    populateFolders();
-    
-    // Ensure window is visible
+
+    // Show window first so it appears instantly
     setAttribute(Qt::WA_ShowWithoutActivating, false);
     setVisible(true);
     raise();
     activateWindow();
-    
-    // Constructor completed successfully
+
+    // In CLI mode, skip populateFolders — the CLI handler calls selectCropFolder()
+    // which adds only the target crop on demand, avoiding a full scan of all crops.
+    // In GUI mode, defer until after the window has painted.
+    if (QApplication::arguments().size() < 2)
+        QTimer::singleShot(0, this, &MainWindow::populateFolders);
 }
 
 MainWindow::~MainWindow()
@@ -2599,18 +2598,32 @@ bool MainWindow::selectCropFolder(const QString &cropName)
         qWarning() << "MainWindow::selectCropFolder - fileComboBox not initialized";
         return false;
     }
-    
+
+    // Search existing items first (GUI mode — combo already populated)
     for (int i = 0; i < m_fileComboBox->count(); ++i) {
         QString folderText = m_fileComboBox->itemText(i);
         if (folderText.compare(cropName, Qt::CaseInsensitive) == 0) {
             m_fileComboBox->setCurrentIndex(i);
             m_selectedFolder = folderText;
-            // Trigger folder selection change
             onFolderSelectionChanged();
             return true;
         }
     }
-    
+
+    // CLI mode: combo is empty because populateFolders was skipped.
+    // Verify the crop exists in DSSATPRO then add just this one entry.
+    QVector<CropDetails> allCrops = m_dataProcessor->getCropDetails();
+    for (const CropDetails &crop : allCrops) {
+        if (crop.cropName.compare(cropName, Qt::CaseInsensitive) == 0 &&
+            !crop.directory.isEmpty()) {
+            m_fileComboBox->addItem(crop.cropName);
+            m_fileComboBox->setCurrentIndex(m_fileComboBox->count() - 1);
+            m_selectedFolder = crop.cropName;
+            onFolderSelectionChanged();
+            return true;
+        }
+    }
+
     qWarning() << "MainWindow: Crop folder not found:" << cropName;
     return false;
 }

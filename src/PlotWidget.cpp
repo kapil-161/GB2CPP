@@ -553,12 +553,12 @@ void PlotWidget::autoFitAxes()
     double xRightPadding = (maxX - minX) * 0.05;
     double xLeftPadding = 0;  // No padding on origin side
     double yPadding = (maxY - 0) * 0.05;  // Calculate padding from 0, not minY
-    
+
     // Handle edge case where all values are the same
     if (xRightPadding == 0) xRightPadding = qAbs(maxX) * 0.1 + 1;
     // No edge case handling needed for xLeftPadding since it's always 0
     if (yPadding == 0) yPadding = maxY * 0.1 + 1;
-    
+
     // Force Y-axis to start from 0
     minY = 0;
     

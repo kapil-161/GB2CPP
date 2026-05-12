@@ -342,11 +342,8 @@ int main(int argc, char *argv[])
     }
 #endif
     
-    // Check if another instance is already running.
-    // When launched with CLI args (e.g. from DSSAT), always allow a new instance —
-    // DSSAT expects a fresh window per crop. Only enforce single-instance for plain GUI launches.
-    bool hasCliArgs = (app.arguments().size() >= 2);
-    if (!hasCliArgs && !app.isFirstInstance()) {
+    // Check if another instance is already running (always enforced).
+    if (!app.isFirstInstance()) {
 #ifdef ENABLE_DEBUG_OUTPUT
         qCWarning(appCategory) << "Another instance of" << Config::APP_NAME << "is already running";
 #endif
