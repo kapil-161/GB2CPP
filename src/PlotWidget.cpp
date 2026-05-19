@@ -297,7 +297,43 @@ void PlotWidget::setupUI()
     m_legendStack->addWidget(m_preplotPanel);       // page 0 — shown before first plot
     m_legendStack->addWidget(m_legendScrollArea);   // page 1 — shown after plotting
     m_legendStack->setCurrentIndex(0);
-    m_mainLayout->addWidget(m_legendStack, 20);
+
+    // Drag handle bar
+    m_legendHandle = new QWidget();
+    m_legendHandle->setFixedHeight(22);
+    m_legendHandle->setCursor(Qt::SizeAllCursor);
+    m_legendHandle->setStyleSheet("background-color: #e8e8e8; border-bottom: 1px solid #cccccc;");
+    m_legendHandle->setToolTip("Drag to float legend over chart");
+    QHBoxLayout* handleLayout = new QHBoxLayout(m_legendHandle);
+    handleLayout->setContentsMargins(5, 2, 2, 2);
+    QLabel* gripLabel = new QLabel("⠇  Legend");
+    gripLabel->setStyleSheet("color: #555555; font-size: 11px;");
+    handleLayout->addWidget(gripLabel);
+    handleLayout->addStretch();
+
+    QPushButton* dockBtn = new QPushButton("→");
+    dockBtn->setFixedSize(18, 18);
+    dockBtn->setToolTip("Dock legend back to panel");
+    dockBtn->setStyleSheet(
+        "QPushButton { border: none; background: transparent; color: #555555; font-size: 12px; padding: 0; }"
+        "QPushButton:hover { color: #0078d4; }");
+    dockBtn->hide();  // only visible when floating
+    dockBtn->setObjectName("legendDockBtn");
+    connect(dockBtn, &QPushButton::clicked, this, &PlotWidget::dockLegend);
+    handleLayout->addWidget(dockBtn);
+
+    m_legendHandle->installEventFilter(this);
+
+    // Legend panel: handle + stack as one draggable unit
+    m_legendPanel = new QWidget();
+    m_legendPanel->setFixedWidth(200);
+    QVBoxLayout* legendPanelLayout = new QVBoxLayout(m_legendPanel);
+    legendPanelLayout->setContentsMargins(0, 0, 0, 0);
+    legendPanelLayout->setSpacing(0);
+    legendPanelLayout->addWidget(m_legendHandle);
+    legendPanelLayout->addWidget(m_legendStack);
+
+    m_mainLayout->addWidget(m_legendPanel);
 
 }
 
@@ -4007,11 +4043,48 @@ bool PlotWidget::eventFilter(QObject* obj, QEvent* event)
     if (event->type() == QEvent::MouseButtonPress) {
         QWidget* widget = qobject_cast<QWidget*>(obj);
         if (widget && widget->property("seriesToHighlight").isValid()) {
-            // Create click handler (matching Python _create_toggle_handler)
             createToggleHandler(widget);
             return true;
         }
     }
+
+    // ── Legend handle drag ──────────────────────────────────────────────────
+    if (obj == m_legendHandle) {
+        if (event->type() == QEvent::MouseButtonPress) {
+            QMouseEvent* me = static_cast<QMouseEvent*>(event);
+            if (me->button() == Qt::LeftButton) {
+                m_legendDragging = true;
+                QPoint globalClick = m_legendHandle->mapToGlobal(me->pos());
+                m_legendDragOffset = globalClick - m_legendPanel->mapToGlobal(QPoint(0, 0));
+                return true;
+            }
+        }
+        else if (event->type() == QEvent::MouseButtonDblClick) {
+            QMouseEvent* me = static_cast<QMouseEvent*>(event);
+            if (me->button() == Qt::LeftButton) {
+                if (m_legendFloating) dockLegend();
+                return true;
+            }
+        }
+        else if (event->type() == QEvent::MouseMove) {
+            QMouseEvent* me = static_cast<QMouseEvent*>(event);
+            if (m_legendDragging) {
+                QPoint globalCursor = m_legendHandle->mapToGlobal(me->pos());
+                QPoint newPos = mapFromGlobal(globalCursor - m_legendDragOffset);
+                if (!m_legendFloating) floatLegend();
+                newPos.setX(qBound(0, newPos.x(), width()  - m_legendPanel->width()));
+                newPos.setY(qBound(0, newPos.y(), height() - m_legendPanel->height()));
+                m_legendPanel->move(newPos);
+                m_legendPanel->raise();
+                return true;
+            }
+        }
+        else if (event->type() == QEvent::MouseButtonRelease) {
+            m_legendDragging = false;
+            return false;
+        }
+    }
+
     return QWidget::eventFilter(obj, event);
 }
 
@@ -4374,3 +4447,41 @@ void PlotWidget::showTreatmentSelection()
 // onSettingsButtonClicked / applyPlotSettings / saveSettings / loadSettings / setXAxisVariable → see PlotWidget_Settings.cpp
 
 // plotScatter -> see PlotWidget_Scatter.cpp
+
+void PlotWidget::floatLegend()
+{
+    if (m_legendFloating || !m_legendPanel) return;
+    m_mainLayout->removeWidget(m_legendPanel);
+    // Remove stretch constraints so the panel shrinks to its content
+    m_legendPanel->setMaximumHeight(QWIDGETSIZE_MAX);
+    m_legendPanel->setMinimumHeight(0);
+    m_legendStack->setMaximumHeight(QWIDGETSIZE_MAX);
+    m_legendStack->setMinimumHeight(0);
+    m_legendPanel->adjustSize();
+    m_legendPanel->setAttribute(Qt::WA_TranslucentBackground);
+    m_legendPanel->setStyleSheet(
+        "QWidget { background: transparent; }"
+        "#legendPanel { border: 1px solid #4a6fa5; border-radius: 3px; }");
+    m_legendPanel->setObjectName("legendPanel");
+    m_legendPanel->setFixedWidth(200);
+    if (auto* btn = m_legendHandle->findChild<QPushButton*>("legendDockBtn"))
+        btn->show();
+    m_legendPanel->show();
+    m_legendPanel->raise();
+    m_legendFloating = true;
+}
+
+void PlotWidget::dockLegend()
+{
+    if (!m_legendFloating || !m_legendPanel) return;
+    if (auto* btn = m_legendHandle->findChild<QPushButton*>("legendDockBtn"))
+        btn->hide();
+    m_legendPanel->setAttribute(Qt::WA_TranslucentBackground, false);
+    m_legendPanel->setStyleSheet("");
+    m_legendPanel->setObjectName("");
+    m_legendPanel->setFixedWidth(200);
+    m_mainLayout->addWidget(m_legendPanel);
+    m_legendPanel->show();
+    m_legendFloating = false;
+    m_legendDragging = false;
+}

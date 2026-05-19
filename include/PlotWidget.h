@@ -318,7 +318,11 @@ private:
     // Hover tooltip
     void showHoverTooltip(QAbstractSeries* series, const QPointF& dataPoint, const QPoint& viewPos);
     void hideHoverTooltip();
-    
+
+    // Draggable legend
+    void floatLegend();
+    void dockLegend();
+
     // Legacy functions (kept for compatibility)
     void createLegendHeader();
     void createVariableSection(const QString& varName, const QString& displayName);
@@ -407,6 +411,13 @@ private:
 
     // Hover tooltip
     QLabel* m_hoverTooltip = nullptr;
+
+    // Draggable legend
+    QWidget* m_legendPanel  = nullptr;
+    QWidget* m_legendHandle = nullptr;
+    bool     m_legendFloating = false;
+    bool     m_legendDragging = false;
+    QPoint   m_legendDragOffset;
     
     // Plot settings
     bool m_showLegend;
