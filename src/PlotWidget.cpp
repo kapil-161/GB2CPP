@@ -3911,10 +3911,19 @@ bool PlotWidget::eventFilter(QObject* obj, QEvent* event)
                 m_chartView->chart()->zoom(1.0 / scaleFactor);
             return true;
         }
+        else if (event->type() == QEvent::MouseButtonDblClick) {
+            QMouseEvent* mouseEvent = static_cast<QMouseEvent*>(event);
+            if (mouseEvent->button() == Qt::LeftButton) {
+                m_chartView->chart()->zoomReset();
+                autoFitAxes();
+                return true;
+            }
+        }
         else if (event->type() == QEvent::MouseButtonPress) {
             QMouseEvent* mouseEvent = static_cast<QMouseEvent*>(event);
             if (mouseEvent->button() == Qt::MiddleButton) {
                 m_chartView->chart()->zoomReset();
+                autoFitAxes();
                 return true;
             }
             else if (mouseEvent->button() == Qt::RightButton) {
