@@ -493,8 +493,8 @@ void PlotWidget::enforceAxisColors()
 
 void PlotWidget::autoFitAxes()
 {
-    // Reset pending flag when auto-fit executes
     m_autoFitPending = false;
+    m_isZoomed = false;
     
     qDebug() << "PlotWidget::autoFitAxes() - CALLED";
     
@@ -3909,13 +3909,32 @@ bool PlotWidget::eventFilter(QObject* obj, QEvent* event)
                 m_chartView->chart()->zoom(scaleFactor);
             else
                 m_chartView->chart()->zoom(1.0 / scaleFactor);
+            m_isZoomed = true;
             return true;
         }
         else if (event->type() == QEvent::MouseButtonDblClick) {
             QMouseEvent* mouseEvent = static_cast<QMouseEvent*>(event);
             if (mouseEvent->button() == Qt::LeftButton) {
-                m_chartView->chart()->zoomReset();
-                autoFitAxes();
+                if (m_isZoomed) {
+                    m_chartView->chart()->zoomReset();
+                    autoFitAxes();
+                    m_isZoomed = false;
+                } else {
+                    // Zoom in 2x centred on the cursor
+                    QPoint vpos = (obj == m_chartView->viewport())
+                                  ? mouseEvent->pos()
+                                  : m_chartView->viewport()->mapFromGlobal(mouseEvent->globalPos());
+                    QPointF scenePos = m_chartView->mapToScene(vpos);
+                    QPointF chartPos = m_chart->mapFromScene(scenePos);
+                    QRectF plotArea = m_chart->plotArea();
+                    double w = plotArea.width()  / 2.0;
+                    double h = plotArea.height() / 2.0;
+                    QRectF zoomRect(chartPos.x() - w / 2.0, chartPos.y() - h / 2.0, w, h);
+                    // Clamp rect to plot area so we don't zoom outside data range
+                    zoomRect = zoomRect.intersected(plotArea);
+                    m_chart->zoomIn(zoomRect);
+                    m_isZoomed = true;
+                }
                 return true;
             }
         }
@@ -3924,6 +3943,7 @@ bool PlotWidget::eventFilter(QObject* obj, QEvent* event)
             if (mouseEvent->button() == Qt::MiddleButton) {
                 m_chartView->chart()->zoomReset();
                 autoFitAxes();
+                m_isZoomed = false;
                 return true;
             }
             else if (mouseEvent->button() == Qt::RightButton) {

@@ -403,6 +403,7 @@ private:
     // Plot→Legend hit-testing state
     QAbstractSeries* m_hoveredSeries = nullptr;
     QPoint m_chartClickPressPos;
+    bool m_isZoomed = false;
 
     // Hover tooltip
     QLabel* m_hoverTooltip = nullptr;
