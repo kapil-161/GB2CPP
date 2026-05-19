@@ -3825,6 +3825,10 @@ void PlotWidget::updatePlotWithScaling()
     }
     
     qDebug() << "PlotWidget::updatePlotWithScaling() - COMPLETED";
+
+    // Switch between single-chart and multi-panel layout based on settings
+    if (!m_isScatterMode && !m_isBoxPlotMode)
+        plotTimeSeriesMultiPanel();
 }
 
 void PlotWidget::onPlotSettingsChanged()

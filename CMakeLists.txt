@@ -89,6 +89,7 @@ set(SOURCES
     src/PlotWidget_Settings.cpp
     src/PlotWidget_Legend.cpp
     src/PlotWidget_Scatter.cpp
+    src/PlotWidget_TSPanel.cpp
     src/TableWidget.cpp
     src/MetricsCalculator.cpp
     src/MetricsTableWidget.cpp

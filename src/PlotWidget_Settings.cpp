@@ -441,8 +441,9 @@ void PlotWidget::saveSettings() const
     s.setValue("showMinorGrid",  m_plotSettings.showMinorGrid);
     s.setValue("minorTickCount", m_plotSettings.minorTickCount);
 
-    // Interaction
+    // Interaction & Layout
     s.setValue("showHoverTooltip", m_plotSettings.showHoverTooltip);
+    s.setValue("multiPanelTimeSeries", m_plotSettings.multiPanelTimeSeries);
 
     // Legend
     s.setValue("showLegend",      m_plotSettings.showLegend);
@@ -497,6 +498,7 @@ void PlotWidget::loadSettings()
     m_plotSettings.minorTickCount = s.value("minorTickCount", m_plotSettings.minorTickCount).toInt();
 
     m_plotSettings.showHoverTooltip = s.value("showHoverTooltip", m_plotSettings.showHoverTooltip).toBool();
+    m_plotSettings.multiPanelTimeSeries = s.value("multiPanelTimeSeries", m_plotSettings.multiPanelTimeSeries).toBool();
 
     m_plotSettings.showLegend     = s.value("showLegend",     m_plotSettings.showLegend).toBool();
     m_plotSettings.legendPosition = s.value("legendPosition", m_plotSettings.legendPosition).toString();

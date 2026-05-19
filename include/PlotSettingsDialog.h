@@ -92,6 +92,9 @@ struct PlotSettings {
     // Interaction settings
     bool showHoverTooltip = false;
 
+    // Layout settings
+    bool multiPanelTimeSeries = false;  // tile Y variables in a grid instead of overlaying
+
     // Treatment filter (empty excludedSeriesKeys = show all)
     QSet<QString> excludedSeriesKeys;  // format: "varName::expId::trtId"
     QStringList availableExperiments;
@@ -193,6 +196,9 @@ private:
     QSpinBox *m_legendFontSizeSpinBox;
     QCheckBox *m_boldTitleCheckBox;
     QCheckBox *m_boldAxisLabelsCheckBox;
+
+    // Layout controls
+    QCheckBox *m_multiPanelTSCheckBox;
 
     // Scatter metrics checkboxes
     QMap<QString, QCheckBox*> m_scatterMetricCheckBoxes;

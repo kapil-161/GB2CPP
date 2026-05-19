@@ -291,6 +291,8 @@ private:
     void setupPreplotPanel();
     void resizeScatterPanels();
     QPixmap grabScatterAtSize(int panelSide);
+    void plotTimeSeriesMultiPanel();
+    void resizeTimeSeriesPanels();
 
     void updateLegend(const QVector<PlotData> &plotDataList);
     void updateLegendAdvanced(const QMap<QString, QMap<QString, QVector<QSharedPointer<PlotData>>>>& legendEntries);
@@ -440,6 +442,14 @@ private:
     QVector<QChartView*> m_scatterPanelViews;
     int m_scatterNCols = 1;
     int m_scatterNRows = 1;
+
+    // Multi-panel time series: one panel per Y variable
+    QWidget *m_tsPanelContainer = nullptr;
+    QGridLayout *m_tsPanelGrid = nullptr;
+    QScrollArea *m_tsScrollArea = nullptr;
+    QVector<QChartView*> m_tsPanelViews;
+    int m_tsNCols = 1;
+    int m_tsNRows = 1;
 
     // Scatter CSV export: key = "VARIABLE::EXPERIMENT", value = list of (sim, meas) points
     QMap<QString, QVector<QPointF>> m_scatterExportData;

@@ -43,6 +43,7 @@ PlotSettings PlotSettingsDialog::getSettings() const
     settings.minorTickCount = m_minorTickCountSpinBox->value();
     settings.showLegend = m_showLegendCheckBox->isChecked();
     settings.showHoverTooltip = m_showHoverTooltipCheckBox->isChecked();
+    settings.multiPanelTimeSeries = m_multiPanelTSCheckBox->isChecked();
     settings.legendPosition = m_legendPositionComboBox->currentData().toString();
     settings.legendX = m_legendXSpinBox->value();
     settings.legendY = m_legendYSpinBox->value();
@@ -312,6 +313,15 @@ void PlotSettingsDialog::setupUI()
     QWidget *appearanceTab = new QWidget();
     QVBoxLayout *appearanceLayout = new QVBoxLayout(appearanceTab);
     
+    // Plot Layout group
+    QGroupBox *layoutGroup = new QGroupBox("Plot Layout");
+    QVBoxLayout *layoutGroupLayout = new QVBoxLayout(layoutGroup);
+    m_multiPanelTSCheckBox = new QCheckBox("Multi-panel grid for time series (one panel per Y variable)");
+    m_multiPanelTSCheckBox->setChecked(m_settings.multiPanelTimeSeries);
+    m_multiPanelTSCheckBox->setToolTip("When enabled and 2+ Y variables are selected, each variable is shown in its own panel");
+    layoutGroupLayout->addWidget(m_multiPanelTSCheckBox);
+    appearanceLayout->addWidget(layoutGroup);
+
     // Legend settings group
     QGroupBox *legendGroup = new QGroupBox("Legend Settings");
     QVBoxLayout *legendLayout = new QVBoxLayout(legendGroup);
@@ -618,6 +628,7 @@ void PlotSettingsDialog::onResetDefaults()
     m_minorTickCountSpinBox->setValue(defaults.minorTickCount);
     m_showLegendCheckBox->setChecked(defaults.showLegend);
     m_showHoverTooltipCheckBox->setChecked(defaults.showHoverTooltip);
+    m_multiPanelTSCheckBox->setChecked(defaults.multiPanelTimeSeries);
     { int i = m_legendPositionComboBox->findData(defaults.legendPosition); if (i >= 0) m_legendPositionComboBox->setCurrentIndex(i); }
     m_legendXSpinBox->setValue(defaults.legendX);
     m_legendYSpinBox->setValue(defaults.legendY);
