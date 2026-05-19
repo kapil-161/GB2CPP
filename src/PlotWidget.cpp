@@ -319,8 +319,15 @@ void PlotWidget::setupChart()
     // Enable pan with right mouse button by setting drag mode programmatically
     // Pan will be handled in eventFilter for right mouse button
     
-    // Install event filter for mouse wheel zoom and middle-click reset
+    // Install event filter on both the view and its viewport.
+    // Mouse events (including moves) are delivered to the viewport widget, not the
+    // QChartView itself. Both need the filter so zoom, pan, and hit-testing all work.
     m_chartView->installEventFilter(this);
+    m_chartView->viewport()->installEventFilter(this);
+
+    // Enable mouse tracking so MouseMove fires without a button held (needed for hover).
+    m_chartView->setMouseTracking(true);
+    m_chartView->viewport()->setMouseTracking(true);
     
     // Replace placeholder in left layout
     QLayoutItem* item = m_leftLayout->itemAt(0);
@@ -2220,7 +2227,7 @@ void PlotWidget::addSeriesToPlot(const QVector<PlotData> &plotDataList)
             sharedPlotData->series = series;
             m_seriesToPlotData[series] = sharedPlotData;
             m_chart->addSeries(series);
-            
+
             // Attach series to existing axes (don't create default axes)
             auto axes = m_chart->axes();
             if (axes.size() >= 2) {
@@ -3889,40 +3896,73 @@ void PlotWidget::addTestData()
 
 bool PlotWidget::eventFilter(QObject* obj, QEvent* event)
 {
-    // Handle chart view events for zoom and pan
-    if (obj == m_chartView && m_chartView) {
+    // Mouse events arrive on the viewport child widget, not on the QChartView itself.
+    // Accept events from either so zoom/pan/hit-testing all work.
+    const bool isChartObj = m_chartView &&
+                            (obj == m_chartView || obj == m_chartView->viewport());
+
+    if (isChartObj) {
         if (event->type() == QEvent::Wheel) {
             QWheelEvent* wheelEvent = static_cast<QWheelEvent*>(event);
             const double scaleFactor = 1.15;
-            
-            if (wheelEvent->angleDelta().y() > 0) {
-                // Zoom in
+            if (wheelEvent->angleDelta().y() > 0)
                 m_chartView->chart()->zoom(scaleFactor);
-            } else {
-                // Zoom out
+            else
                 m_chartView->chart()->zoom(1.0 / scaleFactor);
-            }
             return true;
         }
         else if (event->type() == QEvent::MouseButtonPress) {
             QMouseEvent* mouseEvent = static_cast<QMouseEvent*>(event);
             if (mouseEvent->button() == Qt::MiddleButton) {
-                // Reset zoom on middle click
                 m_chartView->chart()->zoomReset();
                 return true;
             }
             else if (mouseEvent->button() == Qt::RightButton) {
-                // Switch to pan mode for right mouse button
                 m_chartView->setDragMode(QGraphicsView::ScrollHandDrag);
-                return false; // Let the chart view handle the drag
+                return false;
+            }
+            else if (mouseEvent->button() == Qt::LeftButton) {
+                // Viewport coords — store for click-vs-drag detection
+                QPoint vpos = (obj == m_chartView->viewport())
+                              ? mouseEvent->pos()
+                              : m_chartView->viewport()->mapFromGlobal(mouseEvent->globalPos());
+                m_chartClickPressPos = vpos;
             }
         }
         else if (event->type() == QEvent::MouseButtonRelease) {
             QMouseEvent* mouseEvent = static_cast<QMouseEvent*>(event);
             if (mouseEvent->button() == Qt::RightButton) {
-                // Switch back to zoom mode when right mouse button is released
                 m_chartView->setDragMode(QGraphicsView::RubberBandDrag);
                 return false;
+            }
+            else if (mouseEvent->button() == Qt::LeftButton) {
+                QPoint vpos = (obj == m_chartView->viewport())
+                              ? mouseEvent->pos()
+                              : m_chartView->viewport()->mapFromGlobal(mouseEvent->globalPos());
+                QPoint delta = vpos - m_chartClickPressPos;
+                if (delta.manhattanLength() < 6) {
+                    QAbstractSeries* hit = findSeriesNearPoint(vpos);
+                    if (hit) {
+                        selectLegendRowForSeries(hit);
+                        // Fall through (return false) so QChartView receives the
+                        // release event and resets its rubber-band state. Without
+                        // this, QChartView thinks the button is still held and starts
+                        // rubber-band selection on the next mouse move.
+                    }
+                }
+            }
+        }
+        else if (event->type() == QEvent::MouseMove) {
+            QMouseEvent* mouseEvent = static_cast<QMouseEvent*>(event);
+            // Always use viewport coordinates for hit-testing
+            QPoint vpos = (obj == m_chartView->viewport())
+                          ? mouseEvent->pos()
+                          : m_chartView->viewport()->mapFromGlobal(mouseEvent->globalPos());
+            QAbstractSeries* hit = findSeriesNearPoint(vpos);
+            if (hit != m_hoveredSeries) {
+                if (m_hoveredSeries) highlightLegendRowForSeries(m_hoveredSeries, false);
+                m_hoveredSeries = hit;
+                if (m_hoveredSeries) highlightLegendRowForSeries(m_hoveredSeries, true);
             }
         }
     }

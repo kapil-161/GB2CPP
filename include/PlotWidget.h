@@ -307,6 +307,12 @@ private:
     QStringList cropTreatmentList(const QStringList& treatments, int maxEntries) const;
     QString getCropNameFromCode(const QString& cropCode) const;
     void highlightSeries(QAbstractSeries* series, bool highlight);
+
+    // Plot → Legend reverse communication
+    QWidget* findLegendRowForSeries(QAbstractSeries* series) const;
+    void highlightLegendRowForSeries(QAbstractSeries* series, bool hoverOn);
+    void selectLegendRowForSeries(QAbstractSeries* series);
+    QAbstractSeries* findSeriesNearPoint(const QPoint& viewPos) const;
     
     // Legacy functions (kept for compatibility)
     void createLegendHeader();
@@ -388,6 +394,10 @@ private:
     // Legend management (simplified)
     QVector<QSharedPointer<PlotData>> m_plotDataList;
     QMap<QAbstractSeries*, QSharedPointer<PlotData>> m_seriesToPlotData;
+
+    // Plot→Legend hit-testing state
+    QAbstractSeries* m_hoveredSeries = nullptr;
+    QPoint m_chartClickPressPos;
     
     // Plot settings
     bool m_showLegend;

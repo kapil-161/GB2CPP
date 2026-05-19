@@ -612,6 +612,91 @@ void PlotWidget::createLegendRow(const LegendTreatmentData& treatmentData, const
     createSimpleLegendRow(treatmentData, varName, displayName);
 }
 
+// ============================================================================
+// PLOT → LEGEND REVERSE COMMUNICATION
+// ============================================================================
+
+QWidget* PlotWidget::findLegendRowForSeries(QAbstractSeries* series) const
+{
+    for (int i = 0; i < m_legendLayout->count(); ++i) {
+        QLayoutItem* item = m_legendLayout->itemAt(i);
+        if (!item || !item->widget()) continue;
+        QWidget* widget = item->widget();
+        if (!widget->property("seriesToHighlight").isValid()) continue;
+        const auto seriesList = widget->property("seriesToHighlight").value<QVector<QAbstractSeries*>>();
+        if (seriesList.contains(series))
+            return widget;
+    }
+    return nullptr;
+}
+
+void PlotWidget::highlightLegendRowForSeries(QAbstractSeries* series, bool hoverOn)
+{
+    QWidget* row = findLegendRowForSeries(series);
+    if (!row) return;
+    // Don't override a persistent click-highlight
+    if (row->property("highlighted").toBool()) return;
+    row->setStyleSheet(hoverOn ? "background-color: #f0f7ff;" : "");
+}
+
+void PlotWidget::selectLegendRowForSeries(QAbstractSeries* series)
+{
+    QWidget* row = findLegendRowForSeries(series);
+    if (row)
+        createToggleHandler(row);
+}
+
+QAbstractSeries* PlotWidget::findSeriesNearPoint(const QPoint& viewPos) const
+{
+    // viewPos is in QChartView viewport coordinates.
+    // QGraphicsView::mapToScene() expects viewport coordinates directly — no
+    // intermediate widget mapping needed.
+    // mapToPosition() returns coordinates in QChart's local item space, which is the
+    // same space as mapFromScene(), so the comparison is valid.
+    QPointF scenePos = m_chartView->mapToScene(viewPos);
+    QPointF chartPos = m_chart->mapFromScene(scenePos);
+
+    const double lineThreshold    = 20.0;  // lines are thin, needs generous hit area
+    const double scatterThreshold = 14.0;
+
+    QAbstractSeries* nearest = nullptr;
+    double minDist = std::numeric_limits<double>::max();
+
+    for (QAbstractSeries* series : m_chart->series()) {
+        if (!series->isVisible()) continue;
+
+        if (auto* ls = qobject_cast<QLineSeries*>(series)) {
+            const auto pts = ls->points();
+            for (int i = 0; i + 1 < pts.size(); ++i) {
+                QPointF a = m_chart->mapToPosition(pts[i],   series);
+                QPointF b = m_chart->mapToPosition(pts[i+1], series);
+                // Distance from chartPos to segment AB
+                QPointF ab = b - a;
+                QPointF ap = chartPos - a;
+                double lenSq = ab.x()*ab.x() + ab.y()*ab.y();
+                double t = (lenSq > 0) ? qBound(0.0, (ap.x()*ab.x() + ap.y()*ab.y()) / lenSq, 1.0) : 0.0;
+                QPointF proj = a + t * ab;
+                double dist = QLineF(chartPos, proj).length();
+                if (dist < lineThreshold && dist < minDist) {
+                    minDist = dist;
+                    nearest = series;
+                }
+            }
+        } else if (auto* ss = qobject_cast<QScatterSeries*>(series)) {
+            double threshold = scatterThreshold + ss->markerSize() / 2.0;
+            for (const QPointF& pt : ss->points()) {
+                QPointF mapped = m_chart->mapToPosition(pt, series);
+                double dist = QLineF(chartPos, mapped).length();
+                if (dist < threshold && dist < minDist) {
+                    minDist = dist;
+                    nearest = series;
+                }
+            }
+        }
+    }
+    return nearest;
+}
+
 void PlotWidget::resetAllHighlightedItems()
 {
     // Reset all legend rows (matching Python _reset_all_highlighted_items)
