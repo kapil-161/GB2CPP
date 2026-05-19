@@ -54,7 +54,7 @@ MainWindow::MainWindow(QWidget *parent)
     
     // Apply Python-matching stylesheet
     setStyleSheet(
-        "* { color: #000000; font-family: 'Segoe UI', Arial, sans-serif; }"
+        "* { color: #000000; font-family: Arial; }"
         "QMainWindow, QWidget { background-color: #F0F5F9; }"
         "QTabWidget::pane { border: 1px solid #E4E8ED; background-color: #F0F5F9; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }"
         "QTabWidget::tab-bar { left: 5px; }"
@@ -229,7 +229,7 @@ void MainWindow::setupControlPanel()
     // Refresh files button
     m_refreshFilesButton = new QPushButton();
     m_refreshFilesButton->setToolTip("Refresh output files");
-    m_refreshFilesButton->setText("↻");
+    m_refreshFilesButton->setText("R");
     m_refreshFilesButton->setFixedSize(24, 24);
     m_refreshFilesButton->setStyleSheet(
         "QPushButton { background-color: #8B7355; border: none; color: white; }"
@@ -259,7 +259,7 @@ void MainWindow::setupControlPanel()
     m_fileListWidget->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
     fileContainerLayout->addWidget(m_fileListWidget);
     
-    m_unselectFilesButton = new QPushButton("×");
+    m_unselectFilesButton = new QPushButton("X");
     m_unselectFilesButton->setStyleSheet(
         "QPushButton { background-color: #ffcccc; border: none; padding: 0px; margin: 0px; font-size: 8px; width: 12px; max-width: 12px; min-width: 12px; }"
         "QPushButton:hover { background-color: #ffcccc; border-radius: 3px; }"

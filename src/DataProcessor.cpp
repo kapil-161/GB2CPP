@@ -1097,8 +1097,16 @@ bool DataProcessor::readObservedData(const QString &simulatedFilePath, const QSt
     // Use DSSATPRO directory path using 3-letter code (cropCode + "D")
     QString folderPath;
     if (!cropCode.isEmpty() && cropCode != "XX") {
-        // Create 3-letter code by adding "D" to crop code (e.g., "BN" -> "BND")
-        QString threeLetterCode = cropCode.toUpper() + "D";
+        // Application types use different DSSATPRO directory codes than the 2-letter DETAIL.CDE codes.
+        // Standard crops: append "D" (e.g., "BN" -> "BND").
+        // Special cases: DSSATPRO uses ASD/AQD/etc. instead of SND/SQD.
+        static const QMap<QString, QString> detailCodeToDssatproDir = {
+            {"SN", "ASD"},  // Seasonal
+            {"SQ", "AQD"},  // Sequence
+            {"FX", "YFD"},  // Yield Forecast
+        };
+        QString up = cropCode.toUpper();
+        QString threeLetterCode = detailCodeToDssatproDir.value(up, up + "D");
         qDebug() << "DataProcessor: Looking up directory in DSSATPRO using 3-letter code:" << threeLetterCode;
         
         folderPath = getDirectoryFromDssatProByThreeLetterCode(threeLetterCode);
@@ -1745,11 +1753,11 @@ QVector<CropDetails> DataProcessor::getCropDetails()
                 continue;
             }
             
-            if ((inCropSection || inApplicationsSection) && !line.trimmed().isEmpty()) {
+            if (inCropSection && !line.trimmed().isEmpty()) {
                 if (line.length() >= 8) {
                     QString cropCode = line.left(8).trimmed();
                     QString cropName = line.mid(8, 64).trimmed();
-                    
+
                     if (!cropCode.isEmpty() && !cropName.isEmpty()) {
                         CropDetails crop;
                         crop.cropCode = cropCode.left(2); // First 2 characters
@@ -1759,6 +1767,8 @@ QVector<CropDetails> DataProcessor::getCropDetails()
                     }
                 }
             }
+            // Application types (SN, SQ, FX …) are skipped here and added explicitly
+            // after DSSATPRO parsing using the correct ASD/AQD/… directory codes.
         }
         detailFile.close();
     }
@@ -1824,8 +1834,8 @@ QVector<CropDetails> DataProcessor::getCropDetails()
                 if (folderCode.endsWith("D") && folderCode.length() >= 3) {
                     QString code = folderCode.left(folderCode.length() - 1); // Remove 'D'
                     qDebug() << "DSSATPRO: Found directory mapping:" << folderCode << "(" << code << ") ->" << directory;
-                    
-                    // Update matching crop
+
+                    // Update matching crop (standard crops only — application types handled separately below)
                     if (cropMap.contains(code)) {
                         cropMap[code].directory = directory;
                         qDebug() << "DSSATPRO: Updated directory for code" << code;
@@ -1838,9 +1848,32 @@ QVector<CropDetails> DataProcessor::getCropDetails()
         proFile.close();
     }
     
-    // Convert to vector
+    // Convert regular crops to vector
     for (auto it = cropMap.begin(); it != cropMap.end(); ++it) {
         cropDetails.append(it.value());
+    }
+
+    // Append application type entries explicitly.
+    // Application types use non-standard DSSATPRO directory codes (ASD, AQD, APD …)
+    // that don't match the 2-letter DETAIL.CDE codes (SN, SQ), so they can't be
+    // resolved by the standard "cropCode + D" pattern. Multiple apps also share the
+    // same 2-letter code (SN = Seasonal AND Spatial), so we handle each separately.
+    struct AppType { const char *code; const char *name; const char *dssatproKey; };
+    static const AppType appTypes[] = {
+        {"SN", "Seasonal", "ASD"},
+        {"SQ", "Sequence", "AQD"},
+        {"SN", "Spatial",  "APD"},
+    };
+    for (const AppType &app : appTypes) {
+        QString dir = getDirectoryFromDssatProByThreeLetterCode(QString(app.dssatproKey));
+        if (!dir.isEmpty()) {
+            CropDetails cd;
+            cd.cropCode  = QString(app.code);
+            cd.cropName  = QString(app.name);
+            cd.directory = dir;
+            cropDetails.append(cd);
+            qDebug() << "getCropDetails: Added application type" << app.name << "code" << app.code << "dir" << dir;
+        }
     }
 
     // Cache the results

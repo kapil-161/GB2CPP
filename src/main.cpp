@@ -1,6 +1,7 @@
 #include <QApplication>
 #include <QStyleFactory>
 #include <QDir>
+#include <QFileInfo>
 #include <QStandardPaths>
 #include <QMessageBox>
 #include <QIcon>
@@ -238,6 +239,14 @@ void setupApplicationStyle(QApplication &app)
 
 int main(int argc, char *argv[])
 {
+    // Restore caller's working directory when launched via the portable NSIS launcher.
+    // The launcher sets GB2_WORKING_DIR before changing to %TEMP%\GB2_runtime,
+    // so relative paths in --save / --metrics resolve against the original terminal CWD.
+    QString callerCwd = qEnvironmentVariable("GB2_WORKING_DIR");
+    if (!callerCwd.isEmpty()) {
+        QDir::setCurrent(callerCwd);
+    }
+
     // Check for verbose/debug flag before creating application
     QStringList args;
     for (int i = 0; i < argc; ++i) {
@@ -316,6 +325,23 @@ int main(int argc, char *argv[])
             fprintf(stdout, "Observed data messages will be shown in this console.\n");
             fprintf(stdout, "Use --verbose or --debug flag to see all debug messages.\n\n");
         }
+    }
+#endif
+
+    // Disable DirectWrite text backend to bypass TextShaping.dll crash on Windows 11 + Qt6.
+    // Must be set before QApplication is constructed.
+#ifdef Q_OS_WIN
+    if (qEnvironmentVariableIsEmpty("QT_QPA_PLATFORM")) {
+        qputenv("QT_QPA_PLATFORM", "windows:nodirectwrite");
+    }
+    // Explicitly point Qt at the platform plugin directory relative to this exe.
+    // Required when running inside Enigma Virtual Box so Qt's LoadLibraryW call
+    // for qwindows.dll hits Enigma's virtual filesystem at the correct absolute path.
+    if (qEnvironmentVariableIsEmpty("QT_QPA_PLATFORM_PLUGIN_PATH")) {
+        wchar_t exePath[MAX_PATH] = {};
+        GetModuleFileNameW(NULL, exePath, MAX_PATH);
+        QString exeDir = QFileInfo(QString::fromWCharArray(exePath)).absolutePath();
+        qputenv("QT_QPA_PLATFORM_PLUGIN_PATH", (exeDir + "/platforms").toLocal8Bit());
     }
 #endif
 

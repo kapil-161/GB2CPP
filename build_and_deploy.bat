@@ -22,21 +22,24 @@ set CMAKE_PATH=
 set MINGW_PATH=
 
 REM Check common Qt installation locations
-for %%i in (6.9.1 6.8.1 6.7.1 6.6.1) do (
-    if exist "C:\Qt\%%i\mingw_64" (
+for %%i in (6.8.1 6.8.2 6.9.1 6.11.1 6.11.0 6.7.1 6.6.1) do (
+    if exist "C:\Qt\%%i\mingw_64\" (
         set QT_DIR=C:\Qt\%%i\mingw_64
+        echo Found Qt at: C:\Qt\%%i\mingw_64
         goto :found_qt
     )
 )
 
-REM Fallback to manual path if auto-detection fails
-set QT_DIR=C:\Qt\6.9.1\mingw_64
+echo ERROR: Qt not found. Please install Qt 6.x with MinGW to C:\Qt (https://www.qt.io/download-qt-installer)
+pause
+exit /b 1
 
 :found_qt
-echo Found Qt at: %QT_DIR%
 
 REM Auto-detect CMake
-if exist "C:\Qt\Tools\CMake_64\bin\cmake.exe" (
+if exist "C:\Qt\Tools\CMake\bin\cmake.exe" (
+    set CMAKE_PATH=C:\Qt\Tools\CMake\bin\cmake.exe
+) else if exist "C:\Qt\Tools\CMake_64\bin\cmake.exe" (
     set CMAKE_PATH=C:\Qt\Tools\CMake_64\bin\cmake.exe
 ) else if exist "C:\Program Files\CMake\bin\cmake.exe" (
     set CMAKE_PATH=C:\Program Files\CMake\bin\cmake.exe
@@ -200,35 +203,45 @@ if exist manual_deployment\Qt6Svg.dll del manual_deployment\Qt6Svg.dll
 if exist manual_deployment\D3Dcompiler_47.dll del manual_deployment\D3Dcompiler_47.dll
 if exist manual_deployment\opengl32sw.dll del manual_deployment\opengl32sw.dll
 
+if not defined QUIET_MODE echo Removed unnecessary files to minimize deployment size
+if not defined QUIET_MODE echo KEPT: platforms folder, libgcc/libwinpthread
+
+if not defined QUIET_MODE echo.
+if not defined QUIET_MODE echo Step 7: Building single portable GB2.exe with NSIS...
+cd /d "%PROJECT_DIR%"
+
+REM Auto-detect NSIS
+set NSIS_PATH=
+if exist "C:\Program Files\NSIS\makensis.exe" set NSIS_PATH=C:\Program Files\NSIS\makensis.exe
+if exist "C:\Program Files (x86)\NSIS\makensis.exe" set NSIS_PATH=C:\Program Files (x86)\NSIS\makensis.exe
+
+if not defined NSIS_PATH (
+    echo WARNING: NSIS not found - skipping portable exe build
+    echo Install NSIS from https://nsis.sourceforge.io to enable single-exe packaging
+    goto :skip_nsis
+)
+
+REM Remove stale runtime so the new exe is picked up on next launch
+if exist "%TEMP%\GB2_runtime\GB2.exe" del /f /q "%TEMP%\GB2_runtime\GB2.exe"
+
+"%NSIS_PATH%" gb2_launcher.nsi
+if %ERRORLEVEL% neq 0 (
+    echo ERROR: NSIS packaging failed!
+    goto :skip_nsis
+)
+if not defined QUIET_MODE echo SUCCESS: Single portable exe saved to C:\DSSAT48\Tools\gb2\GB2.exe
+
+:skip_nsis
 if not defined QUIET_MODE (
-    echo Removed unnecessary files to minimize deployment size
-    echo KEPT: platforms folder, libgcc/libwinpthread
-    echo.
-    echo Step 7: Testing deployment...
-    cd manual_deployment
-    echo Testing if GB2.exe runs...
-    start "" GB2.exe
-    timeout /t 3 /nobreak >nul
     echo.
     echo ========================================
     echo SUCCESS: Build and deployment complete!
     echo ========================================
     echo.
     echo Deployment folder: %PROJECT_DIR%manual_deployment
-    echo.
-    echo Next steps:
-    echo 1. Open Enigma Virtual Box
-    echo 2. Input File: %PROJECT_DIR%manual_deployment\GB2.exe
-    echo 3. Add ALL files from manual_deployment folder
-    echo 4. PRESERVE folder structure (especially platforms\)
-    echo 5. Process to create single executable
-    echo.
-    echo Expected result: ~60MB single executable
+    echo Portable single exe: C:\DSSAT48\Tools\gb2\GB2.exe
     echo ========================================
     pause
 ) else (
-    cd manual_deployment
-    start "" GB2.exe >nul 2>&1
-    timeout /t 2 /nobreak >nul
     echo Build complete. Deployment folder: %PROJECT_DIR%manual_deployment
 )
