@@ -5,6 +5,7 @@
 #include <QFrame>
 #include <QHBoxLayout>
 #include <QDebug>
+#include <QDateTime>
 #include <QtCharts/QLineSeries>
 #include <QtCharts/QScatterSeries>
 #include <algorithm>
@@ -695,6 +696,117 @@ QAbstractSeries* PlotWidget::findSeriesNearPoint(const QPoint& viewPos) const
         }
     }
     return nearest;
+}
+
+// ============================================================================
+// HOVER TOOLTIP
+// ============================================================================
+
+QPointF PlotWidget::findNearestDataPoint(QAbstractSeries* series, const QPoint& viewPos) const
+{
+    QPointF scenePos = m_chartView->mapToScene(viewPos);
+    QPointF chartPos = m_chart->mapFromScene(scenePos);
+
+    // Chart series points (may use virtual x in axis-break mode)
+    QVector<QPointF> chartPoints;
+    if (auto* ls = qobject_cast<QLineSeries*>(series))
+        chartPoints = ls->points();
+    else if (auto* ss = qobject_cast<QScatterSeries*>(series))
+        chartPoints = ss->points();
+
+    if (chartPoints.isEmpty()) return {};
+
+    // Original data points from PlotData (real x values even in axis-break mode)
+    QVector<QPointF> originalPoints;
+    auto pd = m_seriesToPlotData.value(series);
+    if (pd) originalPoints = pd->points;
+
+    double minDist = std::numeric_limits<double>::max();
+    int nearestIdx = 0;
+    for (int i = 0; i < chartPoints.size(); ++i) {
+        QPointF mapped = m_chart->mapToPosition(chartPoints[i], series);
+        double dist = QLineF(chartPos, mapped).length();
+        if (dist < minDist) { minDist = dist; nearestIdx = i; }
+    }
+
+    if (nearestIdx < originalPoints.size())
+        return originalPoints[nearestIdx];
+    return chartPoints.value(nearestIdx);
+}
+
+void PlotWidget::showHoverTooltip(QAbstractSeries* series, const QPointF& dataPoint, const QPoint& viewPos)
+{
+    auto pd = m_seriesToPlotData.value(series);
+    if (!pd) return;
+
+    // Variable display name and unit
+    QPair<QString, QString> varInfo = DataProcessor::getVariableInfo(pd->variable);
+    QString varName = varInfo.first.isEmpty() ? pd->variable : varInfo.first;
+    QString unit    = varInfo.second;
+
+    // X value
+    QString xStr;
+    if (m_currentXVar == "DATE") {
+        xStr = QDateTime::fromMSecsSinceEpoch((qint64)dataPoint.x()).toString("MMM dd, yyyy");
+    } else {
+        xStr = QString::number(dataPoint.x(), 'f', 1);
+    }
+
+    // Y value — adaptive precision
+    double y = dataPoint.y();
+    QString yStr;
+    if (qAbs(y) >= 0.01 && qAbs(y) < 1e6)
+        yStr = QString::number(y, 'f', 2);
+    else
+        yStr = QString::number(y, 'g', 4);
+    if (!unit.isEmpty()) yStr += " " + unit;
+
+    QString typeStr = pd->isObserved ? "Obs" : "Sim";
+    QString html = QString(
+        "<div style='font-family:sans-serif;font-size:11px;'>"
+        "<b>%1</b> <span style='color:#aad4ff;'>(%2)</span><br>"
+        "<span style='color:#cccccc;'>%3</span><br>"
+        "<span style='color:#88aacc;'>%4:</span> %5<br>"
+        "<b style='font-size:12px;'>%6</b>"
+        "</div>")
+        .arg(varName.toHtmlEscaped())
+        .arg(typeStr)
+        .arg(pd->treatmentName.toHtmlEscaped())
+        .arg(m_currentXVar.toHtmlEscaped())
+        .arg(xStr.toHtmlEscaped())
+        .arg(yStr.toHtmlEscaped());
+
+    if (!m_hoverTooltip) {
+        m_hoverTooltip = new QLabel(m_chartView);
+        m_hoverTooltip->setStyleSheet(
+            "background-color: rgba(30,40,55,220);"
+            "color: white;"
+            "border: 1px solid #4a6fa5;"
+            "border-radius: 4px;"
+            "padding: 5px 7px;"
+        );
+        m_hoverTooltip->setTextFormat(Qt::RichText);
+        m_hoverTooltip->setAttribute(Qt::WA_TransparentForMouseEvents);
+    }
+
+    m_hoverTooltip->setText(html);
+    m_hoverTooltip->adjustSize();
+
+    // Position near cursor, keep within chartView bounds
+    const int offsetX = 14, offsetY = -m_hoverTooltip->height() - 4;
+    QPoint pos = viewPos + QPoint(offsetX, offsetY);
+    QRect avail = m_chartView->rect();
+    pos.setX(qBound(2, pos.x(), avail.right()  - m_hoverTooltip->width()  - 2));
+    pos.setY(qBound(2, pos.y(), avail.bottom() - m_hoverTooltip->height() - 2));
+    m_hoverTooltip->move(pos);
+    m_hoverTooltip->show();
+    m_hoverTooltip->raise();
+}
+
+void PlotWidget::hideHoverTooltip()
+{
+    if (m_hoverTooltip)
+        m_hoverTooltip->hide();
 }
 
 void PlotWidget::resetAllHighlightedItems()

@@ -313,6 +313,11 @@ private:
     void highlightLegendRowForSeries(QAbstractSeries* series, bool hoverOn);
     void selectLegendRowForSeries(QAbstractSeries* series);
     QAbstractSeries* findSeriesNearPoint(const QPoint& viewPos) const;
+    QPointF findNearestDataPoint(QAbstractSeries* series, const QPoint& viewPos) const;
+
+    // Hover tooltip
+    void showHoverTooltip(QAbstractSeries* series, const QPointF& dataPoint, const QPoint& viewPos);
+    void hideHoverTooltip();
     
     // Legacy functions (kept for compatibility)
     void createLegendHeader();
@@ -398,6 +403,9 @@ private:
     // Plot→Legend hit-testing state
     QAbstractSeries* m_hoveredSeries = nullptr;
     QPoint m_chartClickPressPos;
+
+    // Hover tooltip
+    QLabel* m_hoverTooltip = nullptr;
     
     // Plot settings
     bool m_showLegend;

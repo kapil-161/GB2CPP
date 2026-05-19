@@ -3,7 +3,14 @@
     "allow": [
       "Bash(mv:*)",
       "Bash(./GB2.exe --version)",
-      "Bash(git push:*)"
+      "Bash(git push:*)",
+      "PowerShell(cmd /c \"dir C:\\\\DSSAT48\\\\Tools\\\\GB2\\\\ 2>&1\")",
+      "PowerShell(cmd /c \"winget install Python.Python.3.12 --architecture x86 --source winget --accept-package-agreements --accept-source-agreements 2>&1\")",
+      "PowerShell(Stop-Process -Name \"GB2_packed\" -Force -ErrorAction SilentlyContinue)",
+      "PowerShell(cmd /c '\"C:\\\\Program Files \\(x86\\)\\\\Enigma Virtual Box\\\\enigmavbconsole.exe\" \"C:\\\\DSSAT48\\\\Tools\\\\GB2CPP\\\\GB2.evb\" 2>&1')",
+      "PowerShell([System.IO.Directory]::GetDirectories\\(\"C:\\\\Users\\\\kapilbhattarai\\\\AppData\\\\Local\"\\) | ForEach-Object { Split-Path $_ -Leaf })",
+      "PowerShell([System.IO.Directory]::GetDirectories\\(\"C:\\\\Users\\\\kapilbhattarai\\\\AppData\\\\Local\\\\Programs\"\\) | ForEach-Object { Split-Path $_ -Leaf })",
+      "PowerShell($installer = \"$env:TEMP\\\\Git-installer.exe\"; Start-Process -FilePath $installer -ArgumentList \"/VERYSILENT /NORESTART /NOCANCEL /SP- /CLOSEAPPLICATIONS /RESTARTAPPLICATIONS /COMPONENTS=icons,ext\\\\reg\\\\shellhere,assoc,assoc_sh\" -Wait; Write-Host \"Git installation complete\")"
     ],
     "deny": [],
     "ask": []

@@ -3964,6 +3964,14 @@ bool PlotWidget::eventFilter(QObject* obj, QEvent* event)
                 m_hoveredSeries = hit;
                 if (m_hoveredSeries) highlightLegendRowForSeries(m_hoveredSeries, true);
             }
+            if (m_plotSettings.showHoverTooltip) {
+                if (hit) {
+                    QPointF nearestPt = findNearestDataPoint(hit, vpos);
+                    showHoverTooltip(hit, nearestPt, vpos);
+                } else {
+                    hideHoverTooltip();
+                }
+            }
         }
     }
     

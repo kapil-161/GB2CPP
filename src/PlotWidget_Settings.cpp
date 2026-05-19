@@ -419,6 +419,7 @@ void PlotWidget::applyPlotSettings(const PlotSettings &settings)
     // Update internal settings
     m_showGrid = settings.showGrid;
     m_showLegend = settings.showLegend;
+    if (!settings.showHoverTooltip) hideHoverTooltip();
 
     // Update internal plot settings
     // Note: error bar change detection is handled in onSettingsButtonClicked()
@@ -439,6 +440,9 @@ void PlotWidget::saveSettings() const
     s.setValue("showGrid",       m_plotSettings.showGrid);
     s.setValue("showMinorGrid",  m_plotSettings.showMinorGrid);
     s.setValue("minorTickCount", m_plotSettings.minorTickCount);
+
+    // Interaction
+    s.setValue("showHoverTooltip", m_plotSettings.showHoverTooltip);
 
     // Legend
     s.setValue("showLegend",      m_plotSettings.showLegend);
@@ -491,6 +495,8 @@ void PlotWidget::loadSettings()
     m_plotSettings.showGrid       = s.value("showGrid",       m_plotSettings.showGrid).toBool();
     m_plotSettings.showMinorGrid  = s.value("showMinorGrid",  m_plotSettings.showMinorGrid).toBool();
     m_plotSettings.minorTickCount = s.value("minorTickCount", m_plotSettings.minorTickCount).toInt();
+
+    m_plotSettings.showHoverTooltip = s.value("showHoverTooltip", m_plotSettings.showHoverTooltip).toBool();
 
     m_plotSettings.showLegend     = s.value("showLegend",     m_plotSettings.showLegend).toBool();
     m_plotSettings.legendPosition = s.value("legendPosition", m_plotSettings.legendPosition).toString();

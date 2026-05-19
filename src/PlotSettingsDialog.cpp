@@ -42,6 +42,7 @@ PlotSettings PlotSettingsDialog::getSettings() const
     settings.showMinorGrid = m_showMinorGridCheckBox->isChecked();
     settings.minorTickCount = m_minorTickCountSpinBox->value();
     settings.showLegend = m_showLegendCheckBox->isChecked();
+    settings.showHoverTooltip = m_showHoverTooltipCheckBox->isChecked();
     settings.legendPosition = m_legendPositionComboBox->currentData().toString();
     settings.legendX = m_legendXSpinBox->value();
     settings.legendY = m_legendYSpinBox->value();
@@ -353,6 +354,12 @@ void PlotSettingsDialog::setupUI()
     legendXYLayout->addStretch();
     legendLayout->addLayout(legendXYLayout);
     
+    // Hover tooltip
+    m_showHoverTooltipCheckBox = new QCheckBox("Show hover tooltip on chart");
+    m_showHoverTooltipCheckBox->setChecked(m_settings.showHoverTooltip);
+    m_showHoverTooltipCheckBox->setToolTip("When enabled, hovering near a series shows variable name, treatment, and value");
+    legendLayout->addWidget(m_showHoverTooltipCheckBox);
+
     // Plot mean of replicates
     m_plotMeanRepsCheckBox = new QCheckBox("Plot Mean of Replicates (sequence OSU)");
     m_plotMeanRepsCheckBox->setChecked(m_settings.plotMeanReps);
@@ -610,6 +617,7 @@ void PlotSettingsDialog::onResetDefaults()
     m_showMinorGridCheckBox->setChecked(defaults.showMinorGrid);
     m_minorTickCountSpinBox->setValue(defaults.minorTickCount);
     m_showLegendCheckBox->setChecked(defaults.showLegend);
+    m_showHoverTooltipCheckBox->setChecked(defaults.showHoverTooltip);
     { int i = m_legendPositionComboBox->findData(defaults.legendPosition); if (i >= 0) m_legendPositionComboBox->setCurrentIndex(i); }
     m_legendXSpinBox->setValue(defaults.legendX);
     m_legendYSpinBox->setValue(defaults.legendY);

@@ -89,6 +89,9 @@ struct PlotSettings {
     // Scatter panel overlay metrics (subset of available stats to display)
     QSet<QString> scatterMetrics = {"RMSE", "R²"};
 
+    // Interaction settings
+    bool showHoverTooltip = false;
+
     // Treatment filter (empty excludedSeriesKeys = show all)
     QSet<QString> excludedSeriesKeys;  // format: "varName::expId::trtId"
     QStringList availableExperiments;
@@ -135,6 +138,9 @@ private:
     QDoubleSpinBox *m_legendXSpinBox;
     QDoubleSpinBox *m_legendYSpinBox;
     
+    // Interaction controls
+    QCheckBox *m_showHoverTooltipCheckBox;
+
     // Error bar controls
     QCheckBox *m_showErrorBarsCheckBox;
     QComboBox *m_errorBarTypeComboBox;
