@@ -293,6 +293,7 @@ private:
     QPixmap grabScatterAtSize(int panelSide);
     void plotTimeSeriesMultiPanel();
     void resizeTimeSeriesPanels();
+    void buildMultiPanelLegend();
 
     void updateLegend(const QVector<PlotData> &plotDataList);
     void updateLegendAdvanced(const QMap<QString, QMap<QString, QVector<QSharedPointer<PlotData>>>>& legendEntries);

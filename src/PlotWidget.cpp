@@ -3748,45 +3748,21 @@ void PlotWidget::updatePlotWithScaling()
         return;
     }
 
-    // Re-calculate scaling factors based on current Y-vars
-    qDebug() << "PlotWidget::updatePlotWithScaling() - About to calculate scaling factors";
-    m_scaleFactors = calculateScalingFactors(m_simData, m_obsData, m_currentYVars);
-    qDebug() << "PlotWidget::updatePlotWithScaling() - Scaling factors calculated";
+    // In multi-panel mode each variable has its own Y axis — scaling is not needed
+    bool isMultiPanel = m_plotSettings.multiPanelTimeSeries && m_currentYVars.size() >= 2
+                        && !m_isScatterMode && !m_isBoxPlotMode;
 
-    // Create temporary copies for scaling
     DataTable scaledSimData = m_simData;
     DataTable scaledObsData = m_obsData;
 
-    // Apply scaling
-    qDebug() << "PlotWidget::updatePlotWithScaling() - BEFORE scaling, sample values:";
-    for (const QString &var : m_currentYVars) {
-        const DataColumn *col = scaledSimData.getColumn(var);
-        if (col && !col->data.isEmpty()) {
-            qDebug() << "  " << var << " first value BEFORE scaling:" << col->data[0];
-        }
-    }
-    
-    scaledSimData = applyScaling(scaledSimData, m_currentYVars);
-
-    qDebug() << "PlotWidget::updatePlotWithScaling() - AFTER scaling, sample values:";
-    for (const QString &var : m_currentYVars) {
-        const DataColumn *col = scaledSimData.getColumn(var);
-        if (col && !col->data.isEmpty()) {
-            // Find first non-zero value
-            QString firstNonZero = "all zero";
-            for (int i = 0; i < qMin(10, col->data.size()); ++i) {
-                double val = col->data[i].toDouble();
-                if (qAbs(val) > 0.0001) {
-                    firstNonZero = col->data[i].toString();
-                    break;
-                }
-            }
-            qDebug() << "  " << var << " first non-zero AFTER scaling:" << firstNonZero;
-        }
-    }
-
-    if (scaledObsData.rowCount > 0) {
-        scaledObsData = applyScaling(scaledObsData, m_currentYVars);
+    if (!isMultiPanel) {
+        // Re-calculate scaling factors based on current Y-vars
+        m_scaleFactors = calculateScalingFactors(m_simData, m_obsData, m_currentYVars);
+        scaledSimData = applyScaling(scaledSimData, m_currentYVars);
+        if (scaledObsData.rowCount > 0)
+            scaledObsData = applyScaling(scaledObsData, m_currentYVars);
+    } else {
+        m_scaleFactors.clear();
     }
 
     // Update the plot with scaled data
@@ -3814,9 +3790,12 @@ void PlotWidget::updatePlotWithScaling()
     }
     qDebug() << "PlotWidget::updatePlotWithScaling() - Datasets plotted";
 
-    // Update the scaling label
-    qDebug() << "PlotWidget::updatePlotWithScaling() - About to update scaling label";
-    updateScalingLabel(m_currentYVars);
+    // Update the scaling label (hidden in multi-panel mode — no scaling applied)
+    if (isMultiPanel) {
+        if (m_scalingLabel) m_scalingLabel->setVisible(false);
+    } else {
+        updateScalingLabel(m_currentYVars);
+    }
     
     // Schedule auto-fit using timer (consolidates multiple auto-fit calls)
     if (m_autoFitTimer && !m_autoFitPending) {
