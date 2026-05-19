@@ -408,6 +408,7 @@ private:
     QAbstractSeries* m_hoveredSeries = nullptr;
     QPoint m_chartClickPressPos;
     bool m_isZoomed = false;
+    bool m_ctrlDragPending = false;
 
     // Hover tooltip
     QLabel* m_hoverTooltip = nullptr;

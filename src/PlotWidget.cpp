@@ -38,6 +38,9 @@
 #include <QPdfWriter>
 #include <QEnterEvent>
 #include <QContextMenuEvent>
+#include <QDrag>
+#include <QMimeData>
+#include <QBuffer>
 #include <algorithm>
 #include <cmath>
 
@@ -3987,11 +3990,15 @@ bool PlotWidget::eventFilter(QObject* obj, QEvent* event)
                 return false;
             }
             else if (mouseEvent->button() == Qt::LeftButton) {
-                // Viewport coords — store for click-vs-drag detection
                 QPoint vpos = (obj == m_chartView->viewport())
                               ? mouseEvent->pos()
                               : m_chartView->viewport()->mapFromGlobal(mouseEvent->globalPos());
                 m_chartClickPressPos = vpos;
+                // Ctrl held → potential image drag, block rubber-band
+                if (mouseEvent->modifiers() & Qt::ControlModifier) {
+                    m_ctrlDragPending = true;
+                    return true;
+                }
             }
         }
         else if (event->type() == QEvent::MouseButtonRelease) {
@@ -4001,6 +4008,10 @@ bool PlotWidget::eventFilter(QObject* obj, QEvent* event)
                 return false;
             }
             else if (mouseEvent->button() == Qt::LeftButton) {
+                if (m_ctrlDragPending) {
+                    m_ctrlDragPending = false;
+                    return true;
+                }
                 QPoint vpos = (obj == m_chartView->viewport())
                               ? mouseEvent->pos()
                               : m_chartView->viewport()->mapFromGlobal(mouseEvent->globalPos());
@@ -4009,20 +4020,54 @@ bool PlotWidget::eventFilter(QObject* obj, QEvent* event)
                     QAbstractSeries* hit = findSeriesNearPoint(vpos);
                     if (hit) {
                         selectLegendRowForSeries(hit);
-                        // Fall through (return false) so QChartView receives the
-                        // release event and resets its rubber-band state. Without
-                        // this, QChartView thinks the button is still held and starts
-                        // rubber-band selection on the next mouse move.
                     }
                 }
             }
         }
         else if (event->type() == QEvent::MouseMove) {
             QMouseEvent* mouseEvent = static_cast<QMouseEvent*>(event);
-            // Always use viewport coordinates for hit-testing
             QPoint vpos = (obj == m_chartView->viewport())
                           ? mouseEvent->pos()
                           : m_chartView->viewport()->mapFromGlobal(mouseEvent->globalPos());
+
+            // Ctrl+drag → export chart as drag image
+            if (m_ctrlDragPending && (mouseEvent->buttons() & Qt::LeftButton)) {
+                QPoint delta = vpos - m_chartClickPressPos;
+                if (delta.manhattanLength() >= 6) {
+                    m_ctrlDragPending = false;
+                    // Grab the whole PlotWidget (chart + legend at their actual positions)
+                    // Hide UI chrome (bottom toolbar) exactly as clipboard export does
+                    bool bottomWasVisible = m_bottomContainer && m_bottomContainer->isVisible();
+                    if (m_bottomContainer) m_bottomContainer->setVisible(false);
+                    QApplication::processEvents();
+                    QPixmap chartPixmap = this->grab();
+                    if (m_bottomContainer) m_bottomContainer->setVisible(bottomWasVisible);
+
+                    // Save to a temp file so apps that need a file URI (Word, web uploads) work
+                    QString tempPath = QDir::temp().filePath("gb2_chart.png");
+                    chartPixmap.save(tempPath, "PNG");
+
+                    QByteArray pngData;
+                    QBuffer buf(&pngData);
+                    buf.open(QIODevice::WriteOnly);
+                    chartPixmap.save(&buf, "PNG");
+                    buf.close();
+
+                    QMimeData* mimeData = new QMimeData();
+                    mimeData->setData("image/png", pngData);
+                    mimeData->setImageData(chartPixmap.toImage());
+                    mimeData->setUrls({ QUrl::fromLocalFile(tempPath) });
+
+                    QDrag* drag = new QDrag(this);
+                    drag->setMimeData(mimeData);
+                    drag->setPixmap(chartPixmap.scaled(240, 160, Qt::KeepAspectRatio, Qt::SmoothTransformation));
+                    drag->setHotSpot(QPoint(8, 8));
+                    drag->exec(Qt::CopyAction);
+                    return true;
+                }
+            }
+
+            // Always use viewport coordinates for hit-testing
             QAbstractSeries* hit = findSeriesNearPoint(vpos);
             if (hit != m_hoveredSeries) {
                 if (m_hoveredSeries) highlightLegendRowForSeries(m_hoveredSeries, false);
