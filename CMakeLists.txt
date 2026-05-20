@@ -187,11 +187,10 @@ if(WIN32)
     )
 endif()
 
-# Disable debug output for release builds
-# In Release mode, ENABLE_DEBUG_OUTPUT is not defined, so all debug output is suppressed
-if(NOT CMAKE_BUILD_TYPE STREQUAL "Release")
-    target_compile_definitions(GB2 PRIVATE ENABLE_DEBUG_OUTPUT)
-endif()
+# Suppress qDebug() output in Release builds (qWarning/qCritical still work)
+target_compile_definitions(GB2 PRIVATE
+    $<$<CONFIG:Release>:QT_NO_DEBUG_OUTPUT>
+)
 
 # Set output directory
 set_target_properties(GB2 PROPERTIES
