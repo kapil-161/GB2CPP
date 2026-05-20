@@ -318,7 +318,7 @@ void MainWindow::setupControlPanel()
     m_fileListWidget->setMinimumHeight(120);
     m_fileListWidget->setMaximumHeight(120);
     m_fileListWidget->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
-    m_fileListWidget->setToolTip("Select output files to plot.\nDrag & drop .OUT files from Explorer to add them.");
+    m_fileListWidget->setToolTip("Select output files to plot.\nDrag & drop .OUT, .OSU, .OPG, .OVT, .OPT, .CSV files from Explorer to add them.");
     fileContainerLayout->addWidget(m_fileListWidget);
     
     m_unselectFilesButton = new QPushButton("X");
@@ -900,7 +900,8 @@ void MainWindow::onUserManual()
   <li>Supported file types: <code>.OUT</code>, <code>.OSU</code>, <code>.OPG</code>, <code>.CSV</code>, <code>EVALUATE.OUT</code>.</li>
   <li>Select multiple files in the outfile list to overlay their data on the same plot.</li>
   <li>EVALUATE.OUT files automatically switch to the <b>Scatter Plot</b> tab.</li>
-  <li><b>Drag &amp; drop</b> — drag one or more <code>.OUT</code> or <code>.CSV</code> files from Windows Explorer directly onto the outfile list.
+  <li><b>Drag &amp; drop</b> — drag one or more DSSAT output files from Windows Explorer directly onto the outfile list.
+    Supported extensions: <code>.OUT</code>, <code>.OSU</code>, <code>.OPG</code>, <code>.OVT</code>, <code>.OPT</code>, <code>.CSV</code>, and all other O-extension files.
     <ul>
       <li>If the file belongs to a known DSSAT crop folder, the crop selector switches automatically and the file is selected in the populated list.</li>
       <li>Files from outside DSSAT folders are added as standalone entries (shown in italic).</li>
