@@ -448,7 +448,7 @@ private:
     QWidget *m_tsPanelContainer = nullptr;
     QGridLayout *m_tsPanelGrid = nullptr;
     QScrollArea *m_tsScrollArea = nullptr;
-    QVector<QChartView*> m_tsPanelViews;
+    QVector<ErrorBarChartView*> m_tsPanelViews;
     int m_tsNCols = 1;
     int m_tsNRows = 1;
 

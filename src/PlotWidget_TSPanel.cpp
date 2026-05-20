@@ -11,8 +11,224 @@
 #include <QVBoxLayout>
 #include <QScrollArea>
 #include <QSizePolicy>
+#include <QMouseEvent>
+#include <QWheelEvent>
 #include <QDebug>
 #include <limits>
+
+// ---------------------------------------------------------------------------
+// PanelEventFilter — per-panel event filter giving each multi-panel chart view
+// zoom/reset, wheel zoom, right-drag pan, and hover tooltip.
+// No Q_OBJECT needed — only overrides a virtual.
+// ---------------------------------------------------------------------------
+class PanelEventFilter : public QObject
+{
+public:
+    explicit PanelEventFilter(
+        ErrorBarChartView *cv,
+        const QMap<QAbstractSeries*, QSharedPointer<PlotData>> &seriesMap,
+        const QString &xVar,
+        const QVector<ErrorBarChartView::SegmentInfo> &segments,
+        bool showTooltip,
+        QObject *parent = nullptr)
+        : QObject(parent), m_cv(cv), m_seriesMap(seriesMap),
+          m_xVar(xVar), m_segments(segments), m_showTooltip(showTooltip) {}
+
+protected:
+    bool eventFilter(QObject *obj, QEvent *event) override
+    {
+        if (!m_cv) return false;
+        if (obj != m_cv && obj != m_cv->viewport()) return false;
+
+        if (event->type() == QEvent::Wheel) {
+            auto *we = static_cast<QWheelEvent*>(event);
+            const double k = 1.15;
+            m_cv->chart()->zoom(we->angleDelta().y() > 0 ? k : 1.0 / k);
+            m_isZoomed = true;
+            return true;
+        }
+        if (event->type() == QEvent::MouseButtonDblClick) {
+            auto *me = static_cast<QMouseEvent*>(event);
+            if (me->button() == Qt::LeftButton) {
+                if (m_isZoomed) {
+                    m_cv->chart()->zoomReset();
+                    m_isZoomed = false;
+                } else {
+                    QPoint vpos = viewportPos(obj, me);
+                    QPointF chartPos = m_cv->chart()->mapFromScene(m_cv->mapToScene(vpos));
+                    QRectF plotArea  = m_cv->chart()->plotArea();
+                    double w = plotArea.width()  / 2.0;
+                    double h = plotArea.height() / 2.0;
+                    QRectF zoomRect(chartPos.x() - w / 2.0, chartPos.y() - h / 2.0, w, h);
+                    m_cv->chart()->zoomIn(zoomRect.intersected(plotArea));
+                    m_isZoomed = true;
+                }
+                return true;
+            }
+        }
+        if (event->type() == QEvent::MouseButtonPress) {
+            auto *me = static_cast<QMouseEvent*>(event);
+            if (me->button() == Qt::MiddleButton) {
+                m_cv->chart()->zoomReset();
+                m_isZoomed = false;
+                return true;
+            }
+            if (me->button() == Qt::RightButton) {
+                m_cv->setDragMode(QGraphicsView::ScrollHandDrag);
+                return false;
+            }
+        }
+        if (event->type() == QEvent::MouseButtonRelease) {
+            auto *me = static_cast<QMouseEvent*>(event);
+            if (me->button() == Qt::RightButton) {
+                m_cv->setDragMode(QGraphicsView::RubberBandDrag);
+                return false;
+            }
+        }
+        if (event->type() == QEvent::MouseMove && m_showTooltip) {
+            auto *me = static_cast<QMouseEvent*>(event);
+            QPoint vpos = viewportPos(obj, me);
+            QAbstractSeries *hit = seriesNear(vpos);
+            if (hit) {
+                auto pd = m_seriesMap.value(hit);
+                if (pd) showTip(pd, nearestPoint(hit, vpos), vpos);
+                else    hideTip();
+            } else {
+                hideTip();
+            }
+        }
+        if (event->type() == QEvent::Leave)
+            hideTip();
+        return false;
+    }
+
+private:
+    QPoint viewportPos(QObject *obj, QMouseEvent *me) const
+    {
+        return (obj == m_cv->viewport())
+               ? me->pos()
+               : m_cv->viewport()->mapFromGlobal(me->globalPos());
+    }
+
+    QAbstractSeries* seriesNear(const QPoint &vpos) const
+    {
+        QPointF chartPos = m_cv->chart()->mapFromScene(m_cv->mapToScene(vpos));
+        const double lineThr    = 20.0;
+        const double scatterThr = 14.0;
+        QAbstractSeries *nearest = nullptr;
+        double minDist = std::numeric_limits<double>::max();
+        for (QAbstractSeries *s : m_cv->chart()->series()) {
+            if (!s->isVisible()) continue;
+            if (auto *ls = qobject_cast<QLineSeries*>(s)) {
+                const auto pts = ls->points();
+                for (int i = 0; i + 1 < pts.size(); ++i) {
+                    QPointF a = m_cv->chart()->mapToPosition(pts[i],   s);
+                    QPointF b = m_cv->chart()->mapToPosition(pts[i+1], s);
+                    QPointF ab = b - a, ap = chartPos - a;
+                    double lenSq = ab.x()*ab.x() + ab.y()*ab.y();
+                    double t = (lenSq > 0) ? qBound(0.0, (ap.x()*ab.x()+ap.y()*ab.y())/lenSq, 1.0) : 0.0;
+                    double dist = QLineF(chartPos, a + t*ab).length();
+                    if (dist < lineThr && dist < minDist) { minDist = dist; nearest = s; }
+                }
+            } else if (auto *ss = qobject_cast<QScatterSeries*>(s)) {
+                double thr = scatterThr + ss->markerSize() / 2.0;
+                for (const QPointF &pt : ss->points()) {
+                    double dist = QLineF(chartPos, m_cv->chart()->mapToPosition(pt, s)).length();
+                    if (dist < thr && dist < minDist) { minDist = dist; nearest = s; }
+                }
+            }
+        }
+        return nearest;
+    }
+
+    QPointF nearestPoint(QAbstractSeries *series, const QPoint &vpos) const
+    {
+        QPointF chartPos = m_cv->chart()->mapFromScene(m_cv->mapToScene(vpos));
+        QVector<QPointF> pts;
+        if (auto *ls = qobject_cast<QLineSeries*>(series))        pts = ls->points();
+        else if (auto *ss = qobject_cast<QScatterSeries*>(series)) pts = ss->points();
+        if (pts.isEmpty()) return {};
+        double minDist = std::numeric_limits<double>::max();
+        int idx = 0;
+        for (int i = 0; i < pts.size(); ++i) {
+            double d = QLineF(chartPos, m_cv->chart()->mapToPosition(pts[i], series)).length();
+            if (d < minDist) { minDist = d; idx = i; }
+        }
+        return pts[idx]; // virtual x in axis-break mode
+    }
+
+    // Convert virtual x back to real msec for axis-break DATE display
+    double unremapX(double vx) const
+    {
+        for (int i = 0; i < m_segments.size(); ++i) {
+            const auto &s = m_segments[i];
+            if (vx <= s.virtualEnd || i == m_segments.size() - 1)
+                return s.realStart + (vx - s.virtualStart);
+        }
+        return vx;
+    }
+
+    void showTip(const QSharedPointer<PlotData> &pd, const QPointF &pt, const QPoint &vpos)
+    {
+        QPair<QString,QString> vi = DataProcessor::getVariableInfo(pd->variable);
+        QString varName = vi.first.isEmpty() ? pd->variable : vi.first;
+        QString unit    = vi.second;
+
+        QString xStr;
+        if (m_xVar == "DATE") {
+            double realMsec = m_segments.isEmpty() ? pt.x() : unremapX(pt.x());
+            xStr = QDateTime::fromMSecsSinceEpoch((qint64)realMsec).toString("MMM dd, yyyy");
+        } else {
+            xStr = QString::number(pt.x(), 'f', 1);
+        }
+
+        double y = pt.y();
+        QString yStr = (qAbs(y) >= 0.01 && qAbs(y) < 1e6)
+                       ? QString::number(y, 'f', 2) : QString::number(y, 'g', 4);
+        if (!unit.isEmpty()) yStr += " " + unit;
+
+        QString html = QString(
+            "<div style='font-family:sans-serif;font-size:11px;'>"
+            "<b>%1</b> <span style='color:#aad4ff;'>(%2)</span><br>"
+            "<span style='color:#cccccc;'>%3</span><br>"
+            "<span style='color:#88aacc;'>%4:</span> %5<br>"
+            "<b style='font-size:12px;'>%6</b>"
+            "</div>")
+            .arg(varName.toHtmlEscaped()).arg(pd->isObserved ? "Obs" : "Sim")
+            .arg(pd->treatmentName.toHtmlEscaped())
+            .arg(m_xVar.toHtmlEscaped()).arg(xStr.toHtmlEscaped())
+            .arg(yStr.toHtmlEscaped());
+
+        if (!m_tooltip) {
+            m_tooltip = new QLabel(m_cv);
+            m_tooltip->setStyleSheet(
+                "background-color: rgba(30,40,55,220); color: white;"
+                "border: 1px solid #4a6fa5; border-radius: 4px; padding: 5px 7px;");
+            m_tooltip->setTextFormat(Qt::RichText);
+            m_tooltip->setAttribute(Qt::WA_TransparentForMouseEvents);
+        }
+        m_tooltip->setText(html);
+        m_tooltip->adjustSize();
+        const int ox = 14, oy = -m_tooltip->height() - 4;
+        QPoint pos = vpos + QPoint(ox, oy);
+        QRect avail = m_cv->rect();
+        pos.setX(qBound(2, pos.x(), avail.right()  - m_tooltip->width()  - 2));
+        pos.setY(qBound(2, pos.y(), avail.bottom() - m_tooltip->height() - 2));
+        m_tooltip->move(pos);
+        m_tooltip->show();
+        m_tooltip->raise();
+    }
+
+    void hideTip() { if (m_tooltip) m_tooltip->hide(); }
+
+    QPointer<ErrorBarChartView> m_cv;
+    QMap<QAbstractSeries*, QSharedPointer<PlotData>> m_seriesMap;
+    QString m_xVar;
+    QVector<ErrorBarChartView::SegmentInfo> m_segments;
+    bool m_showTooltip;
+    bool m_isZoomed = false;
+    QPointer<QLabel> m_tooltip;
+};
 
 // ---------------------------------------------------------------------------
 // resizeTimeSeriesPanels — called deferred after layout; sizes panels to fill
@@ -86,7 +302,7 @@ void PlotWidget::plotTimeSeriesMultiPanel()
     if (m_bottomContainer) m_bottomContainer->setVisible(true); // keep DAS/DAP/Date buttons
 
     // Destroy old panel chart views
-    for (QChartView *cv : m_tsPanelViews) cv->deleteLater();
+    for (ErrorBarChartView *cv : m_tsPanelViews) cv->deleteLater();
     m_tsPanelViews.clear();
 
     // Create scroll area + container/grid on first use
@@ -164,6 +380,30 @@ void PlotWidget::plotTimeSeriesMultiPanel()
     globalXMax += xPad;
 
     bool isDateAxis = (m_currentXVar == "DATE");
+    bool hasBreaks  = isDateAxis && !m_axisBreaks.isEmpty();
+
+    // Pre-build break/segment vectors once — same for every panel
+    QVector<ErrorBarChartView::BreakInfo>   globalBreakInfos;
+    QVector<ErrorBarChartView::SegmentInfo> globalSegInfos;
+    if (hasBreaks) {
+        for (int i = 0; i < m_axisBreaks.size(); ++i) {
+            ErrorBarChartView::BreakInfo bi;
+            double segVEnd = m_axisSegments[i].virtualStart
+                             + (m_axisSegments[i].end - m_axisSegments[i].start);
+            bi.virtualX  = segVEnd + BREAK_VIRTUAL_WIDTH / 2.0;
+            bi.realStart = m_axisBreaks[i].gapStart;
+            bi.realEnd   = m_axisBreaks[i].gapEnd;
+            globalBreakInfos.append(bi);
+        }
+        for (const AxisSegment &s : m_axisSegments) {
+            ErrorBarChartView::SegmentInfo si;
+            si.virtualStart = s.virtualStart;
+            si.virtualEnd   = s.virtualStart + (s.end - s.start);
+            si.realStart    = s.start;
+            si.realEnd      = s.end;
+            globalSegInfos.append(si);
+        }
+    }
 
     // --- Build one panel per variable ---
     QVector<QAbstractAxis*> allXAxes; // for cross-panel X-sync
@@ -183,6 +423,11 @@ void PlotWidget::plotTimeSeriesMultiPanel()
         for (const auto &pd : varData) {
             for (const QPointF &pt : pd->points)
                 yDataMax = qMax(yDataMax, pt.y());
+            // Include error bar tops so they don't get clipped
+            if (m_plotSettings.showErrorBars && pd->isObserved) {
+                for (const ErrorBarData &eb : pd->errorBars)
+                    yDataMax = qMax(yDataMax, eb.meanY + eb.errorValue);
+            }
         }
         if (yDataMax <= 0.0) yDataMax = 1.0;
 
@@ -196,6 +441,8 @@ void PlotWidget::plotTimeSeriesMultiPanel()
         chart->setTitle("");
 
         // Add series from PlotData
+        QMap<QAbstractSeries*, QVector<ErrorBarData>>      panelErrorBars;
+        QMap<QAbstractSeries*, QSharedPointer<PlotData>>   panelSeriesMap;
         for (const auto &pd : varData) {
             if (pd->isObserved) {
                 QScatterSeries *ss = new QScatterSeries();
@@ -206,6 +453,9 @@ void PlotWidget::plotTimeSeriesMultiPanel()
                 ss->setUseOpenGL(false);
                 for (const QPointF &pt : pd->points) ss->append(pt);
                 chart->addSeries(ss);
+                panelSeriesMap[ss] = pd;
+                if (m_plotSettings.showErrorBars && !pd->errorBars.isEmpty())
+                    panelErrorBars[ss] = pd->errorBars;
             } else {
                 QLineSeries *ls = new QLineSeries();
                 // Force solid line — style variation is only needed in overlay mode
@@ -214,6 +464,7 @@ void PlotWidget::plotTimeSeriesMultiPanel()
                 ls->setPen(solidPen);
                 for (const QPointF &pt : pd->points) ls->append(pt);
                 chart->addSeries(ls);
+                panelSeriesMap[ls] = pd;
             }
         }
 
@@ -223,7 +474,7 @@ void PlotWidget::plotTimeSeriesMultiPanel()
 
         // --- X axis ---
         QAbstractAxis *xAxis = nullptr;
-        if (isDateAxis) {
+        if (isDateAxis && !hasBreaks) {
             QDateTimeAxis *dtAx = new QDateTimeAxis();
             dtAx->setFormat("d MMM");
             dtAx->setMin(QDateTime::fromMSecsSinceEpoch((qint64)globalXMin));
@@ -238,6 +489,18 @@ void PlotWidget::plotTimeSeriesMultiPanel()
             dtAx->setLinePen(QPen(m_plotSettings.axisLineColor));
             dtAx->setLabelsBrush(QBrush(Qt::black));
             xAxis = dtAx;
+        } else if (isDateAxis && hasBreaks) {
+            // Axis-break mode: virtual QValueAxis — custom tick labels painted by ErrorBarChartView
+            QValueAxis *vAx = new QValueAxis();
+            vAx->setRange(globalXMin, globalXMax);
+            vAx->setTickCount(2);
+            vAx->setLabelsVisible(false);
+            vAx->setMinorTickCount(0);
+            vAx->setMinorGridLineVisible(false);
+            vAx->setGridLineVisible(m_plotSettings.showGrid);
+            chart->addAxis(vAx, Qt::AlignBottom);
+            vAx->setLinePen(QPen(m_plotSettings.axisLineColor));
+            xAxis = vAx;
         } else {
             QValueAxis *vAx = new QValueAxis();
             // Target ~5 ticks for compact panels — find a clean interval
@@ -338,10 +601,24 @@ void PlotWidget::plotTimeSeriesMultiPanel()
         stripLabel->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
         panelLayout->addWidget(stripLabel);
 
-        QChartView *cv = new QChartView(chart);
+        ErrorBarChartView *cv = new ErrorBarChartView(chart);
         cv->setRenderHint(QPainter::Antialiasing);
         cv->setFrameShape(QFrame::NoFrame);
         cv->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+        cv->setDragMode(QGraphicsView::RubberBandDrag);
+        cv->setRubberBand(QChartView::RectangleRubberBand);
+        cv->setMouseTracking(true);
+        cv->viewport()->setMouseTracking(true);
+        auto *panelFilter = new PanelEventFilter(
+            cv, panelSeriesMap, m_currentXVar, globalSegInfos,
+            m_plotSettings.showHoverTooltip, cv); // parented to cv — auto-deleted
+        cv->installEventFilter(panelFilter);
+        cv->viewport()->installEventFilter(panelFilter);
+        if (m_plotSettings.showErrorBars)
+            cv->setErrorBarData(panelErrorBars);
+        cv->setAxisLineColor(m_plotSettings.axisLineColor);
+        if (hasBreaks) cv->setAxisBreaks(globalBreakInfos, globalSegInfos);
+        else           cv->clearAxisBreaks();
         panelLayout->addWidget(cv, 1);
 
         int row = vi / nCols;
@@ -350,9 +627,10 @@ void PlotWidget::plotTimeSeriesMultiPanel()
         m_tsPanelViews.append(cv);
     }
 
-    // --- Cross-panel X-axis sync (DateTimeAxis) ---
+    // --- Cross-panel X-axis sync ---
     // When user zooms one panel, all others follow the same time range.
-    if (isDateAxis && allXAxes.size() > 1) {
+    // Axis-break DATE mode uses QValueAxis (virtual coords), same sync path as numeric axes.
+    if (isDateAxis && !hasBreaks && allXAxes.size() > 1) {
         static bool syncing = false;
         for (QAbstractAxis *ax : allXAxes) {
             auto *dtAx = qobject_cast<QDateTimeAxis*>(ax);
@@ -372,7 +650,7 @@ void PlotWidget::plotTimeSeriesMultiPanel()
                                  syncing = false;
                              });
         }
-    } else if (!isDateAxis && allXAxes.size() > 1) {
+    } else if ((!isDateAxis || hasBreaks) && allXAxes.size() > 1) {
         static bool syncing = false;
         for (QAbstractAxis *ax : allXAxes) {
             auto *vAx = qobject_cast<QValueAxis*>(ax);
