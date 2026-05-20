@@ -144,8 +144,9 @@ void PlotWidget::plotScatter(
     auto niceAxis = [](double dataMin, double dataMax,
                        double &outMin, double &outMax, int &outTicks, QString &outFmt) {
         double range = dataMax - dataMin;
-        double pad = (range > 0) ? range * 0.05 : 1.0;
-        if (range < 1.0) pad = qMax(pad, 0.5 * range + 0.5);
+        // For zero or near-zero range (single point), use 10% of value magnitude as pad
+        double pad = (range > 0) ? range * 0.1
+                                 : qMax(1.0, std::abs(dataMin) * 0.1);
         dataMin -= pad;  dataMax += pad;
         if (dataMax <= dataMin) dataMax = dataMin + 1.0;
         double rawRange = dataMax - dataMin;
@@ -159,7 +160,10 @@ void PlotWidget::plotScatter(
         outMax  = qCeil (dataMax / step) * step;
         if (outMax <= outMin) outMax = outMin + step;
         outTicks = qRound((outMax - outMin) / step) + 1;
-        outFmt   = (step < 1.0) ? QString("%.2g") : QString("%.0f");
+        // Pick format: avoid scientific notation — use decimal places based on step
+        if (step >= 1.0)       outFmt = "%.0f";
+        else if (step >= 0.1)  outFmt = "%.1f";
+        else                   outFmt = "%.2f";
     };
 
     // --- Build / reset scatter panel area ---
