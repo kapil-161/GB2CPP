@@ -2000,8 +2000,10 @@ void PlotWidget::plotDatasets(const DataTable &simData, const DataTable &obsData
                 plotData.color = getColorForTreatment(treatmentId, colorIndex); // Use same treatmentId as simulated data for consistent colors
                 // Line style based on variable index, not treatment index
                 plotData.lineStyleIndex = yVars.indexOf(yVar); // modulo applied at render time
-                // Marker based on variable index to ensure each variable gets a different marker
-                plotData.symbolIndex = yVars.indexOf(yVar);
+                // In multi-panel mode each variable has its own panel, so use one consistent
+                // marker shape (index 0 = circle) across all panels. In overlay mode, vary
+                // by variable so different variables on the same axes can be distinguished.
+                plotData.symbolIndex = m_plotSettings.multiPanelTimeSeries ? 0 : yVars.indexOf(yVar);
                 colorIndex++;
                 plotData.isObserved = true;
                 
