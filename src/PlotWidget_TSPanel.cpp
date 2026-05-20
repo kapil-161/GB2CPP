@@ -202,7 +202,7 @@ private:
         if (!m_tooltip) {
             m_tooltip = new QLabel(m_cv);
             m_tooltip->setStyleSheet(
-                "background-color: rgba(30,40,55,220); color: white;"
+                "background-color: rgba(255,255,255,242); color: #1a1a2e;"
                 "border: 1px solid #4a6fa5; border-radius: 4px; padding: 5px 7px;");
             m_tooltip->setTextFormat(Qt::RichText);
             m_tooltip->setAttribute(Qt::WA_TransparentForMouseEvents);

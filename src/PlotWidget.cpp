@@ -275,7 +275,7 @@ void PlotWidget::setupUI()
     m_legendScrollArea->setWidgetResizable(true);
     m_legendScrollArea->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     m_legendScrollArea->setFrameShape(QFrame::NoFrame);
-    m_legendScrollArea->setFixedWidth(200);
+    // No fixed width — inherits from panel
 
     // Legend container
     m_legendWidget = new QWidget();
@@ -296,7 +296,7 @@ void PlotWidget::setupUI()
     // Legend stack: page 0 = treatment pre-selection, page 1 = legend
     setupPreplotPanel();
     m_legendStack = new QStackedWidget();
-    m_legendStack->setFixedWidth(200);
+    // No fixed width — inherits from panel
     m_legendStack->addWidget(m_preplotPanel);       // page 0 — shown before first plot
     m_legendStack->addWidget(m_legendScrollArea);   // page 1 — shown after plotting
     m_legendStack->setCurrentIndex(0);
@@ -327,14 +327,47 @@ void PlotWidget::setupUI()
 
     m_legendHandle->installEventFilter(this);
 
-    // Legend panel: handle + stack as one draggable unit
+    // Inner container: handle + stack
+    QWidget *legendInner = new QWidget();
+    QVBoxLayout *legendInnerLayout = new QVBoxLayout(legendInner);
+    legendInnerLayout->setContentsMargins(0, 0, 0, 0);
+    legendInnerLayout->setSpacing(0);
+    legendInnerLayout->addWidget(m_legendHandle);
+    legendInnerLayout->addWidget(m_legendStack);
+
+    // Left-edge resize strip — drag to change width
+    m_legendResizeStrip = new QWidget();
+    m_legendResizeStrip->setFixedWidth(5);
+    m_legendResizeStrip->setCursor(Qt::SizeHorCursor);
+    m_legendResizeStrip->setStyleSheet("background-color: transparent;");
+    m_legendResizeStrip->setToolTip("Drag to resize width");
+    m_legendResizeStrip->installEventFilter(this);
+
+    // Middle row: left strip + inner content
+    QWidget *legendMidRow = new QWidget();
+    QHBoxLayout *legendMidLayout = new QHBoxLayout(legendMidRow);
+    legendMidLayout->setContentsMargins(0, 0, 0, 0);
+    legendMidLayout->setSpacing(0);
+    legendMidLayout->addWidget(m_legendResizeStrip);
+    legendMidLayout->addWidget(legendInner, 1);
+
+    // Bottom resize strip — drag to change height (visible when floating)
+    m_legendResizeBottom = new QWidget();
+    m_legendResizeBottom->setFixedHeight(5);
+    m_legendResizeBottom->setCursor(Qt::SizeVerCursor);
+    m_legendResizeBottom->setStyleSheet("background-color: transparent;");
+    m_legendResizeBottom->setToolTip("Drag to resize height");
+    m_legendResizeBottom->installEventFilter(this);
+    m_legendResizeBottom->hide();  // only visible when floating
+
+    // Legend panel: mid row + bottom strip stacked vertically
     m_legendPanel = new QWidget();
-    m_legendPanel->setFixedWidth(200);
+    m_legendPanel->setFixedWidth(m_legendUserWidth);
     QVBoxLayout* legendPanelLayout = new QVBoxLayout(m_legendPanel);
     legendPanelLayout->setContentsMargins(0, 0, 0, 0);
     legendPanelLayout->setSpacing(0);
-    legendPanelLayout->addWidget(m_legendHandle);
-    legendPanelLayout->addWidget(m_legendStack);
+    legendPanelLayout->addWidget(legendMidRow, 1);
+    legendPanelLayout->addWidget(m_legendResizeBottom);
 
     m_mainLayout->addWidget(m_legendPanel);
 
@@ -4076,6 +4109,58 @@ bool PlotWidget::eventFilter(QObject* obj, QEvent* event)
         }
     }
 
+    // ── Legend width resize (left strip) ────────────────────────────────────
+    if (obj == m_legendResizeStrip) {
+        if (event->type() == QEvent::MouseButtonPress) {
+            QMouseEvent* me = static_cast<QMouseEvent*>(event);
+            if (me->button() == Qt::LeftButton) {
+                m_legendResizing = true;
+                m_legendResizeStartGlobalX = m_legendResizeStrip->mapToGlobal(me->pos()).x();
+                m_legendResizeStartWidth = m_legendPanel->width();
+                return true;
+            }
+        }
+        else if (event->type() == QEvent::MouseMove) {
+            if (m_legendResizing) {
+                QMouseEvent* me = static_cast<QMouseEvent*>(event);
+                int delta = m_legendResizeStartGlobalX - m_legendResizeStrip->mapToGlobal(me->pos()).x();
+                m_legendUserWidth = qBound(100, m_legendResizeStartWidth + delta, 600);
+                m_legendPanel->setFixedWidth(m_legendUserWidth);
+                return true;
+            }
+        }
+        else if (event->type() == QEvent::MouseButtonRelease) {
+            m_legendResizing = false;
+            return true;
+        }
+    }
+
+    // ── Legend height resize (bottom strip, floating only) ──────────────────
+    if (obj == m_legendResizeBottom) {
+        if (event->type() == QEvent::MouseButtonPress) {
+            QMouseEvent* me = static_cast<QMouseEvent*>(event);
+            if (me->button() == Qt::LeftButton) {
+                m_legendResizingH = true;
+                m_legendResizeStartGlobalY = m_legendResizeBottom->mapToGlobal(me->pos()).y();
+                m_legendResizeStartHeight = m_legendPanel->height();
+                return true;
+            }
+        }
+        else if (event->type() == QEvent::MouseMove) {
+            if (m_legendResizingH) {
+                QMouseEvent* me = static_cast<QMouseEvent*>(event);
+                int delta = m_legendResizeBottom->mapToGlobal(me->pos()).y() - m_legendResizeStartGlobalY;
+                int newHeight = qBound(80, m_legendResizeStartHeight + delta, 900);
+                m_legendPanel->setFixedHeight(newHeight);
+                return true;
+            }
+        }
+        else if (event->type() == QEvent::MouseButtonRelease) {
+            m_legendResizingH = false;
+            return true;
+        }
+    }
+
     // ── Legend handle drag ──────────────────────────────────────────────────
     if (obj == m_legendHandle) {
         if (event->type() == QEvent::MouseButtonPress) {
@@ -4480,7 +4565,6 @@ void PlotWidget::floatLegend()
 {
     if (m_legendFloating || !m_legendPanel) return;
     m_mainLayout->removeWidget(m_legendPanel);
-    // Remove stretch constraints so the panel shrinks to its content
     m_legendPanel->setMaximumHeight(QWIDGETSIZE_MAX);
     m_legendPanel->setMinimumHeight(0);
     m_legendStack->setMaximumHeight(QWIDGETSIZE_MAX);
@@ -4488,10 +4572,10 @@ void PlotWidget::floatLegend()
     m_legendPanel->adjustSize();
     m_legendPanel->setAttribute(Qt::WA_TranslucentBackground);
     m_legendPanel->setStyleSheet(
-        "QWidget { background: transparent; }"
-        "#legendPanel { border: 1px solid #4a6fa5; border-radius: 3px; }");
+        "#legendPanel { background: rgba(255,255,255,245); border: 1px solid #4a6fa5; border-radius: 4px; }");
     m_legendPanel->setObjectName("legendPanel");
-    m_legendPanel->setFixedWidth(200);
+    m_legendPanel->setFixedWidth(m_legendUserWidth);
+    if (m_legendResizeBottom) m_legendResizeBottom->show();
     if (auto* btn = m_legendHandle->findChild<QPushButton*>("legendDockBtn"))
         btn->show();
     m_legendPanel->show();
@@ -4504,12 +4588,17 @@ void PlotWidget::dockLegend()
     if (!m_legendFloating || !m_legendPanel) return;
     if (auto* btn = m_legendHandle->findChild<QPushButton*>("legendDockBtn"))
         btn->hide();
+    if (m_legendResizeBottom) m_legendResizeBottom->hide();
     m_legendPanel->setAttribute(Qt::WA_TranslucentBackground, false);
     m_legendPanel->setStyleSheet("");
     m_legendPanel->setObjectName("");
-    m_legendPanel->setFixedWidth(200);
+    // Clear fixed height so panel fills full window height when docked
+    m_legendPanel->setMinimumHeight(0);
+    m_legendPanel->setMaximumHeight(QWIDGETSIZE_MAX);
+    m_legendPanel->setFixedWidth(m_legendUserWidth);
     m_mainLayout->addWidget(m_legendPanel);
     m_legendPanel->show();
     m_legendFloating = false;
     m_legendDragging = false;
+    m_legendResizingH = false;
 }

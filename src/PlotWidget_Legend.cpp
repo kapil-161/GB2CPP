@@ -341,13 +341,12 @@ void PlotWidget::createLegendRowFromData(const QMap<QString, QVariant>& treatmen
         symbolWidget->setLayout(symbolLayout);
 
         if (scatterData) {
-            QString tooltip = QString("Variable: %1").arg(displayName);
             LegendSampleWidget* sample = new LegendSampleWidget(
                 true,
                 scatterData->pen,
                 scatterData->symbol,
                 scatterData->brush,
-                tooltip
+                QString()
             );
             symbolLayout->addWidget(sample);
         }
@@ -387,16 +386,12 @@ void PlotWidget::createLegendRowFromData(const QMap<QString, QVariant>& treatmen
     }
 
     if (obsData) {
-        QString obsTooltip = QString("Observed\nVariable: %1\nTreatment: %2")
-                            .arg(displayName)
-                            .arg(treatmentData["name"].toString());
-
         LegendSampleWidget* obsSample = new LegendSampleWidget(
             true,  // has symbol
             obsData->pen,
             obsData->symbol,
             obsData->brush,
-            obsTooltip
+            QString()
         );
         obsLayout->addWidget(obsSample);
     } else {
@@ -420,16 +415,12 @@ void PlotWidget::createLegendRowFromData(const QMap<QString, QVariant>& treatmen
     }
 
     if (simData) {
-        QString simTooltip = QString("Simulated\nVariable: %1\nTreatment: %2")
-                            .arg(displayName)
-                            .arg(treatmentData["name"].toString());
-
         LegendSampleWidget* simSample = new LegendSampleWidget(
             false,  // no symbol (line)
             simData->pen,
             "",
             QBrush(),
-            simTooltip
+            QString()
         );
         simLayout->addWidget(simSample);
     } else {
@@ -491,9 +482,6 @@ void PlotWidget::createLegendRowFromData(const QMap<QString, QVariant>& treatmen
     QLabel* trtLabel = new QLabel(legendDisplayName);
     trtLabel->setAlignment(Qt::AlignLeft | Qt::AlignVCenter);
     trtLabel->setWordWrap(true);
-    trtLabel->setToolTip(QString("Treatment: %1\nVariable: %2")
-                        .arg(legendDisplayName)
-                        .arg(displayName));
 
     rowLayout->addWidget(obsWidget);
     rowLayout->addWidget(simWidget);
@@ -779,8 +767,8 @@ void PlotWidget::showHoverTooltip(QAbstractSeries* series, const QPointF& dataPo
     if (!m_hoverTooltip) {
         m_hoverTooltip = new QLabel(m_chartView);
         m_hoverTooltip->setStyleSheet(
-            "background-color: rgba(30,40,55,220);"
-            "color: white;"
+            "background-color: rgba(255,255,255,242);"
+            "color: #1a1a2e;"
             "border: 1px solid #4a6fa5;"
             "border-radius: 4px;"
             "padding: 5px 7px;"

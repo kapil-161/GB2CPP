@@ -416,12 +416,21 @@ private:
     // Hover tooltip
     QLabel* m_hoverTooltip = nullptr;
 
-    // Draggable legend
-    QWidget* m_legendPanel  = nullptr;
-    QWidget* m_legendHandle = nullptr;
-    bool     m_legendFloating = false;
-    bool     m_legendDragging = false;
+    // Draggable / resizable legend
+    QWidget* m_legendPanel        = nullptr;
+    QWidget* m_legendHandle       = nullptr;
+    QWidget* m_legendResizeStrip  = nullptr;  // left-edge: resize width
+    QWidget* m_legendResizeBottom = nullptr;  // bottom-edge: resize height (floating only)
+    bool     m_legendFloating     = false;
+    bool     m_legendDragging     = false;
+    bool     m_legendResizing     = false;
+    bool     m_legendResizingH    = false;    // height resize in progress
     QPoint   m_legendDragOffset;
+    int      m_legendResizeStartGlobalX = 0;
+    int      m_legendResizeStartGlobalY = 0;
+    int      m_legendResizeStartWidth   = 0;
+    int      m_legendResizeStartHeight  = 0;
+    int      m_legendUserWidth          = 205; // persists across float/dock cycles
     
     // Plot settings
     bool m_showLegend;
