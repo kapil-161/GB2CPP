@@ -3113,46 +3113,39 @@ void PlotWidget::exportPlot(const QString &filePath, const QString &format)
     if (m_chartView) { m_chartView->update(); m_chartView->repaint(); }
     QApplication::processEvents();
 
-    QPixmap pixmap;
+    bool insideLegend = !m_isScatterMode && m_showLegend
+                        && m_plotSettings.legendPosition != "outside-right";
+    bool legendStackWasVisible = m_legendStack && m_legendStack->isVisible();
+    if (insideLegend && m_legendStack) m_legendStack->setVisible(false);
+    bool bottomWasVisible = m_bottomContainer && m_bottomContainer->isVisible();
+    if (m_bottomContainer) m_bottomContainer->setVisible(false);
+    QApplication::processEvents();
 
-    if (m_isScatterMode && m_scatterPanelContainer && m_legendWidget) {
-        pixmap = grabScatterAtSize(400);
-    } else {
-        bool insideLegend = m_showLegend && m_plotSettings.legendPosition != "outside-right";
-
-        // For inside-legend mode, hide entire legend stack so the chart fills the full width
-        bool legendStackWasVisible = m_legendStack && m_legendStack->isVisible();
-        if (insideLegend && m_legendStack) m_legendStack->setVisible(false);
-
-        // Hide bottom button bar so it doesn't appear in the exported image
-        bool bottomWasVisible = m_bottomContainer && m_bottomContainer->isVisible();
-        if (m_bottomContainer) m_bottomContainer->setVisible(false);
-        QApplication::processEvents();
-
-        pixmap = QPixmap(this->size());
-        pixmap.fill(Qt::white);
+    QPixmap pixmap = QPixmap(this->size());
+    pixmap.fill(Qt::white);
+    {
         QPainter painter(&pixmap);
         painter.setRenderHint(QPainter::Antialiasing, true);
         painter.setRenderHint(QPainter::TextAntialiasing, true);
         painter.setRenderHint(QPainter::SmoothPixmapTransform, true);
         this->render(&painter);
-        painter.end();
-
-        if (insideLegend) {
-            if (m_legendStack) m_legendStack->setVisible(legendStackWasVisible);
-            QApplication::processEvents();
-            QRectF plotArea;
-            if (m_chart && m_chartView) {
-                QRectF pa = m_chart->plotArea();
-                QPointF offset = m_chartView->mapTo(this, QPoint(0, 0));
-                plotArea = pa.translated(offset);
-            }
-            overlayLegend(pixmap, m_legendWidget, m_plotSettings.legendPosition, plotArea, m_plotSettings.legendX, m_plotSettings.legendY);
-        }
-
-        if (m_legendStack && !insideLegend) m_legendStack->setVisible(legendStackWasVisible);
-        if (m_bottomContainer) m_bottomContainer->setVisible(bottomWasVisible);
     }
+
+    if (insideLegend) {
+        if (m_legendStack) m_legendStack->setVisible(legendStackWasVisible);
+        QApplication::processEvents();
+        QRectF plotArea;
+        if (m_chart && m_chartView) {
+            QRectF pa = m_chart->plotArea();
+            QPointF offset = m_chartView->mapTo(this, QPoint(0, 0));
+            plotArea = pa.translated(offset);
+        }
+        overlayLegend(pixmap, m_legendWidget, m_plotSettings.legendPosition,
+                      plotArea, m_plotSettings.legendX, m_plotSettings.legendY);
+    }
+
+    if (m_legendStack && !insideLegend) m_legendStack->setVisible(legendStackWasVisible);
+    if (m_bottomContainer) m_bottomContainer->setVisible(bottomWasVisible);
 
     qDebug() << "exportPlot: filePath=" << filePath << "format=" << format << "pixmap=" << pixmap.size();
     bool ok = false;
@@ -3197,41 +3190,55 @@ void PlotWidget::exportPlot(const QString &filePath, const QString &format)
 // Render scatter panels at a given panel size, composite with legend, return pixmap
 QPixmap PlotWidget::grabScatterAtSize(int panelSide)
 {
-    if (!m_scatterPanelContainer || !m_scatterPanelGrid || !m_legendWidget)
+    if (m_scatterPanelViews.isEmpty())
         return QPixmap();
 
     int nCols   = m_scatterNCols;
-    int nRows   = m_scatterNRows;
-    int spacing = m_scatterPanelGrid->spacing();
-    int margins = 12;
+    int spacing = (m_scatterPanelGrid ? m_scatterPanelGrid->spacing() : 6);
+    int pad     = 6;
 
-    // Resize panels to target size
-    for (int i = 0; i < m_scatterPanelGrid->count(); ++i) {
-        QLayoutItem *item = m_scatterPanelGrid->itemAt(i);
-        if (item && item->widget())
-            item->widget()->setFixedSize(panelSide, panelSide);
+    // Resize each panel to target size, grab individually, then restore
+    QVector<QSize> savedSizes;
+    for (QChartView *cv : m_scatterPanelViews) {
+        savedSizes.append(cv->size());
+        cv->setFixedSize(panelSide, panelSide);
     }
-    int cW = panelSide * nCols + spacing * (nCols - 1) + margins;
-    int cH = panelSide * nRows + spacing * (nRows - 1) + margins;
-    m_scatterPanelContainer->setFixedSize(cW, cH);
-    m_scatterPanelContainer->update();
     QApplication::processEvents();
 
-    QPixmap panelsPixmap = m_scatterPanelContainer->grab();
-    QPixmap legendPixmap = m_legendWidget->grab();
+    int nRows = (m_scatterPanelViews.size() + nCols - 1) / nCols;
+    int gridW = nCols * panelSide + (nCols - 1) * spacing + 2 * pad;
+    int gridH = nRows * panelSide + (nRows - 1) * spacing + 2 * pad;
 
-    int totalW = panelsPixmap.width() + legendPixmap.width() + 12;
-    int totalH = qMax(panelsPixmap.height(), legendPixmap.height());
-    QPixmap result(totalW, totalH);
+    // Only include legend if it's visible (hidden for single-experiment scatter)
+    bool legendVisible = m_legendWidget && m_legendPanel && m_legendPanel->isVisible();
+    QPixmap legendPixmap = legendVisible ? m_legendWidget->grab() : QPixmap();
+
+    int resultW = gridW + (legendVisible ? legendPixmap.width() + 12 : 0);
+    int resultH = legendVisible ? qMax(gridH, legendPixmap.height()) : gridH;
+
+    QPixmap result(resultW, resultH);
     result.fill(Qt::white);
     QPainter p(&result);
     p.setRenderHint(QPainter::Antialiasing);
     p.setRenderHint(QPainter::SmoothPixmapTransform);
-    p.drawPixmap(0, (totalH - panelsPixmap.height()) / 2, panelsPixmap);
-    p.drawPixmap(panelsPixmap.width() + 12, (totalH - legendPixmap.height()) / 2, legendPixmap);
+
+    for (int i = 0; i < m_scatterPanelViews.size(); ++i) {
+        int row = i / nCols;
+        int col = i % nCols;
+        int x   = pad + col * (panelSide + spacing);
+        int y   = pad + row * (panelSide + spacing);
+        QPixmap px = m_scatterPanelViews[i]->grab();
+        p.drawPixmap(x, y, px.scaled(panelSide, panelSide,
+                     Qt::IgnoreAspectRatio, Qt::SmoothTransformation));
+    }
+
+    if (legendVisible)
+        p.drawPixmap(gridW + 12, (resultH - legendPixmap.height()) / 2, legendPixmap);
     p.end();
 
-    // Restore to screen size
+    // Restore panel sizes
+    for (int i = 0; i < m_scatterPanelViews.size(); ++i)
+        m_scatterPanelViews[i]->setFixedSize(savedSizes[i]);
     resizeScatterPanels();
 
     return result;
@@ -3245,32 +3252,30 @@ void PlotWidget::copyPlotToClipboard()
     this->update();
     QApplication::processEvents();
 
-    QPixmap pixmap;
+    bool insideLegend = !m_isScatterMode && m_showLegend
+                        && m_plotSettings.legendPosition != "outside-right";
+    bool legendStackWasVisible = m_legendStack && m_legendStack->isVisible();
+    if (insideLegend && m_legendStack) m_legendStack->setVisible(false);
+    bool bottomWasVisible = m_bottomContainer && m_bottomContainer->isVisible();
+    if (m_bottomContainer) m_bottomContainer->setVisible(false);
+    QApplication::processEvents();
 
-    if (m_isScatterMode && m_scatterPanelContainer && m_legendWidget) {
-        pixmap = grabScatterAtSize(400); // 400px per panel for clipboard
-    } else {
-        bool insideLegend = m_showLegend && m_plotSettings.legendPosition != "outside-right";
-        bool legendStackWasVisible = m_legendStack && m_legendStack->isVisible();
-        if (insideLegend && m_legendStack) m_legendStack->setVisible(false);
-        bool bottomWasVisible = m_bottomContainer && m_bottomContainer->isVisible();
-        if (m_bottomContainer) m_bottomContainer->setVisible(false);
+    QPixmap pixmap = this->grab();
+
+    if (insideLegend) {
+        if (m_legendStack) m_legendStack->setVisible(legendStackWasVisible);
         QApplication::processEvents();
-        pixmap = this->grab();
-        if (insideLegend) {
-            if (m_legendStack) m_legendStack->setVisible(legendStackWasVisible);
-            QApplication::processEvents();
-            QRectF plotArea;
-            if (m_chart && m_chartView) {
-                QRectF pa = m_chart->plotArea();
-                QPointF offset = m_chartView->mapTo(this, QPoint(0, 0));
-                plotArea = pa.translated(offset);
-            }
-            overlayLegend(pixmap, m_legendWidget, m_plotSettings.legendPosition, plotArea, m_plotSettings.legendX, m_plotSettings.legendY);
+        QRectF plotArea;
+        if (m_chart && m_chartView) {
+            QRectF pa = m_chart->plotArea();
+            QPointF offset = m_chartView->mapTo(this, QPoint(0, 0));
+            plotArea = pa.translated(offset);
         }
-        if (m_legendStack && !insideLegend) m_legendStack->setVisible(legendStackWasVisible);
-        if (m_bottomContainer) m_bottomContainer->setVisible(bottomWasVisible);
+        overlayLegend(pixmap, m_legendWidget, m_plotSettings.legendPosition,
+                      plotArea, m_plotSettings.legendX, m_plotSettings.legendY);
     }
+    if (m_legendStack && !insideLegend) m_legendStack->setVisible(legendStackWasVisible);
+    if (m_bottomContainer) m_bottomContainer->setVisible(bottomWasVisible);
 
     QClipboard *clipboard = QApplication::clipboard();
     if (clipboard)
