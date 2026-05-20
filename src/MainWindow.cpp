@@ -892,19 +892,46 @@ void MainWindow::onUserManual()
 
 <h2 style="color:#1565C0;">1. Loading Files</h2>
 <ul>
-  <li>Click <b>Open File</b> or use <b>File → Open</b> to load a DSSAT output file.</li>
+  <li>Use the <b>Crop</b> dropdown to select a DSSAT crop folder — the outfile list updates automatically.</li>
+  <li>Click <b>Open File</b> or use <b>File → Open</b> to load any DSSAT output file directly.</li>
   <li>Supported file types: <code>.OUT</code>, <code>.OSU</code>, <code>.OPG</code>, <code>.CSV</code>, <code>EVALUATE.OUT</code>.</li>
-  <li>Multiple files can be selected in the file list to overlay plots.</li>
+  <li>Select multiple files in the outfile list to overlay their data on the same plot.</li>
   <li>EVALUATE.OUT files automatically switch to the <b>Scatter Plot</b> tab.</li>
+  <li><b>Drag &amp; drop</b> — drag one or more <code>.OUT</code> or <code>.CSV</code> files from Windows Explorer directly onto the outfile list.
+    <ul>
+      <li>If the file belongs to a known DSSAT crop folder, the crop selector switches automatically and the file is selected in the populated list.</li>
+      <li>Files from outside DSSAT folders are added as standalone entries (shown in italic).</li>
+    </ul>
+  </li>
+  <li>Use the <b>Search</b> box above the outfile list to filter by filename.</li>
+  <li>Click the <b>X</b> button beside the list to deselect all files at once.</li>
 </ul>
 
 <h2 style="color:#1565C0;">2. Time Series Tab</h2>
 <ul>
-  <li>Select an <b>X variable</b> (e.g. DATE, DAS, DAP, WYEAR) and one or more <b>Y variables</b>.</li>
+  <li>Select an <b>X variable</b> (e.g. DATE, DAS, DAP) from the dropdown; use the <b>DAS / DAP / DATE</b> quick-switch buttons.</li>
+  <li>Select one or more <b>Y variables</b> from the list (use the search box to filter).</li>
   <li>Click <b>Refresh Plot</b> to render the plot.</li>
-  <li>Use the <b>DAS / DAP / DATE</b> buttons to quickly switch the X axis.</li>
-  <li>The <b>Treatments</b> panel lets you check/uncheck individual treatments before plotting.</li>
+  <li>The <b>Treatments</b> panel lets you enable/disable individual treatments before plotting.</li>
   <li>Click a legend entry to highlight that series; click again to reset.</li>
+  <li>When a DATE x-axis has gaps between discontiguous periods, <b>axis breaks</b> collapse the gap automatically with a visible break mark.</li>
+</ul>
+
+<h3 style="color:#1976D2;">2a. Multi-Panel Time Series</h3>
+<ul>
+  <li>Enable <b>Multi-Panel Grid</b> in <b>Plot Settings</b> to display one panel per selected Y variable instead of overlaying all series on one chart.</li>
+  <li>Each panel shares the same X axis and is synchronized — zooming or panning one panel affects all.</li>
+  <li>Panels scroll vertically when more than 6 Y variables are selected.</li>
+  <li>Error bars, axis breaks, hover tooltips, and double-click zoom all work per-panel.</li>
+</ul>
+
+<h3 style="color:#1976D2;">2b. Chart Interaction</h3>
+<ul>
+  <li><b>Scroll wheel</b> — zoom in/out on the chart.</li>
+  <li><b>Right-click drag</b> — pan the chart.</li>
+  <li><b>Double-click</b> — zoom in; double-click again to reset to full extent.</li>
+  <li><b>Hover</b> — shows a tooltip with the variable name and value at the nearest data point.</li>
+  <li><b>Legend</b> — the legend is a floating, draggable panel. Drag it anywhere on the chart. Click the pin icon to dock it back inside the chart area.</li>
 </ul>
 
 <h2 style="color:#1565C0;">3. OSU Seasonal Summary Files</h2>
@@ -917,16 +944,17 @@ void MainWindow::onUserManual()
 
 <h2 style="color:#1565C0;">4. Scatter Plot Tab</h2>
 <ul>
-  <li>Load an <code>EVALUATE.OUT</code> file — the app will auto-switch to this tab.</li>
+  <li>Load an <code>EVALUATE.OUT</code> file — the app auto-switches to this tab.</li>
   <li>Simulated vs. observed values are plotted with a 1:1 reference line.</li>
   <li>Statistics (RMSE, R², d-stat, BIAS, N) are shown inside each panel.</li>
   <li>Configure which stats are shown via <b>Plot Settings → Scatter Panel Metrics</b>.</li>
+  <li>Click <b>Show Metrics</b> to open a detailed metrics table for all variables.</li>
 </ul>
 
 <h2 style="color:#1565C0;">5. Data View Tab</h2>
 <ul>
-  <li>Displays the raw loaded data as a table.</li>
-  <li>Switch between Regular .OUT, EVALUATE.OUT, or Current Plot Data using the dropdown.</li>
+  <li>Displays the raw loaded data as a sortable table.</li>
+  <li>Use the dropdown to switch between Regular .OUT data, EVALUATE.OUT data, or Current Plot Data.</li>
 </ul>
 
 <h2 style="color:#1565C0;">6. Saving &amp; Exporting</h2>
@@ -935,39 +963,48 @@ void MainWindow::onUserManual()
   <tr><td>Save Data</td><td>Ctrl+S</td><td>Saves simulated and observed data as CSV</td></tr>
   <tr><td>Save Plot Data</td><td>Ctrl+Shift+S</td><td>Saves merged plot data as a single CSV</td></tr>
   <tr><td>Export Plot Image</td><td>Ctrl+E</td><td>Exports the current plot as PNG/SVG</td></tr>
+  <tr><td>Copy Plot</td><td>Ctrl+C</td><td>Copies the plot image to the clipboard</td></tr>
+  <tr><td>Copy Metrics</td><td>—</td><td>Copies metrics table as tab-separated text</td></tr>
 </table>
 
 <h2 style="color:#1565C0;">7. Plot Settings</h2>
 <ul>
-  <li>Grid lines, legend position, axis titles and tick spacing</li>
-  <li>Line width and marker size</li>
-  <li>Axis range overrides (custom min/max)</li>
-  <li>Error bars (SD or SE) for replicated experiments</li>
-  <li>Plot Mean of Replicates (sequence OSU files)</li>
-  <li>Scatter panel metrics selection</li>
+  <li><b>General:</b> grid lines, legend visibility, axis titles, tick spacing</li>
+  <li><b>Style:</b> line width, marker size, color palette</li>
+  <li><b>Axes:</b> custom min/max overrides for X and Y</li>
+  <li><b>Error Bars:</b> SD or SE bars for replicated experiments (observed data points)</li>
+  <li><b>Multi-Panel Grid:</b> one panel per Y variable instead of overlaid lines</li>
+  <li><b>Hover Tooltip:</b> show/hide variable + value tooltip on mouse hover</li>
+  <li><b>Plot Mean of Replicates:</b> average replicates (sequence OSU files)</li>
+  <li><b>Scatter Panel Metrics:</b> choose which statistics appear inside each scatter panel</li>
 </ul>
 
-<h2 style="color:#1565C0;">8. Keyboard Shortcuts</h2>
+<h2 style="color:#1565C0;">8. Keyboard &amp; Mouse Shortcuts</h2>
 <table border="1" cellpadding="4" cellspacing="0" style="border-collapse:collapse;">
   <tr style="background:#E3F2FD;"><th>Shortcut</th><th>Action</th></tr>
   <tr><td>Ctrl+O</td><td>Open file</td></tr>
   <tr><td>Ctrl+S</td><td>Save data CSV</td></tr>
   <tr><td>Ctrl+Shift+S</td><td>Save plot data CSV</td></tr>
   <tr><td>Ctrl+E</td><td>Export plot image</td></tr>
-  <tr><td>Ctrl+Z / Ctrl+Y</td><td>Undo / Redo axis zoom</td></tr>
-  <tr><td>Scroll wheel</td><td>Zoom plot</td></tr>
-  <tr><td>Right-click drag</td><td>Pan plot</td></tr>
+  <tr><td>Ctrl+C</td><td>Copy plot to clipboard</td></tr>
+  <tr><td>Scroll wheel</td><td>Zoom in / out on chart</td></tr>
+  <tr><td>Right-click drag</td><td>Pan chart</td></tr>
+  <tr><td>Double-click</td><td>Zoom in; double-click again to reset</td></tr>
+  <tr><td>Drag legend</td><td>Move floating legend anywhere on chart</td></tr>
 </table>
 
 <h2 style="color:#1565C0;">9. DSSAT File Types</h2>
 <table border="1" cellpadding="4" cellspacing="0" style="border-collapse:collapse;">
-  <tr style="background:#E3F2FD;"><th>Extension</th><th>Type</th><th>X Axis</th></tr>
-  <tr><td>.OUT</td><td>Time series</td><td>DATE / DAS / DAP</td></tr>
+  <tr style="background:#E3F2FD;"><th>Extension</th><th>Type</th><th>Default X Axis</th></tr>
+  <tr><td>.OUT</td><td>Time series (daily/growth stage)</td><td>DATE / DAS / DAP</td></tr>
   <tr><td>.OSU</td><td>Seasonal summary</td><td>WYEAR</td></tr>
   <tr><td>.OPG</td><td>Plant growth</td><td>DATE</td></tr>
   <tr><td>.CSV</td><td>Comma-separated output</td><td>DATE</td></tr>
-  <tr><td>EVALUATE.OUT</td><td>Simulated vs Observed</td><td>—</td></tr>
+  <tr><td>EVALUATE.OUT</td><td>Simulated vs. Observed</td><td>— (scatter)</td></tr>
 </table>
+
+<h2 style="color:#1565C0;">10. CDE Variable Reference</h2>
+<p>Use <b>Help → CDE Codes Reference</b> to search and browse DSSAT variable codes, labels, and descriptions from the DSSAT CDE files.</p>
 
 </body></html>
     )");
