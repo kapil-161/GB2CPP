@@ -1931,8 +1931,44 @@ void MainWindow::addDroppedOutFile(const QString &filePath)
     if (!fi.exists() || !fi.isFile()) return;
 
     QString fileName = fi.fileName();
+    QString fileDir  = QDir(fi.absolutePath()).canonicalPath();
 
-    // Remove the "No .OUT files found" placeholder if present
+    // Try to match the dropped file's directory to a known crop folder.
+    // If found, switch the crop selector → populateFiles fills the list with
+    // that crop's files, then we select this file by name within it.
+    if (m_dataProcessor && m_fileComboBox && !fileDir.isEmpty()) {
+        QStringList folderNames = m_dataProcessor->prepareFolders(true);
+        for (const QString &folderName : folderNames) {
+            QString folderPath = QDir(m_dataProcessor->getActualFolderPath(folderName)).canonicalPath();
+            if (!folderPath.isEmpty() && folderPath.compare(fileDir, Qt::CaseInsensitive) == 0) {
+                // Switch crop (triggers onFolderSelectionChanged → populateFiles)
+                int idx = m_fileComboBox->findText(folderName);
+                if (idx >= 0 && m_fileComboBox->currentIndex() != idx) {
+                    m_fileComboBox->setCurrentIndex(idx);
+                } else if (idx >= 0 && m_fileComboBox->currentIndex() == idx) {
+                    // Same crop already — force-repopulate so list is fresh
+                    populateFiles(folderName);
+                }
+                // Find and select the file by name in the now-populated list
+                for (int i = 0; i < m_fileListWidget->count(); ++i) {
+                    QListWidgetItem *item = m_fileListWidget->item(i);
+                    if (item->text().compare(fileName, Qt::CaseInsensitive) == 0) {
+                        m_fileListWidget->blockSignals(true);
+                        m_fileListWidget->clearSelection();
+                        m_fileListWidget->blockSignals(false);
+                        item->setSelected(true);
+                        m_fileListWidget->scrollToItem(item);
+                        return;
+                    }
+                }
+                // File was filtered out by prepareOutFiles — fall through and add it explicitly
+                break;
+            }
+        }
+    }
+
+    // File is outside DSSAT folders (or was filtered) — add it to the current list.
+    // Remove placeholder if present
     for (int i = 0; i < m_fileListWidget->count(); ++i) {
         if (m_fileListWidget->item(i)->text() == "No .OUT files found") {
             delete m_fileListWidget->takeItem(i);
@@ -1940,11 +1976,10 @@ void MainWindow::addDroppedOutFile(const QString &filePath)
         }
     }
 
-    // Deduplicate by full path stored in UserRole
+    // Deduplicate by full path
     for (int i = 0; i < m_fileListWidget->count(); ++i) {
         QListWidgetItem *existing = m_fileListWidget->item(i);
         if (existing->data(Qt::UserRole).toString() == filePath) {
-            // Already in list — just scroll to it and select it
             m_fileListWidget->blockSignals(true);
             m_fileListWidget->clearSelection();
             m_fileListWidget->blockSignals(false);
@@ -1954,18 +1989,15 @@ void MainWindow::addDroppedOutFile(const QString &filePath)
         }
     }
 
-    // Build item
     QListWidgetItem *item = new QListWidgetItem(fileName);
     item->setData(Qt::UserRole, filePath);
 
-    // Tooltip: CDE description if available, plus full path
     QMap<QString, QString> descs = DataProcessor::getOutfileDescriptions();
     QString desc = descs.value(fi.baseName());
     item->setToolTip(desc.isEmpty()
         ? filePath
         : QString("%1: %2\n%3").arg(fileName, desc, filePath));
 
-    // Italic font to distinguish externally-dropped files from folder files
     QFont f = item->font();
     f.setItalic(true);
     item->setFont(f);
@@ -1973,7 +2005,6 @@ void MainWindow::addDroppedOutFile(const QString &filePath)
     m_fileListWidget->addItem(item);
     m_fileListWidget->scrollToItem(item);
 
-    // Select it (triggers onFileSelectionChanged → loads data)
     m_fileListWidget->blockSignals(true);
     m_fileListWidget->clearSelection();
     m_fileListWidget->blockSignals(false);
