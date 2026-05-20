@@ -68,6 +68,7 @@ public:
 protected:
     void closeEvent(QCloseEvent *event) override;
     void resizeEvent(QResizeEvent *event) override;
+    bool eventFilter(QObject *obj, QEvent *event) override;
 
 private slots:
     void onOpenFile();
@@ -105,6 +106,7 @@ private:
     void setupUI();
     void setupMenuBar();
     void setupStatusBar();
+    void addDroppedOutFile(const QString &filePath);
     void setupMainWidget();
     void setupControlPanel();
     void setupDataPanel();

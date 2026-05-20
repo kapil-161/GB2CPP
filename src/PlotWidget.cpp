@@ -1017,6 +1017,9 @@ void PlotWidget::plotTimeSeries(
 {
     m_isScatterMode = false;
 
+    // Restore legend panel (may have been hidden by scatter mode)
+    if (m_legendPanel) m_legendPanel->setVisible(true);
+
     // Show DAS, DAP, DATE buttons for time series plots (they're applicable)
     setXAxisButtonsVisible(true);
 
@@ -4571,8 +4574,13 @@ void PlotWidget::floatLegend()
     m_legendStack->setMinimumHeight(0);
     m_legendPanel->adjustSize();
     m_legendPanel->setAttribute(Qt::WA_TranslucentBackground);
-    m_legendPanel->setStyleSheet(
-        "#legendPanel { background: rgba(255,255,255,245); border: 1px solid #4a6fa5; border-radius: 4px; }");
+    {
+        QColor bg = m_plotSettings.legendBackgroundColor;
+        if (bg.alpha() == 0) bg = QColor(255, 255, 255, 245);
+        m_legendPanel->setStyleSheet(
+            QString("#legendPanel { background: rgba(%1,%2,%3,%4); border: 1px solid #4a6fa5; border-radius: 4px; }")
+                .arg(bg.red()).arg(bg.green()).arg(bg.blue()).arg(bg.alpha()));
+    }
     m_legendPanel->setObjectName("legendPanel");
     m_legendPanel->setFixedWidth(m_legendUserWidth);
     if (m_legendResizeBottom) m_legendResizeBottom->show();
@@ -4590,8 +4598,17 @@ void PlotWidget::dockLegend()
         btn->hide();
     if (m_legendResizeBottom) m_legendResizeBottom->hide();
     m_legendPanel->setAttribute(Qt::WA_TranslucentBackground, false);
-    m_legendPanel->setStyleSheet("");
     m_legendPanel->setObjectName("");
+    {
+        QColor bg = m_plotSettings.legendBackgroundColor;
+        if (bg.alpha() > 0) {
+            m_legendPanel->setStyleSheet(
+                QString("background-color: rgba(%1,%2,%3,%4);")
+                    .arg(bg.red()).arg(bg.green()).arg(bg.blue()).arg(bg.alpha()));
+        } else {
+            m_legendPanel->setStyleSheet("");
+        }
+    }
     // Clear fixed height so panel fills full window height when docked
     m_legendPanel->setMinimumHeight(0);
     m_legendPanel->setMaximumHeight(QWIDGETSIZE_MAX);

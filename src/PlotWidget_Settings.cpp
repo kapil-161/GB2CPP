@@ -298,6 +298,25 @@ void PlotWidget::applyPlotSettings(const PlotSettings &settings)
         if (m_legendScrollArea->widget())
             m_legendScrollArea->widget()->setStyleSheet(ss);
     }
+    if (m_legendPanel) {
+        if (m_legendFloating) {
+            QColor bg = settings.legendBackgroundColor;
+            // Fall back to near-white if fully transparent
+            if (bg.alpha() == 0) bg = QColor(255, 255, 255, 245);
+            m_legendPanel->setStyleSheet(
+                QString("#legendPanel { background: rgba(%1,%2,%3,%4); border: 1px solid #4a6fa5; border-radius: 4px; }")
+                    .arg(bg.red()).arg(bg.green()).arg(bg.blue()).arg(bg.alpha()));
+        } else {
+            QColor bg = settings.legendBackgroundColor;
+            if (bg.alpha() > 0) {
+                m_legendPanel->setStyleSheet(
+                    QString("background-color: rgba(%1,%2,%3,%4);")
+                        .arg(bg.red()).arg(bg.green()).arg(bg.blue()).arg(bg.alpha()));
+            } else {
+                m_legendPanel->setStyleSheet("");
+            }
+        }
+    }
 
     // Apply legend font (to custom legend widget, not chart legend)
     if (m_legendWidget) {

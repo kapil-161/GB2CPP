@@ -509,6 +509,7 @@ void PlotWidget::plotScatter(
     // --- Build legend in right panel (hide if only one experiment — redundant) ---
     clearLegend();
     bool showScatterLegend = (expOrder.size() > 1);
+    if (m_legendPanel) m_legendPanel->setVisible(showScatterLegend);
     if (m_legendStack) {
         m_legendStack->setCurrentIndex(1);
         m_legendStack->setVisible(showScatterLegend);
