@@ -1006,6 +1006,51 @@ void MainWindow::onUserManual()
 <h2 style="color:#1565C0;">10. CDE Variable Reference</h2>
 <p>Use <b>Help → CDE Codes Reference</b> to search and browse DSSAT variable codes, labels, and descriptions from the DSSAT CDE files.</p>
 
+<h2 style="color:#1565C0;">11. Command-Line / Headless Mode</h2>
+<p>GB2 can be driven from the terminal or called by DSSAT directly, with no manual interaction required.</p>
+
+<h3 style="color:#1976D2;">Basic invocation (called by DSSAT)</h3>
+<pre style="background:#F5F5F5; padding:8px; border-radius:4px;">GB2.exe &lt;DSSATBase&gt; &lt;CropDir&gt; [file1.OUT] [file2.OUT] ...</pre>
+<ul>
+  <li><code>&lt;DSSATBase&gt;</code> — root DSSAT installation path (e.g. <code>C:/DSSAT48</code>)</li>
+  <li><code>&lt;CropDir&gt;</code> — crop output folder (e.g. <code>C:/DSSAT48/Maize</code>)</li>
+  <li>Optional positional args — specific <code>.OUT</code> files to pre-select</li>
+</ul>
+
+<h3 style="color:#1976D2;">Optional flags</h3>
+<table border="1" cellpadding="4" cellspacing="0" style="border-collapse:collapse;">
+  <tr style="background:#E3F2FD;"><th>Flag</th><th>Argument</th><th>Description</th></tr>
+  <tr><td><code>--xvar</code></td><td><code>VARNAME</code></td><td>Pre-select the X axis variable (e.g. <code>DAS</code>)</td></tr>
+  <tr><td><code>--yvar</code></td><td><code>VAR1,VAR2</code></td><td>Pre-select one or more Y variables (comma-separated)</td></tr>
+  <tr><td><code>--save</code></td><td><code>plot.png</code></td><td>Render and save the plot image, then exit (headless)</td></tr>
+  <tr><td><code>--metrics</code></td><td><code>metrics.csv</code></td><td>Save time-series metrics to CSV (use with <code>--save</code>)</td></tr>
+  <tr><td><code>--boxplot</code></td><td>—</td><td>Render as a box plot (OSU seasonal files)</td></tr>
+  <tr><td><code>--scatter</code></td><td>—</td><td>Headless scatter plot mode (requires EVALUATE.OUT)</td></tr>
+  <tr><td><code>--scatter-vars</code></td><td><code>VAR1,VAR2</code></td><td>Limit scatter panels to these variables</td></tr>
+  <tr><td><code>--scatter-metrics</code></td><td><code>RMSE,R2</code></td><td>Override which statistics appear in scatter panels</td></tr>
+  <tr><td><code>-v</code></td><td>—</td><td>Verbose debug output to console</td></tr>
+</table>
+
+<h3 style="color:#1976D2;">Examples</h3>
+<pre style="background:#F5F5F5; padding:8px; border-radius:4px; white-space:pre-wrap;">
+# Open GB2 with Maize folder pre-selected
+GB2.exe C:/DSSAT48 C:/DSSAT48/Maize
+
+# Pre-select files and variables, open interactively
+GB2.exe C:/DSSAT48 C:/DSSAT48/Maize GROWTH.OUT --xvar DAS --yvar LAID,CWAD
+
+# Save plot image without showing the window (headless)
+GB2.exe C:/DSSAT48 C:/DSSAT48/Maize GROWTH.OUT --xvar DAS --yvar LAID --save growth.png
+
+# Headless + save metrics CSV
+GB2.exe C:/DSSAT48 C:/DSSAT48/Maize GROWTH.OUT --xvar DAS --yvar LAID --save growth.png --metrics metrics.csv
+
+# Headless scatter plot from EVALUATE.OUT
+GB2.exe C:/DSSAT48/Maize --scatter --scatter-vars HWAH,CWAH --save scatter.png
+</pre>
+
+<p><b>Note:</b> When <code>--save</code> is used, GB2 renders the plot and exits automatically. Relative output paths are resolved against the terminal's working directory at the time GB2 was launched.</p>
+
 </body></html>
     )");
 
