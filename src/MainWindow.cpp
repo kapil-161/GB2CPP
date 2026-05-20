@@ -9,6 +9,7 @@
 #include <QResizeEvent>
 #include <QScreen>
 #include <QDir>
+#include <QFileInfo>
 #include <QStandardPaths>
 #include <QHeaderView>
 #include <QTableWidget>
@@ -21,6 +22,59 @@
 #include <QTextBrowser>
 #include <QDialog>
 #include <QDialogButtonBox>
+#include <QDragEnterEvent>
+#include <QDragMoveEvent>
+#include <QDropEvent>
+#include <QMimeData>
+#include <QUrl>
+#include <functional>
+
+// Subclass overrides virtual drag events directly — more reliable than event filter
+// for QAbstractItemView which installs its own internal viewport filter.
+// No Q_OBJECT needed; callback is a std::function set after construction.
+class OutFileListWidget : public QListWidget
+{
+public:
+    explicit OutFileListWidget(QWidget *parent = nullptr) : QListWidget(parent)
+    {
+        setAcceptDrops(true);
+    }
+    std::function<void(const QStringList &)> onDrop;
+
+protected:
+    void dragEnterEvent(QDragEnterEvent *event) override
+    {
+        if (event->mimeData()->hasUrls()) {
+            for (const QUrl &url : event->mimeData()->urls()) {
+                QString ext = QFileInfo(url.toLocalFile()).suffix().toLower();
+                if (ext == "out" || ext == "csv") {
+                    event->acceptProposedAction();
+                    return;
+                }
+            }
+        }
+        event->ignore();
+    }
+
+    void dragMoveEvent(QDragMoveEvent *event) override
+    {
+        event->acceptProposedAction();
+    }
+
+    void dropEvent(QDropEvent *event) override
+    {
+        QStringList paths;
+        for (const QUrl &url : event->mimeData()->urls()) {
+            QString path = url.toLocalFile();
+            QString ext  = QFileInfo(path).suffix().toLower();
+            if ((ext == "out" || ext == "csv") && QFileInfo::exists(path))
+                paths << path;
+        }
+        if (onDrop && !paths.isEmpty())
+            onDrop(paths);
+        event->acceptProposedAction();
+    }
+};
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -252,11 +306,16 @@ void MainWindow::setupControlPanel()
     QHBoxLayout *fileContainerLayout = new QHBoxLayout(fileContainer);
     fileContainerLayout->setContentsMargins(0, 0, 0, 0);
     
-    m_fileListWidget = new QListWidget();
+    auto *outFileList = new OutFileListWidget();
+    m_fileListWidget = outFileList;
+    outFileList->onDrop = [this](const QStringList &paths) {
+        for (const QString &p : paths) addDroppedOutFile(p);
+    };
     m_fileListWidget->setSelectionMode(QListWidget::MultiSelection);
     m_fileListWidget->setMinimumHeight(120);
     m_fileListWidget->setMaximumHeight(120);
     m_fileListWidget->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+    m_fileListWidget->setToolTip("Select output files to plot.\nDrag & drop .OUT files from Explorer to add them.");
     fileContainerLayout->addWidget(m_fileListWidget);
     
     m_unselectFilesButton = new QPushButton("X");
@@ -1859,6 +1918,68 @@ void MainWindow::populateFolders()
     }
 }
 
+bool MainWindow::eventFilter(QObject *obj, QEvent *event)
+{
+    return QMainWindow::eventFilter(obj, event);
+}
+
+void MainWindow::addDroppedOutFile(const QString &filePath)
+{
+    if (!m_fileListWidget || filePath.isEmpty()) return;
+
+    QFileInfo fi(filePath);
+    if (!fi.exists() || !fi.isFile()) return;
+
+    QString fileName = fi.fileName();
+
+    // Remove the "No .OUT files found" placeholder if present
+    for (int i = 0; i < m_fileListWidget->count(); ++i) {
+        if (m_fileListWidget->item(i)->text() == "No .OUT files found") {
+            delete m_fileListWidget->takeItem(i);
+            break;
+        }
+    }
+
+    // Deduplicate by full path stored in UserRole
+    for (int i = 0; i < m_fileListWidget->count(); ++i) {
+        QListWidgetItem *existing = m_fileListWidget->item(i);
+        if (existing->data(Qt::UserRole).toString() == filePath) {
+            // Already in list — just scroll to it and select it
+            m_fileListWidget->blockSignals(true);
+            m_fileListWidget->clearSelection();
+            m_fileListWidget->blockSignals(false);
+            existing->setSelected(true);
+            m_fileListWidget->scrollToItem(existing);
+            return;
+        }
+    }
+
+    // Build item
+    QListWidgetItem *item = new QListWidgetItem(fileName);
+    item->setData(Qt::UserRole, filePath);
+
+    // Tooltip: CDE description if available, plus full path
+    QMap<QString, QString> descs = DataProcessor::getOutfileDescriptions();
+    QString desc = descs.value(fi.baseName());
+    item->setToolTip(desc.isEmpty()
+        ? filePath
+        : QString("%1: %2\n%3").arg(fileName, desc, filePath));
+
+    // Italic font to distinguish externally-dropped files from folder files
+    QFont f = item->font();
+    f.setItalic(true);
+    item->setFont(f);
+
+    m_fileListWidget->addItem(item);
+    m_fileListWidget->scrollToItem(item);
+
+    // Select it (triggers onFileSelectionChanged → loads data)
+    m_fileListWidget->blockSignals(true);
+    m_fileListWidget->clearSelection();
+    m_fileListWidget->blockSignals(false);
+    item->setSelected(true);
+}
+
 void MainWindow::populateFiles(const QString &folderName)
 {
     if (!m_fileListWidget || !m_dataProcessor || folderName.isEmpty()) {
@@ -2028,10 +2149,13 @@ void MainWindow::onFileSelectionChanged()
                 qDebug() << "MainWindow::onFileSelectionChanged() - DSSAT base:" << dssatBase;
                 qDebug() << "MainWindow::onFileSelectionChanged() - Selected folder:" << m_selectedFolder;
                 
-                // Get the actual path used by prepareOutFiles instead of reconstructing it
-                QString folderPath = m_dataProcessor->getActualFolderPath(m_selectedFolder);
+                // Dropped external files store their full path in UserRole
+                QString droppedPath = selectedItem->data(Qt::UserRole).toString();
+                QString folderPath  = m_dataProcessor->getActualFolderPath(m_selectedFolder);
                 QString filePath;
-                if (!folderPath.isEmpty()) {
+                if (!droppedPath.isEmpty()) {
+                    filePath = droppedPath;
+                } else if (!folderPath.isEmpty()) {
                     filePath = QDir(folderPath).absoluteFilePath(selectedFile);
                 } else {
                     filePath = QDir(dssatBase).absoluteFilePath(m_selectedFolder + QDir::separator() + selectedFile);
