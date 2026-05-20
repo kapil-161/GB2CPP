@@ -42,12 +42,16 @@ public:
     std::function<void(const QStringList &)> onDrop;
 
 protected:
+    static bool isDssatFile(const QString &ext) {
+        // Accept .CSV and any extension starting with O (.OUT .OSU .OPG .OVT .OPT etc.)
+        return ext == "csv" || (!ext.isEmpty() && ext[0] == 'o');
+    }
+
     void dragEnterEvent(QDragEnterEvent *event) override
     {
         if (event->mimeData()->hasUrls()) {
             for (const QUrl &url : event->mimeData()->urls()) {
-                QString ext = QFileInfo(url.toLocalFile()).suffix().toLower();
-                if (ext == "out" || ext == "csv") {
+                if (isDssatFile(QFileInfo(url.toLocalFile()).suffix().toLower())) {
                     event->acceptProposedAction();
                     return;
                 }
@@ -66,8 +70,7 @@ protected:
         QStringList paths;
         for (const QUrl &url : event->mimeData()->urls()) {
             QString path = url.toLocalFile();
-            QString ext  = QFileInfo(path).suffix().toLower();
-            if ((ext == "out" || ext == "csv") && QFileInfo::exists(path))
+            if (isDssatFile(QFileInfo(path).suffix().toLower()) && QFileInfo::exists(path))
                 paths << path;
         }
         if (onDrop && !paths.isEmpty())
