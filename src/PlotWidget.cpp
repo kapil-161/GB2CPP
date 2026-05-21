@@ -3110,8 +3110,8 @@ QString PlotWidget::getPlotRCode() const
         trtMapBlock = QString(
             "# Treatment display name lookup\n"
             "trt_labels <- c(\n%1\n)\n"
-            "long$TreatmentLabel <- trt_labels[long$TREATMENT]\n"
-            "long$TreatmentLabel[is.na(long$TreatmentLabel)] <- long$TREATMENT[is.na(long$TreatmentLabel)]\n"
+            "long$TreatmentLabel <- trt_labels[as.character(long$TREATMENT)]\n"
+            "long$TreatmentLabel[is.na(long$TreatmentLabel)] <- as.character(long$TREATMENT[is.na(long$TreatmentLabel)])\n"
         ).arg(entries.join(",\n"));
     } else {
         trtMapBlock = "long$TreatmentLabel <- long$TREATMENT\n";
@@ -3185,7 +3185,7 @@ QString PlotWidget::getPlotRCode() const
         "# --- Plot ---\n"
         "p <- ggplot(long, aes(x = .data[[xvar]], y = Value, color = Series)) +\n"
         "  geom_line(data = subset(long, Type == \"Simulated\"), linewidth = 0.9) +\n"
-        "  geom_point(data = subset(long, Type == \"Observed\"), size = 2.5, shape = 16) +\n"
+        "  geom_point(data = subset(long, Type == \"Observed\"), size = 3.5, shape = 21, fill = \"white\", stroke = 1.5) +\n"
         "%7"  // facetLine
         "%8"  // xScaleLine
         "  labs(\n"
