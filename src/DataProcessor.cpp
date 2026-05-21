@@ -122,6 +122,8 @@ void DataTable::merge(const DataTable &other)
         }
         this->addRow(newRowData);
     }
+    // Preserve isObservedOnly: only true when BOTH sides are observed-only
+    this->isObservedOnly = this->isObservedOnly && other.isObservedOnly;
 }
 
 QMap<QString, QPair<QString, QString>> DataProcessor::m_variableInfoCache;
@@ -2566,6 +2568,7 @@ bool DataProcessor::readTFile(const QString &filePath, DataTable &table)
     // Process and standardize data types
     standardizeDataTypes(table);
 
+    table.isObservedOnly = true;  // T files are observed data — plot as scatter, not lines
     qDebug() << "DataProcessor: readTFile - Final table columns:" << table.columnNames << ", rows:" << table.rowCount;
     return true;
 }

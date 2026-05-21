@@ -24,7 +24,8 @@ struct DataTable {
     QVector<DataColumn> columns;
     QStringList columnNames;
     int rowCount = 0;
-    
+    bool isObservedOnly = false; // true for T files — plot as scatter, not lines
+
     void addColumn(const DataColumn &column);
     DataColumn* getColumn(const QString &name);
     const DataColumn* getColumn(const QString &name) const;

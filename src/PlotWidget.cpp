@@ -1820,8 +1820,9 @@ void PlotWidget::plotDatasets(const DataTable &simData, const DataTable &obsData
             // Marker based on variable index to ensure each variable gets a different marker
             plotData.symbolIndex = yVars.indexOf(yVar);
             colorIndex++;
-            plotData.isObserved = false;
-            
+            // T files (isObservedOnly) are observed measurements — render as scatter
+            plotData.isObserved = simData.isObservedOnly;
+
             plotDataList.append(plotData);
         }
     }
