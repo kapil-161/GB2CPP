@@ -902,14 +902,15 @@ void MainWindow::onUserManual()
 <ul>
   <li>Use the <b>Crop</b> dropdown to select a DSSAT crop folder — the outfile list updates automatically.</li>
   <li>Click <b>Open File</b> or use <b>File → Open</b> to load any DSSAT output file directly.</li>
-  <li>Supported file types: <code>.OUT</code>, <code>.OSU</code>, <code>.OPG</code>, <code>.CSV</code>, <code>EVALUATE.OUT</code>.</li>
+  <li>Supported file types: <code>.OUT</code>, <code>.OSU</code>, <code>.OPG</code>, <code>.CSV</code>, <code>EVALUATE.OUT</code>, and observed T files (<code>.WHT</code>, <code>.MZT</code>, <code>.SOT</code>, …).</li>
   <li>Select multiple files in the outfile list to overlay their data on the same plot.</li>
   <li>EVALUATE.OUT files automatically switch to the <b>Scatter Plot</b> tab.</li>
   <li><b>Drag &amp; drop</b> — drag one or more DSSAT output files from Windows Explorer directly onto the outfile list.
-    Supported extensions: <code>.OUT</code>, <code>.OSU</code>, <code>.OPG</code>, <code>.OVT</code>, <code>.OPT</code>, <code>.CSV</code>, and all other O-extension files.
+    Supported extensions: <code>.OUT</code>, <code>.OSU</code>, <code>.OPG</code>, <code>.OVT</code>, <code>.OPT</code>, <code>.CSV</code>, all other O-extension files, and <b>observed T files</b> (<code>.WHT</code>, <code>.MZT</code>, <code>.SOT</code>, etc.).
     <ul>
       <li>If the file belongs to a known DSSAT crop folder, the crop selector switches automatically and the file is selected in the populated list.</li>
       <li>Files from outside DSSAT folders are added as standalone entries (shown in italic).</li>
+      <li>T files are <em>not</em> shown in the outfile list — they are only accessible via drag &amp; drop or the command line.</li>
     </ul>
   </li>
   <li>Use the <b>Search</b> box above the outfile list to filter by filename.</li>
@@ -943,7 +944,20 @@ void MainWindow::onUserManual()
   <li><b>Legend</b> — the legend is a floating, draggable panel. Drag it anywhere on the chart. Click the pin icon to dock it back inside the chart area.</li>
 </ul>
 
-<h2 style="color:#1565C0;">3. OSU Seasonal Summary Files</h2>
+<h2 style="color:#1565C0;">3. Observed T Files</h2>
+<p>T files contain field-measured time-series data — the observed counterpart of simulated <code>.OUT</code> files. Each crop has its own extension: <code>.WHT</code> (wheat), <code>.MZT</code> (maize), <code>.SOT</code> (soybean), <code>.RIT</code> (rice), etc.</p>
+<ul>
+  <li><b>How to load:</b> drag the T file (e.g. <code>KSAS8101.WHT</code>) from Windows Explorer and drop it onto the GB2 outfile list. T files do not appear in the outfile list — they are only accessible via drag &amp; drop or the command line.</li>
+  <li><b>Plot style:</b> T file data is plotted as <b>scatter points</b> (not lines), reflecting its nature as discrete field observations.</li>
+  <li><b>Treatment names:</b> GB2 automatically reads the corresponding <code>.X</code> experiment file (same basename, last extension letter <code>T→X</code>, e.g. <code>KSAS8101.WHX</code>) to retrieve treatment names from the <code>*TREATMENTS</code> section. These names appear in the plot legend.</li>
+  <li><b>Date format:</b> T file dates are stored in YYDDD format (5-digit: 2-digit year + 3-digit day-of-year). GB2 converts these automatically to calendar dates for the X axis.</li>
+  <li><b>Variables:</b> after loading, the variable lists populate from the T file columns. Select DATE (or another date column) as X and any measured variable as Y, then click <b>Refresh Plot</b>.</li>
+  <li><b>Command line:</b> pass the T filename as a positional argument:
+    <pre style="background:#F5F5F5; padding:6px; border-radius:4px;">GB2.exe C:/DSSAT48 C:/DSSAT48/Wheat KSAS8101.WHT --xvar DATE --yvar GWAD</pre>
+  </li>
+</ul>
+
+<h2 style="color:#1565C0;">4. OSU Seasonal Summary Files</h2>
 <ul>
   <li>OSU files contain one row per treatment × year. The default X axis is <b>WYEAR</b>.</li>
   <li>Use the <b>Box Plot</b> button to switch between line plot and box plot view.</li>
@@ -951,7 +965,7 @@ void MainWindow::onUserManual()
   <li>In Plot Settings, enable <b>Plot Mean of Replicates</b> to average replicates into one line per slot.</li>
 </ul>
 
-<h2 style="color:#1565C0;">4. Scatter Plot Tab</h2>
+<h2 style="color:#1565C0;">5. Scatter Plot Tab</h2>
 <ul>
   <li>Load an <code>EVALUATE.OUT</code> file — the app auto-switches to this tab.</li>
   <li>Simulated vs. observed values are plotted with a 1:1 reference line.</li>
@@ -960,13 +974,13 @@ void MainWindow::onUserManual()
   <li>Click <b>Show Metrics</b> to open a detailed metrics table for all variables.</li>
 </ul>
 
-<h2 style="color:#1565C0;">5. Data View Tab</h2>
+<h2 style="color:#1565C0;">6. Data View Tab</h2>
 <ul>
   <li>Displays the raw loaded data as a sortable table.</li>
   <li>Use the dropdown to switch between Regular .OUT data, EVALUATE.OUT data, or Current Plot Data.</li>
 </ul>
 
-<h2 style="color:#1565C0;">6. Saving &amp; Exporting</h2>
+<h2 style="color:#1565C0;">7. Saving &amp; Exporting</h2>
 <table border="1" cellpadding="4" cellspacing="0" style="border-collapse:collapse;">
   <tr style="background:#E3F2FD;"><th>Action</th><th>Shortcut</th><th>Description</th></tr>
   <tr><td>Save Data</td><td>Ctrl+S</td><td>Saves simulated and observed data as CSV</td></tr>
@@ -976,7 +990,7 @@ void MainWindow::onUserManual()
   <tr><td>Copy Metrics</td><td>—</td><td>Copies metrics table as tab-separated text</td></tr>
 </table>
 
-<h2 style="color:#1565C0;">7. Plot Settings</h2>
+<h2 style="color:#1565C0;">8. Plot Settings</h2>
 <ul>
   <li><b>General:</b> grid lines, legend visibility, axis titles, tick spacing</li>
   <li><b>Style:</b> line width, marker size, color palette</li>
@@ -988,7 +1002,7 @@ void MainWindow::onUserManual()
   <li><b>Scatter Panel Metrics:</b> choose which statistics appear inside each scatter panel</li>
 </ul>
 
-<h2 style="color:#1565C0;">8. Keyboard &amp; Mouse Shortcuts</h2>
+<h2 style="color:#1565C0;">9. Keyboard &amp; Mouse Shortcuts</h2>
 <table border="1" cellpadding="4" cellspacing="0" style="border-collapse:collapse;">
   <tr style="background:#E3F2FD;"><th>Shortcut</th><th>Action</th></tr>
   <tr><td>Ctrl+O</td><td>Open file</td></tr>
@@ -1002,20 +1016,21 @@ void MainWindow::onUserManual()
   <tr><td>Drag legend</td><td>Move floating legend anywhere on chart</td></tr>
 </table>
 
-<h2 style="color:#1565C0;">9. DSSAT File Types</h2>
+<h2 style="color:#1565C0;">10. DSSAT File Types</h2>
 <table border="1" cellpadding="4" cellspacing="0" style="border-collapse:collapse;">
-  <tr style="background:#E3F2FD;"><th>Extension</th><th>Type</th><th>Default X Axis</th></tr>
-  <tr><td>.OUT</td><td>Time series (daily/growth stage)</td><td>DATE / DAS / DAP</td></tr>
-  <tr><td>.OSU</td><td>Seasonal summary</td><td>WYEAR</td></tr>
-  <tr><td>.OPG</td><td>Plant growth</td><td>DATE</td></tr>
-  <tr><td>.CSV</td><td>Comma-separated output</td><td>DATE</td></tr>
-  <tr><td>EVALUATE.OUT</td><td>Simulated vs. Observed</td><td>— (scatter)</td></tr>
+  <tr style="background:#E3F2FD;"><th>Extension</th><th>Type</th><th>Plot Style</th><th>Default X Axis</th></tr>
+  <tr><td>.OUT</td><td>Time series (daily/growth stage)</td><td>Line (simulated)</td><td>DATE / DAS / DAP</td></tr>
+  <tr><td>.OSU</td><td>Seasonal summary</td><td>Line / Box</td><td>WYEAR</td></tr>
+  <tr><td>.OPG</td><td>Plant growth</td><td>Line (simulated)</td><td>DATE</td></tr>
+  <tr><td>.CSV</td><td>Comma-separated output</td><td>Line (simulated)</td><td>DATE</td></tr>
+  <tr><td>EVALUATE.OUT</td><td>Simulated vs. Observed</td><td>Scatter (1:1 line)</td><td>— (scatter)</td></tr>
+  <tr><td>.WHT, .MZT, .SOT, … (T files)</td><td>Observed field measurements</td><td>Scatter (observed)</td><td>DATE</td></tr>
 </table>
 
-<h2 style="color:#1565C0;">10. CDE Variable Reference</h2>
+<h2 style="color:#1565C0;">11. CDE Variable Reference</h2>
 <p>Use <b>Help → CDE Codes Reference</b> to search and browse DSSAT variable codes, labels, and descriptions from the DSSAT CDE files.</p>
 
-<h2 style="color:#1565C0;">11. Command-Line / Headless Mode</h2>
+<h2 style="color:#1565C0;">12. Command-Line / Headless Mode</h2>
 <p>GB2 can be driven from the terminal or called by DSSAT directly, with no manual interaction required.</p>
 
 <h3 style="color:#1976D2;">Basic invocation (called by DSSAT)</h3>
@@ -1056,6 +1071,12 @@ GB2.exe C:/DSSAT48 C:/DSSAT48/Maize GROWTH.OUT --xvar DAS --yvar LAID --save gro
 
 # Headless scatter plot from EVALUATE.OUT
 GB2.exe C:/DSSAT48/Maize --scatter --scatter-vars HWAH,CWAH --save scatter.png
+
+# Load and interactively plot an observed T file (wheat)
+GB2.exe C:/DSSAT48 C:/DSSAT48/Wheat KSAS8101.WHT --xvar DATE --yvar GWAD
+
+# Headless save of a T file plot
+GB2.exe C:/DSSAT48 C:/DSSAT48/Wheat KSAS8101.WHT --xvar DATE --yvar GWAD --save tfile.png
 </pre>
 
 <p><b>Note:</b> When <code>--save</code> is used, GB2 renders the plot and exits automatically. Relative output paths are resolved against the terminal's working directory at the time GB2 was launched.</p>
