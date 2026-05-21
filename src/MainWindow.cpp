@@ -43,8 +43,13 @@ public:
 
 protected:
     static bool isDssatFile(const QString &ext) {
-        // Accept .CSV and any extension starting with O (.OUT .OSU .OPG .OVT .OPT etc.)
-        return ext == "csv" || (!ext.isEmpty() && ext[0] == 'o');
+        // Accept .CSV, any O-extension (.OUT .OSU .OPG etc.),
+        // and T files (3-char extension ending in 't', e.g. .wht .mzt .sot)
+        if (ext == "csv") return true;
+        if (!ext.isEmpty() && ext[0] == 'o') return true;
+        if (ext.length() == 3 && ext[2] == 't' && ext[0].isLetter() && ext[1].isLetter())
+            return true;
+        return false;
     }
 
     void dragEnterEvent(QDragEnterEvent *event) override
@@ -2020,19 +2025,20 @@ void MainWindow::addDroppedOutFile(const QString &filePath)
     QString fileDir  = QDir(fi.absolutePath()).canonicalPath();
 
     // Try to match the dropped file's directory to a known crop folder.
-    // If found, switch the crop selector → populateFiles fills the list with
-    // that crop's files, then we select this file by name within it.
+    // If found, switch the crop selector and populate the file list, then select this file.
     if (m_dataProcessor && m_fileComboBox && !fileDir.isEmpty()) {
         QStringList folderNames = m_dataProcessor->prepareFolders(true);
         for (const QString &folderName : folderNames) {
             QString folderPath = QDir(m_dataProcessor->getActualFolderPath(folderName)).canonicalPath();
             if (!folderPath.isEmpty() && folderPath.compare(fileDir, Qt::CaseInsensitive) == 0) {
-                // Switch crop (triggers onFolderSelectionChanged → populateFiles)
                 int idx = m_fileComboBox->findText(folderName);
-                if (idx >= 0 && m_fileComboBox->currentIndex() != idx) {
+                if (idx >= 0) {
+                    // Block signals to avoid async dispatch; switch crop and populate directly.
+                    // Relying on currentIndexChanged from within a drop event is unreliable.
+                    m_fileComboBox->blockSignals(true);
                     m_fileComboBox->setCurrentIndex(idx);
-                } else if (idx >= 0 && m_fileComboBox->currentIndex() == idx) {
-                    // Same crop already — force-repopulate so list is fresh
+                    m_fileComboBox->blockSignals(false);
+                    m_selectedFolder = folderName;
                     populateFiles(folderName);
                 }
                 // Find and select the file by name in the now-populated list
@@ -2328,22 +2334,25 @@ void MainWindow::onFileSelectionChanged()
                     }
                     
                     // Extract experiment codes and treatment names from this file (only for regular files)
-                    if (!isEvaluateFile && fileData.columnNames.contains("EXPERIMENT") && fileData.columnNames.contains("TRT") && fileData.columnNames.contains("TNAME")) {
+                    if (!isEvaluateFile && fileData.columnNames.contains("TRT") && fileData.columnNames.contains("TNAME")) {
                         const DataColumn* expCol = fileData.getColumn("EXPERIMENT");
                         const DataColumn* trtCol = fileData.getColumn("TRT");
                         const DataColumn* tnameCol = fileData.getColumn("TNAME");
 
-                        if (expCol && trtCol && tnameCol) {
+                        if (trtCol && tnameCol) {
                             for (int i = 0; i < fileData.rowCount; ++i) {
-                                QString expCode = expCol->data[i].toString().trimmed();
+                                QString expCode = expCol ? expCol->data[i].toString().trimmed() : QString();
                                 QString trtCode = trtCol->data[i].toString().trimmed();
                                 QString tname = tnameCol->data[i].toString().trimmed();
 
                                 if (!expCode.isEmpty() && expCode != "DEFAULT") {
                                     uniqueExperimentCodes.insert(expCode);
                                 }
-                                if (!expCode.isEmpty() && !trtCode.isEmpty() && !tname.isEmpty()) {
-                                    extractedTreatmentNames[expCode][trtCode] = tname;
+                                if (!trtCode.isEmpty() && !tname.isEmpty()) {
+                                    // T files have no EXPERIMENT column; store under "default" so
+                                    // getTreatmentDisplayName's fallback can find them.
+                                    QString key = expCode.isEmpty() ? "default" : expCode;
+                                    extractedTreatmentNames[key][trtCode] = tname;
                                 }
                             }
                         }
@@ -2901,6 +2910,7 @@ int MainWindow::selectOutputFiles(const QStringList &fileNames)
     int selectedCount = 0;
 
     for (const QString &fileName : fileNames) {
+        bool found = false;
         for (int i = 0; i < m_fileListWidget->count(); ++i) {
             QListWidgetItem *item = m_fileListWidget->item(i);
             if (!item) continue;
@@ -2908,22 +2918,46 @@ int MainWindow::selectOutputFiles(const QStringList &fileNames)
             QString itemText = item->text();
             QString itemData = item->data(Qt::UserRole).toString();
 
-            // Check both display text and user data
             if (itemText.compare(fileName, Qt::CaseInsensitive) == 0 ||
                 itemData.compare(fileName, Qt::CaseInsensitive) == 0) {
                 item->setSelected(true);
                 selectedCount++;
-                qDebug() << "MainWindow: Selected output file:" << fileName;
+                found = true;
                 break;
             }
         }
+
+        if (!found) {
+            // T files (e.g. KSAS8101.WHT) are not in the normal file list —
+            // resolve the full path and add them directly.
+            QString ext = QFileInfo(fileName).suffix().toUpper();
+            bool isTFile = ext.length() == 3 && ext.endsWith('T') &&
+                           ext[0].isLetter() && ext[1].isLetter();
+            if (isTFile && m_dataProcessor) {
+                QString fullPath;
+                if (QFileInfo(fileName).isAbsolute()) {
+                    fullPath = fileName;
+                } else if (!m_selectedFolder.isEmpty()) {
+                    QString cropPath = m_dataProcessor->getActualFolderPath(m_selectedFolder);
+                    fullPath = QDir(cropPath).absoluteFilePath(fileName);
+                }
+                if (!fullPath.isEmpty() && QFileInfo::exists(fullPath)) {
+                    QString baseName = QFileInfo(fullPath).fileName();
+                    QListWidgetItem *newItem = new QListWidgetItem(baseName);
+                    newItem->setData(Qt::UserRole, fullPath);
+                    QFont f = newItem->font(); f.setItalic(true); newItem->setFont(f);
+                    m_fileListWidget->addItem(newItem);
+                    newItem->setSelected(true);
+                    selectedCount++;
+                }
+            }
+        }
     }
-    
+
     if (selectedCount > 0) {
-        // Trigger file selection change
         onFileSelectionChanged();
     }
-    
+
     qDebug() << "MainWindow: Selected" << selectedCount << "of" << fileNames.size() << "files";
     return selectedCount;
 }

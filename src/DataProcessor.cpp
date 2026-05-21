@@ -152,6 +152,10 @@ bool DataProcessor::readFile(const QString &filePath, DataTable &table)
         return readCsvFile(filePath, table);
     } else if (extension.startsWith("O")) {  // .OUT, .OPT, .OVT, etc.
         return readOutFile(filePath, table);
+    } else if (extension.length() == 3 && extension.endsWith("T") &&
+               extension[0].isLetter() && extension[1].isLetter()) {
+        // T files: observed time-series data (WHT, MZT, SOT, etc.)
+        return readTFile(filePath, table);
     } else {
         // Try OUT first, then OSU as fallback
         if (readOutFile(filePath, table)) {
@@ -426,7 +430,7 @@ bool DataProcessor::readOutFile(const QString &filePath, DataTable &table)
         for (int r = 0; r < table.rowCount; ++r) {
             int year = yearCol->data[r].toInt();
             int doy = doyCol->data[r].toInt();
-            
+
             if (year > 0 && doy > 0 && doy <= 366) {
                 QDateTime dateTime = unifiedDateConvert(year, doy);
                 if (dateTime.isValid()) {
@@ -440,7 +444,31 @@ bool DataProcessor::readOutFile(const QString &filePath, DataTable &table)
         }
         table.addColumn(dateCol);
     }
-    
+
+    // Convert T file DATE column (YYDDD format e.g. 81344 → 1981-12-10)
+    // Only needed when no YEAR/DOY columns exist (T files have DATE but not YEAR+DOY)
+    if (!yearCol || !doyCol) {
+        DataColumn* rawDate = table.getColumn("DATE");
+        if (rawDate && !rawDate->data.isEmpty()) {
+            QString first = rawDate->data[0].toString().trimmed();
+            bool ok;
+            int sample = first.toInt(&ok);
+            // 5-digit YYDDD: YYDDD where YY=00..99, DDD=001..366 → range 1001..99366
+            if (ok && sample >= 1001 && sample <= 99366 && first.length() == 5) {
+                for (int r = 0; r < rawDate->data.size(); ++r) {
+                    int yyddd = rawDate->data[r].toString().toInt(&ok);
+                    if (ok && yyddd > 0) {
+                        int yy  = yyddd / 1000;
+                        int doy = yyddd % 1000;
+                        int year = (yy < 50) ? (2000 + yy) : (1900 + yy);
+                        QDateTime dt = unifiedDateConvert(year, doy);
+                        rawDate->data[r] = dt.isValid() ? dt.toString("yyyy-MM-dd") : QVariant();
+                    }
+                }
+            }
+        }
+    }
+
     // Process and standardize data types
     standardizeDataTypes(table);
     
@@ -1407,7 +1435,6 @@ QStringList DataProcessor::prepareOutFiles(const QString &folderName)
         QStringList knownPlottableExtensions = {"OSU", "OPG", "OVT", "OPT", "CSV"};
         if (knownPlottableExtensions.contains(extension)) {
             outFiles.append(file);
-            qDebug() << "prepareOutFiles: Allowing known plottable file:" << file << "(extension:" << extension << ")";
             continue;
         }
         
@@ -2477,6 +2504,34 @@ bool DataProcessor::readTFile(const QString &filePath, DataTable &table)
         int idx = table.getColumnIndex("RUNNO");
         table.columnNames[idx] = "RUN";
         table.columns[idx].name = "RUN";
+    }
+
+    // Look up treatment names from the corresponding .X experiment file.
+    // The X file has the same basename but the extension last char changes T→X.
+    // e.g., KSAS8101.WHT → KSAS8101.WHX
+    if (table.columnNames.contains("TRT")) {
+        QString xFilePath;
+        QString ext = QFileInfo(filePath).suffix();  // e.g. "WHT"
+        if (ext.length() == 3 && ext.endsWith('T', Qt::CaseInsensitive)) {
+            QString xExt = ext.left(2) + (ext[2].isUpper() ? "X" : "x");
+            xFilePath = QFileInfo(filePath).dir().absoluteFilePath(
+                QFileInfo(filePath).completeBaseName() + "." + xExt);
+        }
+        if (!xFilePath.isEmpty() && QFileInfo::exists(xFilePath)) {
+            QMap<QString, QString> trtNames = readTreatmentNamesFromXFile(xFilePath);
+            if (!trtNames.isEmpty()) {
+                DataColumn tnameCol("TNAME");
+                const DataColumn *trtCol = table.getColumn("TRT");
+                for (int r = 0; r < table.rowCount; ++r) {
+                    QString trt = trtCol->data[r].toString().trimmed();
+                    tnameCol.data.append(trtNames.value(trt, trt));
+                }
+                table.addColumn(tnameCol);
+                qDebug() << "DataProcessor: readTFile - Added TNAME column from" << xFilePath;
+            }
+        } else {
+            qDebug() << "DataProcessor: readTFile - No matching X file found at" << xFilePath;
+        }
     }
 
     // Convert dates (PDAT or DATE) to unified format
