@@ -3136,6 +3136,28 @@ QString PlotWidget::getPlotRCode() const
         ? "  facet_wrap(~ Variable, scales = \"free_y\", ncol = 1) +"
         : "";
 
+    // Inverse-scaling block: restore original values if GB2 applied display scaling
+    // (scaling maps small-magnitude variables up to be visible on the same y-axis)
+    QString inverseScaleBlock;
+    {
+        QStringList entries;
+        for (auto it = m_appliedScalingFactors.constBegin(); it != m_appliedScalingFactors.constEnd(); ++it) {
+            if (qAbs(it.value() - 1.0) > 1e-9 && it.value() > 0.0) {
+                double inv = 1.0 / it.value();
+                entries << QString("  \"%1\" = %2").arg(it.key()).arg(inv, 0, 'g', 10);
+            }
+        }
+        if (!entries.isEmpty()) {
+            inverseScaleBlock =
+                "# Restore original units (reverse display scaling applied by GB2)\n"
+                "scale_restore <- c(\n" + entries.join(",\n") + "\n)\n"
+                "for (vname in names(scale_restore)) {\n"
+                "  mask <- long$Variable == vname\n"
+                "  long$Value[mask] <- long$Value[mask] * scale_restore[[vname]]\n"
+                "}\n\n";
+        }
+    }
+
     QString xConvert = isDate
         ? "df[[xvar]] <- as.Date(df[[xvar]])\n"
         : "";
@@ -3181,6 +3203,7 @@ QString PlotWidget::getPlotRCode() const
         "# --- Treatment display names ---\n"
         "%6"  // trtMapBlock
         "\n"
+        "%10" // inverseScaleBlock (empty string when no scaling)
         "long$Series <- paste(long$TreatmentLabel, long$Variable, sep = \" — \")\n\n"
         "# --- Plot ---\n"
         "p <- ggplot(long, aes(x = .data[[xvar]], y = Value, color = Series)) +\n"
@@ -3209,7 +3232,8 @@ QString PlotWidget::getPlotRCode() const
     .arg(trtMapBlock)       // %6
     .arg(facetLine.isEmpty() ? "" : facetLine + "\n")  // %7
     .arg(xScaleLine.isEmpty() ? "" : xScaleLine + "\n") // %8
-    .arg(yLabel);           // %9
+    .arg(yLabel)            // %9
+    .arg(inverseScaleBlock);// %10
 
     return code;
 }
