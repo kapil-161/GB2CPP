@@ -76,6 +76,7 @@ private slots:
     void onSavePlotData();
     void onCopyPlotData();
     void onExportPlot();
+    void onExportRCode();
     void onCopyPlot();
     void onCopyMetrics();
     void onAbout();

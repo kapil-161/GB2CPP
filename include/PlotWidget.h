@@ -216,6 +216,7 @@ public:
     void clear();
     void clearChart();  // Clear chart without clearing data
     QString getPlotCSV() const;
+    QString getPlotRCode() const;  // ggplot2 R script reproducing the current plot
     QString getScatterCSV() const; // CSV export for multi-panel scatter (VARIABLE,EXPERIMENT,SIMULATED,MEASURED)
     void exportPlot(const QString &filePath, const QString &format = "PNG");
     void exportPlot(const QString &filePath, const QString &format, int width, int height, int dpi);

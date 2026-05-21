@@ -189,7 +189,11 @@ void MainWindow::setupMenuBar()
     QAction *exportAction = fileMenu->addAction("&Export Plot...");
     exportAction->setShortcut(QKeySequence("Ctrl+E"));
     connect(exportAction, &QAction::triggered, this, &MainWindow::onExportPlot);
-    
+
+    QAction *exportRCodeAction = fileMenu->addAction("Export &R Code...");
+    exportRCodeAction->setShortcut(QKeySequence("Ctrl+Shift+R"));
+    connect(exportRCodeAction, &QAction::triggered, this, &MainWindow::onExportRCode);
+
     QAction *copyPlotAction = fileMenu->addAction("&Copy Plot");
     copyPlotAction->setShortcut(QKeySequence("Ctrl+Shift+C"));  // Use Ctrl+Shift+C to avoid conflict with standard copy
     connect(copyPlotAction, &QAction::triggered, this, &MainWindow::onCopyPlot);
@@ -851,6 +855,43 @@ void MainWindow::onExportPlot()
     }
 }
 
+void MainWindow::onExportRCode()
+{
+    if (!m_plotWidget) return;
+
+    bool isScatterTab = (m_tabWidget && m_tabWidget->currentIndex() == 2);
+    if (isScatterTab) {
+        m_statusWidget->showWarning("R code export is available for Time Series plots only");
+        return;
+    }
+
+    QString rCode = m_plotWidget->getPlotRCode();
+    if (rCode.isEmpty()) {
+        m_statusWidget->showWarning("No plot data — generate a time series plot first");
+        return;
+    }
+
+    QString fileName = QFileDialog::getSaveFileName(
+        this, "Export R Code",
+        QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation),
+        "R Scripts (*.R);;All Files (*)");
+
+    if (fileName.isEmpty()) return;
+
+    QFileInfo fi(fileName);
+    if (fi.suffix().isEmpty())
+        fileName += ".R";
+
+    QFile file(fileName);
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
+        m_statusWidget->showError("Failed to write file: " + fileName);
+        return;
+    }
+    QTextStream(&file) << rCode;
+    file.close();
+    m_statusWidget->showSuccess("R code saved: " + QFileInfo(fileName).fileName());
+}
+
 void MainWindow::onCopyPlot()
 {
     bool isScatterTab = (m_tabWidget && m_tabWidget->currentIndex() == 2);
@@ -985,9 +1026,10 @@ void MainWindow::onUserManual()
   <tr style="background:#E3F2FD;"><th>Action</th><th>Shortcut</th><th>Description</th></tr>
   <tr><td>Save Data</td><td>Ctrl+S</td><td>Saves simulated and observed data as CSV</td></tr>
   <tr><td>Save Plot Data</td><td>Ctrl+Shift+S</td><td>Saves merged plot data as a single CSV</td></tr>
-  <tr><td>Export Plot Image</td><td>Ctrl+E</td><td>Exports the current plot as PNG/SVG</td></tr>
-  <tr><td>Copy Plot</td><td>Ctrl+C</td><td>Copies the plot image to the clipboard</td></tr>
-  <tr><td>Copy Metrics</td><td>—</td><td>Copies metrics table as tab-separated text</td></tr>
+  <tr><td>Export Plot Image</td><td>Ctrl+E</td><td>Exports the current plot as PNG/JPG/PDF</td></tr>
+  <tr><td>Export R Code</td><td>Ctrl+Shift+R</td><td>Saves a ggplot2 R script that reproduces the current time series plot</td></tr>
+  <tr><td>Copy Plot</td><td>Ctrl+Shift+C</td><td>Copies the plot image to the clipboard</td></tr>
+  <tr><td>Copy Metrics</td><td>Ctrl+Shift+M</td><td>Copies metrics table as tab-separated text</td></tr>
 </table>
 
 <h2 style="color:#1565C0;">8. Plot Settings</h2>
@@ -1009,7 +1051,8 @@ void MainWindow::onUserManual()
   <tr><td>Ctrl+S</td><td>Save data CSV</td></tr>
   <tr><td>Ctrl+Shift+S</td><td>Save plot data CSV</td></tr>
   <tr><td>Ctrl+E</td><td>Export plot image</td></tr>
-  <tr><td>Ctrl+C</td><td>Copy plot to clipboard</td></tr>
+  <tr><td>Ctrl+Shift+R</td><td>Export ggplot2 R code</td></tr>
+  <tr><td>Ctrl+Shift+C</td><td>Copy plot to clipboard</td></tr>
   <tr><td>Scroll wheel</td><td>Zoom in / out on chart</td></tr>
   <tr><td>Right-click drag</td><td>Pan chart</td></tr>
   <tr><td>Double-click</td><td>Zoom in; double-click again to reset</td></tr>
