@@ -92,6 +92,13 @@ PlotSettings PlotSettingsDialog::getSettings() const
             settings.scatterMetrics.insert(it.key());
     }
 
+    // Time series panel metrics — collect checked items
+    settings.tsMetrics.clear();
+    for (auto it = m_tsMetricCheckBoxes.begin(); it != m_tsMetricCheckBoxes.end(); ++it) {
+        if (it.value()->isChecked())
+            settings.tsMetrics.insert(it.key());
+    }
+
     // Preserve treatment filter and available data unchanged
     settings.excludedSeriesKeys = m_settings.excludedSeriesKeys;
     settings.availableExperiments = m_settings.availableExperiments;
@@ -413,6 +420,23 @@ void PlotSettingsDialog::setupUI()
         if (col >= 3) { col = 0; row++; }
     }
     appearanceLayout->addWidget(scatterMetricsGroup);
+
+    // Time series panel metrics group (shown in multi-panel mode per variable)
+    QGroupBox *tsMetricsGroup = new QGroupBox("Time Series Panel Metrics");
+    QGridLayout *tsMetricsLayout = new QGridLayout(tsMetricsGroup);
+    tsMetricsGroup->setToolTip("Statistics displayed inside each time series panel (multi-panel mode), pooled across all treatments for that variable");
+
+    QStringList tsMetricOptions = {"RMSE", "NRMSE", "d-stat", "N"};
+    col = 0; row = 0;
+    for (const QString &metric : tsMetricOptions) {
+        QCheckBox *cb = new QCheckBox(metric);
+        cb->setChecked(m_settings.tsMetrics.contains(metric));
+        m_tsMetricCheckBoxes[metric] = cb;
+        tsMetricsLayout->addWidget(cb, row, col);
+        col++;
+        if (col >= 3) { col = 0; row++; }
+    }
+    appearanceLayout->addWidget(tsMetricsGroup);
 
     // Plot appearance group
     QGroupBox *plotGroup = new QGroupBox("Plot Appearance");

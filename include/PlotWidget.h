@@ -312,6 +312,11 @@ private:
     QString getCropNameFromCode(const QString& cropCode) const;
     void highlightSeries(QAbstractSeries* series, bool highlight);
 
+    // Obs/Sim global visibility toggles
+    void setObsSeriesVisible(bool visible);
+    void setSimSeriesVisible(bool visible);
+    void updateObsSimHeaders();
+
     // Plot → Legend reverse communication
     QWidget* findLegendRowForSeries(QAbstractSeries* series) const;
     void highlightLegendRowForSeries(QAbstractSeries* series, bool hoverOn);
@@ -408,6 +413,12 @@ private:
     QVector<QSharedPointer<PlotData>> m_plotDataList;
     QMap<QAbstractSeries*, QSharedPointer<PlotData>> m_seriesToPlotData;
 
+    // Obs/Sim global toggle state (persist across legend rebuilds; reset on full clear())
+    bool m_obsVisible = true;
+    bool m_simVisible = true;
+    QPointer<QLabel> m_obsHeaderLabel;
+    QPointer<QLabel> m_simHeaderLabel;
+
     // Plot→Legend hit-testing state
     QAbstractSeries* m_hoveredSeries = nullptr;
     QPoint m_chartClickPressPos;
@@ -416,6 +427,9 @@ private:
 
     // Hover tooltip
     QLabel* m_hoverTooltip = nullptr;
+
+    // Time series metrics overlay for single-panel mode
+    QPointer<QLabel> m_tsMetricsOverlay;
 
     // Draggable / resizable legend
     QWidget* m_legendPanel        = nullptr;

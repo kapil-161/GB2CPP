@@ -48,13 +48,23 @@ void PlotWidget::updateLegendAdvanced(const QMap<QString, QMap<QString, QVector<
         headerLayout->setSpacing(5);
         headerWidget->setLayout(headerLayout);
 
-        QLabel* obsHeader = new QLabel("<b>Obs.</b>");
+        auto* obsHeader = new QLabel();
         obsHeader->setAlignment(Qt::AlignCenter);
         obsHeader->setFixedWidth(30);
+        obsHeader->setCursor(Qt::PointingHandCursor);
+        obsHeader->setProperty("legendHeaderType", "obs");
+        obsHeader->installEventFilter(this);
+        m_obsHeaderLabel = obsHeader;
 
-        QLabel* simHeader = new QLabel("<b>Sim.</b>");
+        auto* simHeader = new QLabel();
         simHeader->setAlignment(Qt::AlignCenter);
         simHeader->setFixedWidth(30);
+        simHeader->setCursor(Qt::PointingHandCursor);
+        simHeader->setProperty("legendHeaderType", "sim");
+        simHeader->installEventFilter(this);
+        m_simHeaderLabel = simHeader;
+
+        updateObsSimHeaders();  // apply current toggle appearance
 
         QLabel* trtHeader = new QLabel("<b>Treatment</b>");
         trtHeader->setAlignment(Qt::AlignLeft);
@@ -312,6 +322,11 @@ void PlotWidget::updateLegendAdvanced(const QMap<QString, QMap<QString, QVector<
             m_legendLayout->addWidget(sep);
         }
     }
+
+    // Re-apply toggle visibility in case this is a legend rebuild (e.g. axis change)
+    // after the user had already toggled obs or sim off.
+    if (!m_obsVisible) setObsSeriesVisible(false);
+    if (!m_simVisible) setSimSeriesVisible(false);
 }
 
 void PlotWidget::createLegendRowFromData(const QMap<QString, QVariant>& treatmentData, const QString& varName, const QString& displayName)
@@ -799,7 +814,7 @@ void PlotWidget::hideHoverTooltip()
 
 void PlotWidget::resetAllHighlightedItems()
 {
-    // Reset all legend rows (matching Python _reset_all_highlighted_items)
+    // Reset all legend rows
     for (int i = 0; i < m_legendLayout->count(); ++i) {
         QLayoutItem* item = m_legendLayout->itemAt(i);
         if (item && item->widget()) {
@@ -811,23 +826,21 @@ void PlotWidget::resetAllHighlightedItems()
         }
     }
 
-    // Reset all plot items (matching Python logic)
-    for (int i = 0; i < m_chart->series().count(); ++i) {
-        QAbstractSeries* series = m_chart->series().at(i);
-
-        if (QLineSeries* lineSeries = qobject_cast<QLineSeries*>(series)) {
-            if (lineSeries->property("originalPen").isValid()) {
-                QPen originalPen = lineSeries->property("originalPen").value<QPen>();
-                lineSeries->setPen(originalPen);
-            }
-        } else if (QScatterSeries* scatterSeries = qobject_cast<QScatterSeries*>(series)) {
-            if (scatterSeries->property("originalSize").isValid()) {
-                qreal originalSize = scatterSeries->property("originalSize").toReal();
-                scatterSeries->setMarkerSize(originalSize);
-            }
-            if (scatterSeries->property("originalBrush").isValid()) {
-                QBrush originalBrush = scatterSeries->property("originalBrush").value<QBrush>();
-                scatterSeries->setBrush(originalBrush);
+    // Restore original pen/brush from PlotData — works for both single and multi-panel.
+    // pd->pen/brush are stored at series creation time and never mutated, so they are
+    // always the correct "unhighlighted" baseline regardless of m_tsPanelViews state.
+    for (const auto &pd : m_plotDataList) {
+        if (!pd || !pd->series) continue;
+        QAbstractSeries* series = pd->series.data();
+        if (QLineSeries* ls = qobject_cast<QLineSeries*>(series)) {
+            ls->setPen(pd->pen);
+        } else if (QScatterSeries* ss = qobject_cast<QScatterSeries*>(series)) {
+            if (series->property("custom_shape").isValid()) {
+                ss->setPen(Qt::NoPen);
+                ss->setBrush(Qt::NoBrush);
+            } else {
+                ss->setPen(pd->pen);
+                ss->setBrush(pd->brush);
             }
         }
     }
@@ -835,48 +848,86 @@ void PlotWidget::resetAllHighlightedItems()
 
 void PlotWidget::highlightPlotItems(const QVector<QAbstractSeries*>& seriesToHighlight)
 {
-    for (QAbstractSeries* series : m_chart->series()) {
-        QPen pen;
-        QColor color;
-        if (QLineSeries* lineSeries = qobject_cast<QLineSeries*>(series)) {
-            pen = lineSeries->pen();
-            color = pen.color();
-        } else if (QScatterSeries* scatterSeries = qobject_cast<QScatterSeries*>(series)) {
-            pen = scatterSeries->pen();
-            color = pen.color();
-        } else {
-            continue;
-        }
+    // Build a fast lookup set
+    QSet<QAbstractSeries*> highlightSet(seriesToHighlight.begin(), seriesToHighlight.end());
 
-        if (seriesToHighlight.contains(series)) {
-            // Highlight: make opaque and thicker
-            color.setAlphaF(1.0);
-            pen.setColor(color);
-            pen.setWidth(3);
-        } else {
-            // Dim: make semi-transparent
-            color.setAlphaF(0.2);
-            pen.setColor(color);
-            pen.setWidth(2);
-        }
-        if (QLineSeries* lineSeries = qobject_cast<QLineSeries*>(series)) {
-            lineSeries->setPen(pen);
-        } else if (QScatterSeries* scatterSeries = qobject_cast<QScatterSeries*>(series)) {
-            scatterSeries->setPen(pen);
-        }
+    // Use m_plotDataList (covers both single and multi-panel) and baseline pens/brushes
+    // stored at series creation time — no m_tsPanelViews branch needed.
+    for (const auto &pd : m_plotDataList) {
+        if (!pd || !pd->series) continue;
+        QAbstractSeries* series = pd->series.data();
+        bool isHighlighted = highlightSet.contains(series);
+        bool isCustomShape = series->property("custom_shape").isValid();
 
-        // For scatter series, also adjust brush
-        if (QScatterSeries* scatterSeries = qobject_cast<QScatterSeries*>(series)) {
-            QBrush brush = scatterSeries->brush();
-            color = brush.color();
-            if (seriesToHighlight.contains(series)) {
-                color.setAlphaF(1.0);
-            } else {
-                color.setAlphaF(0.2);
+        if (QLineSeries* ls = qobject_cast<QLineSeries*>(series)) {
+            QPen pen = pd->pen;
+            QColor c = pen.color();
+            c.setAlphaF(isHighlighted ? 1.0 : 0.2);
+            pen.setColor(c);
+            pen.setWidth(isHighlighted ? 3 : 2);
+            ls->setPen(pen);
+        } else if (QScatterSeries* ss = qobject_cast<QScatterSeries*>(series)) {
+            if (!isCustomShape) {
+                QPen pen = pd->pen;
+                QColor c = pen.color();
+                c.setAlphaF(isHighlighted ? 1.0 : 0.2);
+                pen.setColor(c);
+                ss->setPen(pen);
+                QBrush brush = pd->brush;
+                QColor bc = brush.color();
+                bc.setAlphaF(isHighlighted ? 1.0 : 0.2);
+                brush.setColor(bc);
+                ss->setBrush(brush);
             }
-            brush.setColor(color);
-            scatterSeries->setBrush(brush);
         }
+    }
+}
+
+// ============================================================================
+// OBS / SIM GLOBAL TOGGLE
+// ============================================================================
+
+void PlotWidget::updateObsSimHeaders()
+{
+    if (m_obsHeaderLabel) {
+        if (m_obsVisible) {
+            m_obsHeaderLabel->setText("<b>Obs.</b>");
+            m_obsHeaderLabel->setStyleSheet("");
+            m_obsHeaderLabel->setToolTip("Click to hide observed data");
+        } else {
+            m_obsHeaderLabel->setText("<s>Obs.</s>");
+            m_obsHeaderLabel->setStyleSheet("color: #aaaaaa;");
+            m_obsHeaderLabel->setToolTip("Click to show observed data");
+        }
+    }
+    if (m_simHeaderLabel) {
+        if (m_simVisible) {
+            m_simHeaderLabel->setText("<b>Sim.</b>");
+            m_simHeaderLabel->setStyleSheet("");
+            m_simHeaderLabel->setToolTip("Click to hide simulated data");
+        } else {
+            m_simHeaderLabel->setText("<s>Sim.</s>");
+            m_simHeaderLabel->setStyleSheet("color: #aaaaaa;");
+            m_simHeaderLabel->setToolTip("Click to show simulated data");
+        }
+    }
+}
+
+void PlotWidget::setObsSeriesVisible(bool visible)
+{
+    m_obsVisible = visible;
+    for (const auto& pd : m_plotDataList) {
+        if (pd && pd->isObserved && pd->series)
+            pd->series->setVisible(visible);
+    }
+}
+
+void PlotWidget::setSimSeriesVisible(bool visible)
+{
+    m_simVisible = visible;
+    for (const auto& pd : m_plotDataList) {
+        if (pd && !pd->isObserved && pd->series)
+            pd->series->setVisible(visible);
     }
 }
 

@@ -1,4 +1,5 @@
 #include "MetricsTableWidget.h"
+#include <cmath>
 #include "DataProcessor.h"
 #include <QDebug>
 #include <QMessageBox>
@@ -70,15 +71,24 @@ QVariant MetricsTableModel::data(const QModelIndex& index, int role) const
     
     switch (role) {
     case Qt::DisplayRole: {
+        // Overall row: show blank for all text columns except Variable (which shows the var name)
+        if (rowData.value("isOverall").toBool()) {
+            if (columnName == "Variable")       return value.toString();
+            if (columnName == "Treatment")      return QString("Overall");
+            if (columnName == "Treatment Name") return QString("Overall");
+            if (columnName == "Experiment")     return QString("Overall");
+            if (columnName == "Crop")           return QString("Overall");
+            if (!value.isValid()) return QVariant();
+            // fall through to numeric formatting below
+        }
+
         if (!value.isValid()) {
             return "NA";
         }
-        
+
         // Check column type - text fields should always be displayed as strings
-        if (columnName == "Treatment" || columnName == "Treatment Name" || 
+        if (columnName == "Treatment" || columnName == "Treatment Name" ||
             columnName == "Experiment" || columnName == "Crop" || columnName == "Variable") {
-            // Always treat text fields as strings, regardless of stored type
-            // Note: getValueForColumn already prefers CropName over Crop, and VariableName over Variable
             return value.toString();
         }
         
@@ -131,15 +141,14 @@ QVariant MetricsTableModel::data(const QModelIndex& index, int role) const
     }
     
     case Qt::FontRole: {
-        if (columnName == "Variable") {
-            QFont font;
-            font.setBold(true);
-            return font;
-        }
-        return QVariant();
+        QFont font;
+        font.setBold(rowData.value("isOverall").toBool() || columnName == "Variable");
+        return font;
     }
-    
+
     case Qt::BackgroundRole: {
+        if (rowData.value("isOverall").toBool())
+            return QColor("#e0e0e0");
         return QVariant();
     }
     
@@ -160,46 +169,61 @@ QVariant MetricsTableModel::headerData(int section, Qt::Orientation orientation,
 
 void MetricsTableModel::sort(int column, Qt::SortOrder order)
 {
-    if (column < 0 || column >= m_headers.size()) {
-        return;
-    }
-    
+    if (column < 0 || column >= m_headers.size()) return;
+
     layoutAboutToBeChanged();
-    
+
+    // Separate Overall rows (keyed by variable name) from regular rows.
+    // After sorting, Overall rows are re-inserted at the end of their variable group.
+    QMap<QString, QVariant> overallByVar;  // varName → overall row
+    QVariantList regular;
+    for (const QVariant& item : m_data) {
+        const QVariantMap row = item.toMap();
+        if (row.value("isOverall").toBool()) {
+            QString varName = row.value("VariableName").toString();
+            overallByVar[varName] = item;
+        } else {
+            regular.append(item);
+        }
+    }
+
+    // Find sort key
     const QString columnName = m_headers[column];
     const QStringList& possibleKeys = m_keyMap[columnName];
-    
-    // Find the key that exists in the data
     QString keyToSort;
-    for (const auto& key : possibleKeys) {
-        for (const auto& item : m_data) {
-            const QVariantMap itemMap = item.toMap();
-            if (itemMap.contains(key)) {
-                keyToSort = key;
-                break;
-            }
+    for (const QString& key : possibleKeys) {
+        for (const QVariant& item : regular) {
+            if (item.toMap().contains(key)) { keyToSort = key; break; }
         }
-        if (!keyToSort.isEmpty()) {
-            break;
-        }
+        if (!keyToSort.isEmpty()) break;
     }
-    
+
     if (!keyToSort.isEmpty()) {
-        std::sort(m_data.begin(), m_data.end(), [keyToSort, order](const QVariant& a, const QVariant& b) {
-            const QVariantMap mapA = a.toMap();
-            const QVariantMap mapB = b.toMap();
-            
-            const QVariant valueA = mapA.value(keyToSort, 0);
-            const QVariant valueB = mapB.value(keyToSort, 0);
-            
-            if (order == Qt::AscendingOrder) {
-                return valueA.toString() < valueB.toString();
-            } else {
-                return valueA.toString() > valueB.toString();
-            }
+        std::sort(regular.begin(), regular.end(), [keyToSort, order](const QVariant& a, const QVariant& b) {
+            const QVariant va = a.toMap().value(keyToSort, 0);
+            const QVariant vb = b.toMap().value(keyToSort, 0);
+            return order == Qt::AscendingOrder ? va.toString() < vb.toString()
+                                               : va.toString() > vb.toString();
         });
     }
-    
+
+    // Rebuild: group regular rows by variable in sorted order, append Overall after each group
+    QStringList varOrder;
+    QMap<QString, QVariantList> byVar;
+    for (const QVariant& item : regular) {
+        QString varName = item.toMap().value("VariableName").toString();
+        if (varName.isEmpty()) varName = item.toMap().value("Variable").toString();
+        if (!byVar.contains(varName)) varOrder.append(varName);
+        byVar[varName].append(item);
+    }
+
+    m_data.clear();
+    for (const QString& varName : varOrder) {
+        m_data.append(byVar[varName]);
+        if (overallByVar.contains(varName))
+            m_data.append(overallByVar[varName]);
+    }
+
     layoutChanged();
 }
 
@@ -266,15 +290,82 @@ void MetricsTableWidget::setupUI()
     m_layout->addLayout(buttonLayout);
 }
 
+static QVariant rowGet(const QVariantMap& row, const QStringList& keys)
+{
+    for (const QString& k : keys) {
+        if (row.contains(k)) return row[k];
+    }
+    return QVariant();
+}
+
+// Compute one Overall row from a list of same-variable rows.
+// varDisplayName is stored so the Variable column shows the variable name.
+static QVariantMap computeOverallRow(const QVariantList& varRows, bool isScatterPlot,
+                                     const QString& varDisplayName)
+{
+    double totalN = 0, sumObsMean = 0, sumSimMean = 0;
+    double sumSS = 0, sumDStat = 0, sumBias = 0;
+
+    for (const QVariant& item : varRows) {
+        const QVariantMap row = item.toMap();
+        double n = rowGet(row, {"n","N","samples","count"}).toDouble();
+        if (n <= 0) continue;
+        totalN     += n;
+        sumObsMean += n * rowGet(row, {"ObsMean","obs_mean","mean_obs"}).toDouble();
+        sumSimMean += n * rowGet(row, {"SimMean","sim_mean","mean_sim"}).toDouble();
+        double rmse = rowGet(row, {"RMSE","rmse"}).toDouble();
+        sumSS      += n * rmse * rmse;
+        sumDStat   += n * rowGet(row, {"Willmott's d-stat","d-stat","dstat","d_stat","willmott_d"}).toDouble();
+        sumBias    += n * rowGet(row, {"BIAS","BiasIndex","Bias Index","bias_index"}).toDouble();
+    }
+
+    QVariantMap overall;
+    overall["isOverall"]     = true;
+    overall["VariableName"]  = varDisplayName;
+    overall["Treatment"]     = isScatterPlot ? QVariant() : QVariant(QString());
+    overall["TreatmentName"] = QString();
+    overall["Experiment"]    = QString();
+    overall["CropName"]      = QString();
+
+    if (totalN > 0) {
+        double obsMean  = sumObsMean / totalN;
+        double rmse     = std::sqrt(sumSS / totalN);
+        overall["n"]       = totalN;
+        overall["ObsMean"] = obsMean;
+        overall["SimMean"] = sumSimMean / totalN;
+        overall["RMSE"]    = rmse;
+        overall["NRMSE"]   = (obsMean > 0) ? (rmse / obsMean) * 100.0 : 0.0;
+        overall["d-stat"]  = sumDStat / totalN;
+        if (isScatterPlot) overall["BIAS"] = sumBias / totalN;
+    }
+    return overall;
+}
+
 void MetricsTableWidget::setMetrics(const QVariantList& metricsData, bool isScatterPlot)
 {
     if (metricsData.isEmpty()) {
         clear();
         return;
     }
-    
-    m_metricsData = metricsData;
-    
+
+    // Group rows by variable (preserving first-appearance order), then interleave
+    // each group with its per-variable Overall row at the end.
+    QStringList varOrder;
+    QMap<QString, QVariantList> byVar;
+    for (const QVariant& item : metricsData) {
+        const QVariantMap row = item.toMap();
+        QString varName = rowGet(row, {"VariableName","Variable","variable","var"}).toString();
+        if (!byVar.contains(varName)) varOrder.append(varName);
+        byVar[varName].append(item);
+    }
+
+    m_metricsData.clear();
+    for (const QString& varName : varOrder) {
+        const QVariantList& varRows = byVar[varName];
+        m_metricsData.append(varRows);
+        m_metricsData.append(computeOverallRow(varRows, isScatterPlot, varName));
+    }
+
     MetricsTableModel* model = new MetricsTableModel(m_metricsData, isScatterPlot, this);
     m_tableView->setModel(model);
     

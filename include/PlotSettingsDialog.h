@@ -89,6 +89,9 @@ struct PlotSettings {
     // Scatter panel overlay metrics (subset of available stats to display)
     QSet<QString> scatterMetrics = {"RMSE", "R²"};
 
+    // Time series panel overlay metrics (shown in multi-panel mode, per variable)
+    QSet<QString> tsMetrics = {"RMSE", "NRMSE", "d-stat"};
+
     // Interaction settings
     bool showHoverTooltip = false;
 
@@ -202,6 +205,9 @@ private:
 
     // Scatter metrics checkboxes
     QMap<QString, QCheckBox*> m_scatterMetricCheckBoxes;
+
+    // Time series panel metrics checkboxes
+    QMap<QString, QCheckBox*> m_tsMetricCheckBoxes;
 
     // Buttons
     QPushButton *m_resetButton;

@@ -2778,6 +2778,10 @@ void PlotWidget::clear()
         m_autoFitTimer->stop();
     }
     
+    // Reset obs/sim toggle state for new plot
+    m_obsVisible = true;
+    m_simVisible = true;
+
     // Reset scatter mode and show buttons (they'll be hidden again if scatter mode is set)
     m_isScatterMode = false;
     setXAxisButtonsVisible(true);
@@ -4388,9 +4392,21 @@ bool PlotWidget::eventFilter(QObject* obj, QEvent* event)
     
     if (event->type() == QEvent::MouseButtonPress) {
         QWidget* widget = qobject_cast<QWidget*>(obj);
-        if (widget && widget->property("seriesToHighlight").isValid()) {
-            createToggleHandler(widget);
-            return true;
+        if (widget) {
+            QString headerType = widget->property("legendHeaderType").toString();
+            if (headerType == "obs") {
+                setObsSeriesVisible(!m_obsVisible);
+                updateObsSimHeaders();
+                return true;
+            } else if (headerType == "sim") {
+                setSimSeriesVisible(!m_simVisible);
+                updateObsSimHeaders();
+                return true;
+            }
+            if (widget->property("seriesToHighlight").isValid()) {
+                createToggleHandler(widget);
+                return true;
+            }
         }
     }
 
@@ -4507,21 +4523,12 @@ void PlotWidget::createToggleHandler(QWidget* rowWidget)
     rowWidget->setStyleSheet(originalStyle + "background-color: #e6f2ff; border: 1px solid #99ccff;");
     
     // Get plot items for this row
-    QVector<QAbstractSeries*> plotItems = 
+    QVector<QAbstractSeries*> plotItems =
         rowWidget->property("seriesToHighlight").value<QVector<QAbstractSeries*>>();
-    
-    // Highlight/dim items (matching Python logic)
-    for (int i = 0; i < m_chart->series().count(); ++i) {
-        QAbstractSeries* series = m_chart->series().at(i);
-        
-        if (plotItems.contains(series)) {
-            // Highlight selected items
-            highlightSeries(series, true);
-        } else {
-            // Dim other items
-            highlightSeries(series, false);
-        }
-    }
+
+    // Delegate to highlightPlotItems which handles both single-panel (m_chart)
+    // and multi-panel (m_plotDataList) series correctly.
+    highlightPlotItems(plotItems);
 }
 
 void PlotWidget::highlightSeries(QAbstractSeries* series, bool highlight)
