@@ -44,9 +44,7 @@ PlotSettings PlotSettingsDialog::getSettings() const
     settings.showLegend = m_showLegendCheckBox->isChecked();
     settings.showHoverTooltip = m_showHoverTooltipCheckBox->isChecked();
     settings.multiPanelTimeSeries = m_multiPanelTSCheckBox->isChecked();
-    settings.legendPosition = m_legendPositionComboBox->currentData().toString();
-    settings.legendX = m_legendXSpinBox->value();
-    settings.legendY = m_legendYSpinBox->value();
+    settings.legendPosition = "outside-right";
     settings.plotMeanReps = m_plotMeanRepsCheckBox->isChecked();
     settings.showErrorBars = m_showErrorBarsCheckBox->isChecked();
     settings.errorBarType = m_errorBarTypeComboBox->currentData().toString();
@@ -237,22 +235,17 @@ void PlotSettingsDialog::setupUI()
     m_xAxisMinSpinBox->setRange(-1e9, 1e9);
     m_xAxisMinSpinBox->setDecimals(4);
     m_xAxisMinSpinBox->setValue(m_settings.xAxisMin);
-    m_xAxisMinSpinBox->setEnabled(m_settings.useCustomXMin);
-
     m_xAxisMinDateEdit = new QDateTimeEdit();
     m_xAxisMinDateEdit->setDisplayFormat("yyyy-MM-dd");
     m_xAxisMinDateEdit->setCalendarPopup(true);
     m_xAxisMinDateEdit->setDateTime(QDateTime::fromMSecsSinceEpoch(static_cast<qint64>(m_settings.xAxisMin)));
-    m_xAxisMinDateEdit->setEnabled(m_settings.useCustomXMin);
 
     if (m_xAxisIsDate) {
         m_xAxisMinSpinBox->hide();
         rangeLayout->addWidget(m_xAxisMinDateEdit, 0, 1);
-        connect(m_useCustomXMinCheckBox, &QCheckBox::toggled, m_xAxisMinDateEdit, &QDateTimeEdit::setEnabled);
     } else {
         m_xAxisMinDateEdit->hide();
         rangeLayout->addWidget(m_xAxisMinSpinBox, 0, 1);
-        connect(m_useCustomXMinCheckBox, &QCheckBox::toggled, m_xAxisMinSpinBox, &QDoubleSpinBox::setEnabled);
     }
 
     // X Max
@@ -264,22 +257,17 @@ void PlotSettingsDialog::setupUI()
     m_xAxisMaxSpinBox->setRange(-1e9, 1e9);
     m_xAxisMaxSpinBox->setDecimals(4);
     m_xAxisMaxSpinBox->setValue(m_settings.xAxisMax);
-    m_xAxisMaxSpinBox->setEnabled(m_settings.useCustomXMax);
-
     m_xAxisMaxDateEdit = new QDateTimeEdit();
     m_xAxisMaxDateEdit->setDisplayFormat("yyyy-MM-dd");
     m_xAxisMaxDateEdit->setCalendarPopup(true);
     m_xAxisMaxDateEdit->setDateTime(QDateTime::fromMSecsSinceEpoch(static_cast<qint64>(m_settings.xAxisMax)));
-    m_xAxisMaxDateEdit->setEnabled(m_settings.useCustomXMax);
 
     if (m_xAxisIsDate) {
         m_xAxisMaxSpinBox->hide();
         rangeLayout->addWidget(m_xAxisMaxDateEdit, 1, 1);
-        connect(m_useCustomXMaxCheckBox, &QCheckBox::toggled, m_xAxisMaxDateEdit, &QDateTimeEdit::setEnabled);
     } else {
         m_xAxisMaxDateEdit->hide();
         rangeLayout->addWidget(m_xAxisMaxSpinBox, 1, 1);
-        connect(m_useCustomXMaxCheckBox, &QCheckBox::toggled, m_xAxisMaxSpinBox, &QDoubleSpinBox::setEnabled);
     }
 
     // Y Min
@@ -289,8 +277,6 @@ void PlotSettingsDialog::setupUI()
     m_yAxisMinSpinBox->setRange(-1e9, 1e9);
     m_yAxisMinSpinBox->setDecimals(4);
     m_yAxisMinSpinBox->setValue(m_settings.yAxisMin);
-    m_yAxisMinSpinBox->setEnabled(m_settings.useCustomYMin);
-    connect(m_useCustomYMinCheckBox, &QCheckBox::toggled, m_yAxisMinSpinBox, &QDoubleSpinBox::setEnabled);
     rangeLayout->addWidget(m_useCustomYMinCheckBox, 2, 0);
     rangeLayout->addWidget(m_yAxisMinSpinBox, 2, 1);
 
@@ -301,8 +287,6 @@ void PlotSettingsDialog::setupUI()
     m_yAxisMaxSpinBox->setRange(-1e9, 1e9);
     m_yAxisMaxSpinBox->setDecimals(4);
     m_yAxisMaxSpinBox->setValue(m_settings.yAxisMax);
-    m_yAxisMaxSpinBox->setEnabled(m_settings.useCustomYMax);
-    connect(m_useCustomYMaxCheckBox, &QCheckBox::toggled, m_yAxisMaxSpinBox, &QDoubleSpinBox::setEnabled);
     rangeLayout->addWidget(m_useCustomYMaxCheckBox, 3, 0);
     rangeLayout->addWidget(m_yAxisMaxSpinBox, 3, 1);
 
@@ -337,40 +321,6 @@ void PlotSettingsDialog::setupUI()
     m_showLegendCheckBox->setChecked(m_settings.showLegend);
     legendLayout->addWidget(m_showLegendCheckBox);
 
-    QHBoxLayout *legendPosLayout = new QHBoxLayout();
-    legendPosLayout->addWidget(new QLabel("Legend Position (export):"));
-    m_legendPositionComboBox = new QComboBox();
-    m_legendPositionComboBox->addItem("Outside Right", "outside-right");
-    m_legendPositionComboBox->addItem("Inside (custom X/Y)", "inside-custom");
-    int posIdx = m_legendPositionComboBox->findData(m_settings.legendPosition);
-    if (posIdx >= 0) m_legendPositionComboBox->setCurrentIndex(posIdx);
-    legendPosLayout->addWidget(m_legendPositionComboBox);
-    legendPosLayout->addStretch();
-    legendLayout->addLayout(legendPosLayout);
-
-    QHBoxLayout *legendXYLayout = new QHBoxLayout();
-    legendXYLayout->addWidget(new QLabel("X (%):"));
-    m_legendXSpinBox = new QDoubleSpinBox();
-    m_legendXSpinBox->setRange(0.0, 100.0);
-    m_legendXSpinBox->setDecimals(1);
-    m_legendXSpinBox->setSingleStep(1.0);
-    m_legendXSpinBox->setValue(m_settings.legendX);
-    m_legendXSpinBox->setToolTip("Horizontal position of legend as % of plot area width (0=left, 100=right)");
-    m_legendXSpinBox->setFixedWidth(70);
-    legendXYLayout->addWidget(m_legendXSpinBox);
-    legendXYLayout->addSpacing(12);
-    legendXYLayout->addWidget(new QLabel("Y (%):"));
-    m_legendYSpinBox = new QDoubleSpinBox();
-    m_legendYSpinBox->setRange(0.0, 100.0);
-    m_legendYSpinBox->setDecimals(1);
-    m_legendYSpinBox->setSingleStep(1.0);
-    m_legendYSpinBox->setValue(m_settings.legendY);
-    m_legendYSpinBox->setToolTip("Vertical position of legend as % of plot area height (0=top, 100=bottom)");
-    m_legendYSpinBox->setFixedWidth(70);
-    legendXYLayout->addWidget(m_legendYSpinBox);
-    legendXYLayout->addStretch();
-    legendLayout->addLayout(legendXYLayout);
-    
     // Hover tooltip
     m_showHoverTooltipCheckBox = new QCheckBox("Show hover tooltip on chart");
     m_showHoverTooltipCheckBox->setChecked(m_settings.showHoverTooltip);
@@ -653,9 +603,6 @@ void PlotSettingsDialog::onResetDefaults()
     m_showLegendCheckBox->setChecked(defaults.showLegend);
     m_showHoverTooltipCheckBox->setChecked(defaults.showHoverTooltip);
     m_multiPanelTSCheckBox->setChecked(defaults.multiPanelTimeSeries);
-    { int i = m_legendPositionComboBox->findData(defaults.legendPosition); if (i >= 0) m_legendPositionComboBox->setCurrentIndex(i); }
-    m_legendXSpinBox->setValue(defaults.legendX);
-    m_legendYSpinBox->setValue(defaults.legendY);
     m_showErrorBarsCheckBox->setChecked(defaults.showErrorBars);
     int defaultErrorBarIndex = m_errorBarTypeComboBox->findData(defaults.errorBarType);
     if (defaultErrorBarIndex >= 0) {
@@ -677,18 +624,12 @@ void PlotSettingsDialog::onResetDefaults()
     m_yAxisDecimalsSpinBox->setValue(defaults.yAxisDecimals);
     m_useCustomXMinCheckBox->setChecked(defaults.useCustomXMin);
     m_xAxisMinSpinBox->setValue(defaults.xAxisMin);
-    m_xAxisMinSpinBox->setEnabled(defaults.useCustomXMin);
-    m_xAxisMinDateEdit->setEnabled(defaults.useCustomXMin);
     m_useCustomXMaxCheckBox->setChecked(defaults.useCustomXMax);
     m_xAxisMaxSpinBox->setValue(defaults.xAxisMax);
-    m_xAxisMaxSpinBox->setEnabled(defaults.useCustomXMax);
-    m_xAxisMaxDateEdit->setEnabled(defaults.useCustomXMax);
     m_useCustomYMinCheckBox->setChecked(defaults.useCustomYMin);
     m_yAxisMinSpinBox->setValue(defaults.yAxisMin);
-    m_yAxisMinSpinBox->setEnabled(defaults.useCustomYMin);
     m_useCustomYMaxCheckBox->setChecked(defaults.useCustomYMax);
     m_yAxisMaxSpinBox->setValue(defaults.yAxisMax);
-    m_yAxisMaxSpinBox->setEnabled(defaults.useCustomYMax);
     m_plotTitleEdit->setText(defaults.plotTitle);
     updateColorButton(m_backgroundColorButton, defaults.backgroundColor);
     updateColorButton(m_plotAreaColorButton, defaults.plotAreaColor);
@@ -713,9 +654,7 @@ void PlotSettingsDialog::onPreviewSettings()
     m_settings.showMinorGrid = m_showMinorGridCheckBox->isChecked();
     m_settings.minorTickCount = m_minorTickCountSpinBox->value();
     m_settings.showLegend = m_showLegendCheckBox->isChecked();
-    m_settings.legendPosition = m_legendPositionComboBox->currentData().toString();
-    m_settings.legendX = m_legendXSpinBox->value();
-    m_settings.legendY = m_legendYSpinBox->value();
+    m_settings.legendPosition = "outside-right";
     m_settings.showErrorBars = m_showErrorBarsCheckBox->isChecked();
     m_settings.errorBarType = m_errorBarTypeComboBox->currentData().toString();
     m_settings.lineWidth = m_lineWidthSpinBox->value();

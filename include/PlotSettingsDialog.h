@@ -140,9 +140,6 @@ private:
     
     // Legend controls
     QCheckBox *m_showLegendCheckBox;
-    QComboBox *m_legendPositionComboBox;
-    QDoubleSpinBox *m_legendXSpinBox;
-    QDoubleSpinBox *m_legendYSpinBox;
     
     // Interaction controls
     QCheckBox *m_showHoverTooltipCheckBox;
