@@ -290,6 +290,7 @@ void MainWindow::setupControlPanel()
     QLabel *titleLabel = new QLabel("Output Files");
     titleLabel->setStyleSheet("font-weight: bold;");
     headerLayout->addWidget(titleLabel);
+    m_fileGroupLabel = titleLabel;
     headerLayout->addStretch(1);
     
     // Refresh files button
@@ -312,7 +313,8 @@ void MainWindow::setupControlPanel()
     QLineEdit *fileSearch = new QLineEdit();
     fileSearch->setPlaceholderText("Search output files...");
     fileLayout->addWidget(fileSearch);
-    
+    m_fileSearchWidget = fileSearch;
+
     // File list container with unselect button
     QWidget *fileContainer = new QWidget();
     QHBoxLayout *fileContainerLayout = new QHBoxLayout(fileContainer);
@@ -342,6 +344,7 @@ void MainWindow::setupControlPanel()
     fileContainerLayout->addWidget(m_unselectFilesButton, 0, Qt::AlignTop);
     
     fileLayout->addWidget(fileContainer);
+    m_fileContainerWidget = fileContainer;
     controlLayout->addWidget(m_fileGroup, 0);  // Stretch factor 0 = no expansion
 
     // Time Series Variables Group
@@ -2252,7 +2255,24 @@ void MainWindow::onRefreshFiles()
 {
     if (!m_selectedFolder.isEmpty()) {
         m_statusWidget->showInfo("Refreshing file list...");
+
+        // Save current selection so we can restore it after repopulating
+        QStringList previousSelection;
+        if (m_fileListWidget) {
+            for (QListWidgetItem *item : m_fileListWidget->selectedItems())
+                previousSelection << item->text();
+        }
+
         populateFiles(m_selectedFolder);
+
+        // Restore previous selection (re-select files that still exist after refresh)
+        if (m_fileListWidget && !previousSelection.isEmpty()) {
+            for (int i = 0; i < m_fileListWidget->count(); ++i) {
+                QListWidgetItem *item = m_fileListWidget->item(i);
+                if (item && previousSelection.contains(item->text()))
+                    item->setSelected(true);
+            }
+        }
     } else {
         populateFolders();
     }
@@ -3039,11 +3059,20 @@ void MainWindow::hideFileSelectionUI(bool hide)
     if (m_cropGroup) {
         m_cropGroup->setVisible(!hide);
     }
-    
-    if (m_fileGroup) {
-        m_fileGroup->setVisible(!hide);
+
+    if (hide) {
+        // In CLI mode: keep the file group visible so the refresh button is accessible,
+        // but hide everything except the "R" button itself.
+        if (m_fileGroupLabel) m_fileGroupLabel->setVisible(false);
+        if (m_fileSearchWidget) m_fileSearchWidget->setVisible(false);
+        if (m_fileContainerWidget) m_fileContainerWidget->setVisible(false);
+    } else {
+        if (m_fileGroup) m_fileGroup->setVisible(true);
+        if (m_fileGroupLabel) m_fileGroupLabel->setVisible(true);
+        if (m_fileSearchWidget) m_fileSearchWidget->setVisible(true);
+        if (m_fileContainerWidget) m_fileContainerWidget->setVisible(true);
     }
-    
+
     if (hide) {
         qDebug() << "MainWindow: Hidden crop and file selection UI for command line mode";
         // Make Y variable list expand to fill available space

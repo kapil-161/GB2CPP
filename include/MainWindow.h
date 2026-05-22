@@ -199,6 +199,9 @@ private:
     // UI component references for file handling
     QListWidget *m_fileListWidget;
     QPushButton *m_refreshFilesButton;
+    QLineEdit *m_fileSearchWidget = nullptr;   // File search box (hidden in CLI mode)
+    QWidget *m_fileContainerWidget = nullptr;  // File list + unselect button (hidden in CLI mode)
+    QLabel *m_fileGroupLabel = nullptr;        // "Output Files" label (hidden in CLI mode)
     
     // Settings
     bool m_showLegend;
