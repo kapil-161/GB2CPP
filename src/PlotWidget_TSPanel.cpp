@@ -18,6 +18,68 @@
 #include "MetricsCalculator.h"
 
 // ---------------------------------------------------------------------------
+// DraggableOverlay — makes a metrics QLabel draggable inside its parent
+// chart view. Auto-positions at plot-area top-left until the user drags it.
+// ---------------------------------------------------------------------------
+class DraggableOverlay : public QObject {
+public:
+    DraggableOverlay(QChartView *view, QLabel *label, QObject *parent)
+        : QObject(parent), m_view(view), m_label(label)
+    {
+        m_label->setCursor(Qt::SizeAllCursor);
+        m_label->installEventFilter(this);
+        m_view->installEventFilter(this);
+    }
+
+    bool eventFilter(QObject *obj, QEvent *e) override {
+        if (obj == m_view) {
+            if (!m_userPositioned &&
+                (e->type() == QEvent::Resize || e->type() == QEvent::Paint)) {
+                QRectF pa = m_view->chart()->plotArea();
+                if (pa.isValid() && pa.width() > 10)
+                    m_label->move(static_cast<int>(pa.left()) + 4,
+                                  static_cast<int>(pa.top())  + 4);
+                m_label->raise();
+            }
+            return false;
+        }
+        if (obj == m_label) {
+            if (e->type() == QEvent::MouseButtonPress) {
+                auto *me = static_cast<QMouseEvent*>(e);
+                if (me->button() == Qt::LeftButton) {
+                    m_dragging = true;
+                    m_dragOffset = me->pos();
+                    m_label->raise();
+                }
+                return true;
+            }
+            if (e->type() == QEvent::MouseMove && m_dragging) {
+                auto *me = static_cast<QMouseEvent*>(e);
+                QPoint np = m_label->pos() + me->pos() - m_dragOffset;
+                QRect pr  = m_label->parentWidget()->rect();
+                np.setX(qBound(0, np.x(), pr.width()  - m_label->width()));
+                np.setY(qBound(0, np.y(), pr.height() - m_label->height()));
+                m_label->move(np);
+                m_userPositioned = true;
+                return true;
+            }
+            if (e->type() == QEvent::MouseButtonRelease) {
+                m_dragging = false;
+                return true;
+            }
+        }
+        return false;
+    }
+
+private:
+    QChartView *m_view;
+    QLabel     *m_label;
+    QPoint      m_dragOffset;
+    bool        m_dragging       = false;
+    bool        m_userPositioned = false;
+};
+
+// ---------------------------------------------------------------------------
 // PanelEventFilter — per-panel event filter giving each multi-panel chart view
 // zoom/reset, wheel zoom, right-drag pan, and hover tooltip.
 // No Q_OBJECT needed — only overrides a virtual.
@@ -372,25 +434,8 @@ void PlotWidget::plotTimeSeriesMultiPanel()
                 label->show();
                 m_tsMetricsOverlay = label;
 
-                // Keep positioned at top-left of plot area
-                QChartView *cvRef = m_chartView;
-                QLabel *labelRef  = label;
-                struct Repositioner : public QObject {
-                    QChartView *view; QLabel *label;
-                    Repositioner(QChartView *v, QLabel *l, QObject *p)
-                        : QObject(p), view(v), label(l) {}
-                    bool eventFilter(QObject *, QEvent *e) override {
-                        if (e->type() == QEvent::Resize || e->type() == QEvent::Paint) {
-                            QRectF pa = view->chart()->plotArea();
-                            if (pa.isValid() && pa.width() > 10)
-                                label->move(static_cast<int>(pa.left()) + 4,
-                                            static_cast<int>(pa.top())  + 4);
-                            label->raise();
-                        }
-                        return false;
-                    }
-                };
-                cvRef->installEventFilter(new Repositioner(cvRef, labelRef, labelRef));
+                // Draggable overlay: auto-positions top-left, user can drag
+                new DraggableOverlay(m_chartView, label, label);
             }
         }
         return;
@@ -795,24 +840,8 @@ void PlotWidget::plotTimeSeriesMultiPanel()
                 statsLabel->raise();
                 statsLabel->show();
 
-                // Keep label positioned at top-left of plot area on resize/repaint
-                struct Repositioner : public QObject {
-                    QChartView *view; QLabel *label;
-                    Repositioner(QChartView *v, QLabel *l, QObject *p)
-                        : QObject(p), view(v), label(l) {}
-                    bool eventFilter(QObject *, QEvent *e) override {
-                        if (e->type() == QEvent::Resize || e->type() == QEvent::Paint) {
-                            QRectF pa = view->chart()->plotArea();
-                            if (pa.isValid() && pa.width() > 10)
-                                label->move(static_cast<int>(pa.left()) + 4,
-                                            static_cast<int>(pa.top())  + 4);
-                            label->raise();
-                        }
-                        return false;
-                    }
-                };
-                auto *repo = new Repositioner(cv, statsLabel, cv);
-                cv->installEventFilter(repo);
+                // Draggable overlay: auto-positions top-left, user can drag
+                new DraggableOverlay(cv, statsLabel, statsLabel);
             }
         }
 

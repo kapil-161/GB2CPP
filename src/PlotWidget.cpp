@@ -2748,7 +2748,8 @@ void PlotWidget::clearChart()
     }
     clearLegend();
     m_scalingLabel->clear();
-    m_plotDataList.clear(); // Clear unique_ptrs
+    m_plotDataList.clear();
+    if (m_tsMetricsOverlay) { delete m_tsMetricsOverlay; m_tsMetricsOverlay = nullptr; }
     
     // Clear error bars and axis breaks when chart is cleared
     if (m_chartView) {
