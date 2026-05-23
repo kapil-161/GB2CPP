@@ -222,9 +222,15 @@ if not defined NSIS_PATH (
 )
 
 REM Remove stale runtime so the new exe is picked up on next launch
-if exist "%TEMP%\GB2_runtime\GB2.exe" del /f /q "%TEMP%\GB2_runtime\GB2.exe"
+if exist "%TEMP%\GB2_runtime" rmdir /s /q "%TEMP%\GB2_runtime"
 
-"%NSIS_PATH%" gb2_launcher.nsi
+REM Extract version from version_generated.h and pass to NSIS
+set GB2_VERSION=unknown
+for /f "tokens=3" %%v in ('findstr /c:"#define GB2_VERSION " "%PROJECT_DIR%include\version_generated.h"') do set GB2_VERSION=%%v
+set GB2_VERSION=%GB2_VERSION:"=%
+if not defined QUIET_MODE echo Packaging version: %GB2_VERSION%
+
+"%NSIS_PATH%" /DVERSION=%GB2_VERSION% gb2_launcher.nsi
 if %ERRORLEVEL% neq 0 (
     echo ERROR: NSIS packaging failed!
     goto :skip_nsis

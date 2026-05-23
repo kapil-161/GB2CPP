@@ -1,10 +1,16 @@
 ; GB2 Portable Launcher
 ; - Forwards all command-line arguments to GB2.exe
-; - Skips re-extraction if already deployed (delete %TEMP%\GB2_runtime to force refresh)
+; - Skips re-extraction if this exact version is already deployed
+; - Forces re-extraction when a new version is bundled (version marker mismatch)
 ; - Restores caller's working directory so relative --save/--metrics paths resolve correctly
 ; - Uses ExecWait so terminal waits for GB2 to finish (needed for headless --save/--metrics)
 
 !include "FileFunc.nsh"
+
+; Version injected by build_and_deploy.bat via /DVERSION=x.y.z
+!ifndef VERSION
+  !define VERSION "unknown"
+!endif
 
 Name "GB2"
 OutFile "C:\DSSAT48\Tools\gb2\GB2.exe"
@@ -17,8 +23,11 @@ Section
     System::Call 'kernel32::GetCurrentDirectory(i 1024, t .r0)'
     System::Call 'kernel32::SetEnvironmentVariable(t "GB2_WORKING_DIR", t r0)'
 
-    ; Skip extraction if already deployed
-    IfFileExists "$TEMP\GB2_runtime\GB2.exe" launch
+    ; Skip extraction only if this exact version marker exists
+    IfFileExists "$TEMP\GB2_runtime\version_${VERSION}.marker" launch
+
+    ; Remove stale runtime (old version) before extracting new one
+    RMDir /r "$TEMP\GB2_runtime"
 
     SetOutPath "$TEMP\GB2_runtime"
     File "manual_deployment\GB2.exe"
@@ -38,6 +47,11 @@ Section
     SetOutPath "$TEMP\GB2_runtime\resources"
     File "manual_deployment\resources\final.ico"
     File "manual_deployment\resources\final.png"
+
+    ; Write version marker so future launches skip re-extraction
+    SetOutPath "$TEMP\GB2_runtime"
+    FileOpen $0 "$TEMP\GB2_runtime\version_${VERSION}.marker" w
+    FileClose $0
 
     launch:
     ${GetParameters} $R0
