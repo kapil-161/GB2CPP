@@ -23,9 +23,10 @@ StatusWidget::StatusWidget(QWidget *parent)
 
 void StatusWidget::setupUI()
 {
+    setFixedHeight(24);
     m_layout = new QHBoxLayout(this);
     m_layout->setContentsMargins(5, 2, 5, 2);
-    
+
     m_messageLabel = new QLabel(this);
     m_messageLabel->setStyleSheet("padding: 2px 5px;");
     m_layout->addWidget(m_messageLabel);

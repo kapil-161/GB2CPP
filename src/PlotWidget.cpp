@@ -174,30 +174,35 @@ void PlotWidget::setupUI()
     
     // Bottom container with X-axis buttons and scaling label
     m_bottomContainer = new QWidget();
+    m_bottomContainer->setFixedHeight(34);
+    m_bottomContainer->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
     m_bottomLayout = new QHBoxLayout(m_bottomContainer);
-    m_bottomLayout->setContentsMargins(5, 5, 5, 5);
-    m_bottomLayout->setSpacing(0); // Remove gaps between buttons
+    m_bottomLayout->setContentsMargins(6, 2, 6, 2);
+    m_bottomLayout->setSpacing(4);
     
     // X-axis selection buttons (like Python version)
     
+    m_refreshButton = new QPushButton("Refresh");
     m_dasButton = new QPushButton("DAS");
     m_dapButton = new QPushButton("DAP");
     m_dateButton = new QPushButton("DATE");
     m_settingsButton = new QPushButton("⚙");
-    
+
     // Simple, clean button styling
     QString buttonStyle = "QPushButton { "
-                         "padding: 6px 12px; "
+                         "padding: 3px 8px; "
                          "background-color: #f8f9fa; "
                          "border: 1px solid #cccccc; "
                          "border-radius: 4px; "
                          "color: #333333; "
-                         "font-size: 12px; "
+                         "font-size: 11px; "
                          "} "
                          "QPushButton:hover { background-color: #e9ecef; } "
                          "QPushButton:pressed { background-color: #dee2e6; } "
                          "QPushButton:checked { background-color: #0078d4; color: white; border-color: #0078d4; }";
-    
+
+    m_refreshButton->setStyleSheet(buttonStyle);
+    m_refreshButton->setToolTip("Refresh output files");
     m_dasButton->setStyleSheet(buttonStyle);
     m_dapButton->setStyleSheet(buttonStyle);
     m_dateButton->setStyleSheet(buttonStyle);
@@ -219,7 +224,7 @@ void PlotWidget::setupUI()
     m_dateButton->setCheckable(true);
     m_dateButton->setChecked(true); // Default to DATE
     
-    // Simple approach: just add buttons to layout with no gaps
+    m_bottomLayout->addWidget(m_refreshButton);
     m_bottomLayout->addWidget(m_dasButton);
     m_bottomLayout->addWidget(m_dapButton);
     m_bottomLayout->addWidget(m_dateButton);
@@ -230,17 +235,25 @@ void PlotWidget::setupUI()
     m_boxPlotButton->setChecked(false);
     m_boxPlotButton->setVisible(false);
     m_boxPlotButton->setStyleSheet(buttonStyle);
-    m_bottomLayout->addSpacing(10);
     m_bottomLayout->addWidget(m_boxPlotButton);
 
     // Treatments button — opens treatment selection/review panel
     m_treatmentsButton = new QPushButton("Treatments");
     m_treatmentsButton->setStyleSheet(buttonStyle);
     m_treatmentsButton->setToolTip("Show treatment selection panel");
-    m_bottomLayout->addSpacing(6);
     m_bottomLayout->addWidget(m_treatmentsButton);
 
+    // Scaling label takes remaining space after Treatments
+    m_scalingLabel = new QLabel();
+    m_scalingLabel->setStyleSheet("padding: 2px 8px; font-size: 10pt; font-weight: bold; background-color: #fff3cd; border: 1px solid #ffeaa7; border-radius: 3px; color: #856404;");
+    m_scalingLabel->setWordWrap(false);
+    m_scalingLabel->setAlignment(Qt::AlignVCenter | Qt::AlignLeft);
+    m_scalingLabel->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+    m_scalingLabel->setVisible(false);
+    m_bottomLayout->addWidget(m_scalingLabel, 1);
+
     // Connect button signals
+    connect(m_refreshButton, &QPushButton::clicked, this, &PlotWidget::refreshFilesRequested);
     connect(m_dasButton, &QPushButton::clicked, this, &PlotWidget::onDasButtonClicked);
     connect(m_dapButton, &QPushButton::clicked, this, &PlotWidget::onDapButtonClicked);
     connect(m_dateButton, &QPushButton::clicked, this, &PlotWidget::onDateButtonClicked);
@@ -248,17 +261,6 @@ void PlotWidget::setupUI()
     connect(m_treatmentsButton, &QPushButton::clicked, this, &PlotWidget::showTreatmentSelection);
     connect(m_settingsButton, &QPushButton::clicked, this, &PlotWidget::onSettingsButtonClicked);
     
-    // Add spacer
-    m_bottomLayout->addSpacing(20);
-    
-    // Simple scaling label
-    m_scalingLabel = new QLabel();
-    m_scalingLabel->setStyleSheet("padding: 8px; font-size: 10pt; font-weight: bold; background-color: #fff3cd; border: 1px solid #ffeaa7; border-radius: 3px; color: #856404;");
-    m_scalingLabel->setWordWrap(true);
-    m_scalingLabel->setAlignment(Qt::AlignCenter);
-    m_scalingLabel->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Minimum);
-    m_scalingLabel->setVisible(false); // Start hidden
-    m_bottomLayout->addWidget(m_scalingLabel, 1);
     
     
     // Chart placeholder (replaced in setupChart)

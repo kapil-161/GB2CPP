@@ -257,15 +257,6 @@ void MetricsTableWidget::setupUI()
 {
     m_layout = new QVBoxLayout(this);
     
-    // Title label
-    m_titleLabel = new QLabel("Model Performance Metrics");
-    m_titleLabel->setStyleSheet("font-size: 16px; font-weight: bold; margin-bottom: 10px;");
-    m_layout->addWidget(m_titleLabel);
-    
-    // Description label
-    m_descriptionLabel = new QLabel("This table shows performance metrics for simulated versus measured data.");
-    m_layout->addWidget(m_descriptionLabel);
-    
     // Table view
     m_tableView = new QTableView();
     m_tableView->setSortingEnabled(true);
@@ -363,7 +354,8 @@ void MetricsTableWidget::setMetrics(const QVariantList& metricsData, bool isScat
     for (const QString& varName : varOrder) {
         const QVariantList& varRows = byVar[varName];
         m_metricsData.append(varRows);
-        m_metricsData.append(computeOverallRow(varRows, isScatterPlot, varName));
+        if (!isScatterPlot)
+            m_metricsData.append(computeOverallRow(varRows, isScatterPlot, varName));
     }
 
     MetricsTableModel* model = new MetricsTableModel(m_metricsData, isScatterPlot, this);

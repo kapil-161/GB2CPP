@@ -28,6 +28,7 @@
 #include "DataProcessor.h"
 #include "Config.h"
 #include "MetricsDialog.h"
+#include "MetricsTableWidget.h"
 #include "DataTableWidget.h"
 
 class PlotWidget;
@@ -133,6 +134,7 @@ private:
     void showError(const QString &title, const QString &message);
     void showSuccess(const QString &message);
     void showWarning(const QString &message);
+    void updateStatisticsTab();
     void markDataNeedsRefresh();
     void filterOutFiles(const QString &text);
     void filterYVars(const QString &text);
@@ -181,6 +183,12 @@ private:
     // Plot Panel (now integrated into tabs like Python)
     PlotWidget *m_plotWidget;               // Main plotting widget for time series (like Python PyQtGraph)
     PlotWidget *m_scatterPlotWidget;       // Plotting widget for scatter plots
+
+    // Statistics Tab widgets
+    MetricsTableWidget *m_statsTSWidget;
+    MetricsTableWidget *m_statsScatterWidget;
+    QLabel *m_statsTSHeader;
+    QLabel *m_statsScatterHeader;
     
     // Status and Progress
     StatusWidget *m_statusWidget;
@@ -198,7 +206,6 @@ private:
     
     // UI component references for file handling
     QListWidget *m_fileListWidget;
-    QPushButton *m_refreshFilesButton;
     QLineEdit *m_fileSearchWidget = nullptr;   // File search box (hidden in CLI mode)
     QWidget *m_fileContainerWidget = nullptr;  // File list + unselect button (hidden in CLI mode)
     QLabel *m_fileGroupLabel = nullptr;        // "Output Files" label (hidden in CLI mode)

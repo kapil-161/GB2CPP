@@ -254,6 +254,7 @@ signals:
     void errorOccurred(const QString &error);
     void metricsCalculated(const QVector<QMap<QString, QVariant>> &metrics);
     void xVariableChanged(const QString &xVariable);
+    void refreshFilesRequested();
 
 public slots:
     void onSettingsButtonClicked();
@@ -382,6 +383,7 @@ private:
     // X-axis control buttons
     QWidget *m_bottomContainer;
     QHBoxLayout *m_bottomLayout;
+    QPushButton *m_refreshButton;
     QPushButton *m_dateButton;
     QPushButton *m_dasButton;
     QPushButton *m_dapButton;

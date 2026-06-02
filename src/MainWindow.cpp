@@ -92,6 +92,10 @@ MainWindow::MainWindow(QWidget *parent)
     , m_dataTableWidget(nullptr)
     , m_plotWidget(nullptr)
     , m_scatterPlotWidget(nullptr)
+    , m_statsTSWidget(nullptr)
+    , m_statsScatterWidget(nullptr)
+    , m_statsTSHeader(nullptr)
+    , m_statsScatterHeader(nullptr)
     , m_statusWidget(nullptr)
     , m_progressBar(nullptr)
     , m_statusLabel(nullptr)
@@ -238,8 +242,12 @@ void MainWindow::setupMainWidget()
     setCentralWidget(m_centralWidget);
     
     QHBoxLayout *mainLayout = new QHBoxLayout(m_centralWidget);
-    
+    mainLayout->setContentsMargins(0, 0, 0, 0);
+    mainLayout->setSpacing(0);
+
     m_mainSplitter = new QSplitter(Qt::Horizontal, this);
+    m_mainSplitter->setHandleWidth(1);
+    m_mainSplitter->setContentsMargins(0, 0, 0, 0);
     mainLayout->addWidget(m_mainSplitter);
     
     setupControlPanel();
@@ -261,16 +269,20 @@ void MainWindow::setupControlPanel()
     scrollArea->setWidgetResizable(true);
     scrollArea->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     scrollArea->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
-    
+    scrollArea->setFrameShape(QFrame::NoFrame);  // Remove border so top aligns with tab bar
+    scrollArea->setContentsMargins(0, 0, 0, 0);
+
     QWidget *sidebarWidget = new QWidget();
     QVBoxLayout *controlLayout = new QVBoxLayout(sidebarWidget);
-    controlLayout->setContentsMargins(10, 0, 10, 0);
-    
+    controlLayout->setContentsMargins(8, 2, 8, 0);
+    controlLayout->setSpacing(6);
+
     scrollArea->setWidget(sidebarWidget);
-    
+
     QVBoxLayout *panelLayout = new QVBoxLayout(controlPanel);
     panelLayout->setContentsMargins(0, 0, 0, 0);
-    panelLayout->addWidget(scrollArea);
+    panelLayout->setSpacing(0);
+    panelLayout->addWidget(scrollArea, 1);
     
     // Crop Selection Group
     m_cropGroup = new QGroupBox("Select Crop");
@@ -293,16 +305,6 @@ void MainWindow::setupControlPanel()
     m_fileGroupLabel = titleLabel;
     headerLayout->addStretch(1);
     
-    // Refresh files button
-    m_refreshFilesButton = new QPushButton();
-    m_refreshFilesButton->setToolTip("Refresh output files");
-    m_refreshFilesButton->setText("R");
-    m_refreshFilesButton->setFixedSize(24, 24);
-    m_refreshFilesButton->setStyleSheet(
-        "QPushButton { background-color: #8B7355; border: none; color: white; }"
-        "QPushButton:hover { background-color: #A0845C; border-radius: 3px; }"
-    );
-    headerLayout->addWidget(m_refreshFilesButton);
     
     m_fileGroup = new QGroupBox();
     QVBoxLayout *fileLayout = new QVBoxLayout(m_fileGroup);
@@ -315,11 +317,12 @@ void MainWindow::setupControlPanel()
     fileLayout->addWidget(fileSearch);
     m_fileSearchWidget = fileSearch;
 
-    // File list container with unselect button
+    // File list container with unselect button overlaid
     QWidget *fileContainer = new QWidget();
     QHBoxLayout *fileContainerLayout = new QHBoxLayout(fileContainer);
     fileContainerLayout->setContentsMargins(0, 0, 0, 0);
-    
+    fileContainerLayout->setSpacing(0);
+
     auto *outFileList = new OutFileListWidget();
     m_fileListWidget = outFileList;
     outFileList->onDrop = [this](const QStringList &paths) {
@@ -331,17 +334,15 @@ void MainWindow::setupControlPanel()
     m_fileListWidget->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
     m_fileListWidget->setToolTip("Select output files to plot.\nDrag & drop .OUT, .OSU, .OPG, .OVT, .OPT, .CSV files from Explorer to add them.");
     fileContainerLayout->addWidget(m_fileListWidget);
-    
-    m_unselectFilesButton = new QPushButton("X");
+
+    m_unselectFilesButton = new QPushButton("×", m_fileListWidget);
     m_unselectFilesButton->setStyleSheet(
-        "QPushButton { background-color: #ffcccc; border: none; padding: 0px; margin: 0px; font-size: 8px; width: 12px; max-width: 12px; min-width: 12px; }"
-        "QPushButton:hover { background-color: #ffcccc; border-radius: 3px; }"
+        "QPushButton { background-color: #ffcccc; border: none; padding: 0px; margin: 0px; font-size: 8px; }"
+        "QPushButton:hover { background-color: #ff9999; border-radius: 3px; }"
     );
     m_unselectFilesButton->setToolTip("Unselect All");
-    m_unselectFilesButton->setFixedSize(12, 12);
-    m_unselectFilesButton->setMaximumWidth(12);
-    m_unselectFilesButton->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
-    fileContainerLayout->addWidget(m_unselectFilesButton, 0, Qt::AlignTop);
+    m_unselectFilesButton->setFixedSize(14, 14);
+    m_unselectFilesButton->move(m_fileListWidget->width() - 16, 2);
     
     fileLayout->addWidget(fileContainer);
     m_fileContainerWidget = fileContainer;
@@ -350,39 +351,45 @@ void MainWindow::setupControlPanel()
     // Time Series Variables Group
     QGroupBox *timeSeriesGroup = new QGroupBox("Time Series Variables");
     QVBoxLayout *tsLayout = new QVBoxLayout(timeSeriesGroup);
+    tsLayout->setContentsMargins(6, 6, 6, 6);
+    tsLayout->setSpacing(4);
     
     // X Variable
-    tsLayout->addWidget(new QLabel("X Variable"));
+    QLabel *xVarLabel = new QLabel("X Variable");
+    xVarLabel->setStyleSheet("font-weight: bold; font-size: 11px;");
+    tsLayout->addWidget(xVarLabel);
     m_xVariableComboBox = new QComboBox();
     tsLayout->addWidget(m_xVariableComboBox);
-    
+
     // Y Variables
-    tsLayout->addWidget(new QLabel("Y Variables"));
+    QLabel *yVarLabel = new QLabel("Y Variables");
+    yVarLabel->setStyleSheet("font-weight: bold; font-size: 11px;");
+    tsLayout->addWidget(yVarLabel);
     
     // Y Variable search
     m_yVarSearch = new QLineEdit();
     m_yVarSearch->setPlaceholderText("Search Y variables...");
     tsLayout->addWidget(m_yVarSearch);
     
-    // Y Variable list container with unselect button
+    // Y Variable list container with unselect button overlaid via absolute position
     QWidget *yVarContainer = new QWidget();
     QHBoxLayout *yVarContainerLayout = new QHBoxLayout(yVarContainer);
     yVarContainerLayout->setContentsMargins(0, 0, 0, 0);
+    yVarContainerLayout->setSpacing(0);
 
     QListWidget *yVarListWidget = new QListWidget();
     yVarListWidget->setSelectionMode(QListWidget::MultiSelection);
     yVarContainerLayout->addWidget(yVarListWidget);
-    
-    m_unselectYVarsButton = new QPushButton("×");
+
+    // Overlay the X button in the top-right corner of the list widget
+    m_unselectYVarsButton = new QPushButton("×", yVarListWidget);
     m_unselectYVarsButton->setStyleSheet(
-        "QPushButton { background-color: #ffcccc; border: none; padding: 0px; margin: 0px; font-size: 8px; width: 12px; max-width: 12px; min-width: 12px; }"
-        "QPushButton:hover { background-color: #ffcccc; border-radius: 3px; }"
+        "QPushButton { background-color: #ffcccc; border: none; padding: 0px; margin: 0px; font-size: 8px; }"
+        "QPushButton:hover { background-color: #ff9999; border-radius: 3px; }"
     );
     m_unselectYVarsButton->setToolTip("Unselect All");
-    m_unselectYVarsButton->setFixedSize(12, 12);
-    m_unselectYVarsButton->setMaximumWidth(12);
-    m_unselectYVarsButton->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
-    yVarContainerLayout->addWidget(m_unselectYVarsButton, 0, Qt::AlignTop);
+    m_unselectYVarsButton->setFixedSize(14, 14);
+    m_unselectYVarsButton->move(yVarListWidget->width() - 16, 2);
     
     tsLayout->addWidget(yVarContainer, 1);  // Stretch factor 1 = expands to fill space
     controlLayout->addWidget(timeSeriesGroup, 1);  // Stretch factor 1 = expands to fill space
@@ -390,35 +397,24 @@ void MainWindow::setupControlPanel()
     // Store references for later use
     m_yVariableComboBox = yVarListWidget;
 
-    // Let Y variable list expand to fill remaining space, but with reasonable min/max constraints
-    // This ensures buttons remain visible when window is resized
-    m_yVariableComboBox->setMinimumHeight(150);  // Reduced from 200 to allow more flexibility
-    m_yVariableComboBox->setMaximumHeight(400);  // Add maximum to prevent it from pushing buttons out
+    m_yVariableComboBox->setMinimumHeight(100);
     m_yVariableComboBox->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
 
     m_treatmentComboBox = new QComboBox();  // Keep for compatibility
-    
-    // Refresh Plot/Data Button
-    m_updatePlotButton = new QPushButton("Refresh Plot");
-    m_updatePlotButton->setToolTip("Refresh plot when on Time Series tab, or refresh data table when on Data View tab");
+
+    m_metricsButton = nullptr; // Statistics shown in Statistics tab
+
+    // Plot button pinned at bottom of panel, outside scroll area
+    m_updatePlotButton = new QPushButton("Plot");
+    m_updatePlotButton->setToolTip("Plot when on Time Series tab, or refresh data table when on Data View tab");
     m_updatePlotButton->setStyleSheet(
-        "QPushButton { background-color: #2196F3; color: white; font-weight: bold; padding: 8px; }"
+        "QPushButton { background-color: #2196F3; color: white; font-weight: bold; padding: 0px; margin: 0px; border-radius: 0px; }"
         "QPushButton:hover { background-color: #0b7dda; }"
-        "QPushButton:disabled { background-color: #cccccc; }"
+        "QPushButton:disabled { background-color: #aaaaaa; color: #dddddd; }"
     );
     m_updatePlotButton->setEnabled(false);
-    controlLayout->addWidget(m_updatePlotButton);
-    
-    // Metrics Button
-    m_metricsButton = new QPushButton("Show Metrics");
-    m_metricsButton->setToolTip("Show model performance metrics");
-    m_metricsButton->setStyleSheet(
-        "QPushButton { background-color: #4CAF50; color: white; font-weight: bold; padding: 8px; }"
-        "QPushButton:hover { background-color: #45a049; }"
-        "QPushButton:disabled { background-color: #cccccc; }"
-    );
-    m_metricsButton->setEnabled(false);
-    controlLayout->addWidget(m_metricsButton);
+    m_updatePlotButton->setMinimumHeight(34);
+    panelLayout->addWidget(m_updatePlotButton);
     
     // Keep plot group for compatibility but make it minimal
     m_plotGroup = new QGroupBox("Plot Options");
@@ -518,7 +514,45 @@ void MainWindow::setupDataPanel()
     
     m_tabWidget->addTab(scatterPlotWidget, "Scatter Plot");
 
-    m_mainSplitter->addWidget(m_tabWidget);
+    // Statistics Tab (index 3)
+    QWidget *statsWidget = new QWidget();
+    QVBoxLayout *statsLayout = new QVBoxLayout(statsWidget);
+    statsLayout->setContentsMargins(8, 8, 8, 8);
+    statsLayout->setSpacing(8);
+
+    // Time Series section
+    m_statsTSHeader = new QLabel("Time Series Statistics");
+    m_statsTSHeader->setStyleSheet("font-weight: bold; font-size: 13px; color: #1565C0; padding: 4px 0;");
+    statsLayout->addWidget(m_statsTSHeader);
+    m_statsTSWidget = new MetricsTableWidget();
+    statsLayout->addWidget(m_statsTSWidget);
+
+    // Separator
+    QFrame *separator = new QFrame();
+    separator->setFrameShape(QFrame::HLine);
+    separator->setFrameShadow(QFrame::Sunken);
+    statsLayout->addWidget(separator);
+
+    // Scatter Plot section
+    m_statsScatterHeader = new QLabel("Scatter Plot Statistics");
+    m_statsScatterHeader->setStyleSheet("font-weight: bold; font-size: 13px; color: #1565C0; padding: 4px 0;");
+    statsLayout->addWidget(m_statsScatterHeader);
+    m_statsScatterWidget = new MetricsTableWidget();
+    statsLayout->addWidget(m_statsScatterWidget);
+
+    m_tabWidget->addTab(statsWidget, "Statistics");
+
+    // Wrap tab widget + status widget in a container so status only spans plot area
+    QWidget *dataPanel = new QWidget();
+    QVBoxLayout *dataPanelLayout = new QVBoxLayout(dataPanel);
+    dataPanelLayout->setContentsMargins(0, 0, 0, 0);
+    dataPanelLayout->setSpacing(0);
+    dataPanelLayout->addWidget(m_tabWidget, 1);
+
+    m_statusWidget = new StatusWidget(this);
+    dataPanelLayout->addWidget(m_statusWidget, 0);
+
+    m_mainSplitter->addWidget(dataPanel);
     
     // Connect tab changed signal
     connect(m_tabWidget, &QTabWidget::currentChanged, this, &MainWindow::onTabChanged);
@@ -528,18 +562,16 @@ void MainWindow::setupDataPanel()
 
 void MainWindow::setupStatusBar()
 {
-    QStatusBar *statusBar = this->statusBar();
-    
-    m_statusWidget = new StatusWidget(this);
-    statusBar->addWidget(m_statusWidget, 1);
-    
+    // m_statusWidget is created in setupDataPanel and embedded in the plot area
+    // Hide the native status bar — we don't use it anymore
+    statusBar()->hide();
+    statusBar()->setMaximumHeight(0);
+
     m_progressBar = new QProgressBar();
     m_progressBar->setMaximumWidth(200);
     m_progressBar->hide();
-    statusBar->addPermanentWidget(m_progressBar);
-    
+
     m_statusLabel = new QLabel("Ready");
-    statusBar->addPermanentWidget(m_statusLabel);
 }
 
 void MainWindow::connectSignals()
@@ -610,8 +642,11 @@ void MainWindow::connectSignals()
                 this, &MainWindow::onDataViewFileTypeChanged);
     }
     
-    if (m_refreshFilesButton) {
-        connect(m_refreshFilesButton, &QPushButton::clicked, this, &MainWindow::onRefreshFiles);
+    if (m_plotWidget) {
+        connect(m_plotWidget, &PlotWidget::refreshFilesRequested, this, &MainWindow::onRefreshFiles);
+    }
+    if (m_scatterPlotWidget) {
+        connect(m_scatterPlotWidget, &PlotWidget::refreshFilesRequested, this, &MainWindow::onRefreshFiles);
     }
 
     // Connect Y variable search
@@ -939,7 +974,7 @@ void MainWindow::onUserManual()
 <html><body style="font-family:Arial,sans-serif; font-size:13px; margin:16px; color:#222;">
 
 <h1 style="color:#1565C0;">GB2 — User Manual</h1>
-<p>GB2 is a visualization tool for DSSAT crop model output files. Use the left panel to browse and load output files, then configure X/Y variables and click <b>Refresh Plot</b>.</p>
+<p>GB2 is a visualization tool for DSSAT crop model output files. Use the left panel to browse and load output files, then configure X/Y variables and click <b>Plot</b>.</p>
 <hr/>
 
 <h2 style="color:#1565C0;">1. Loading Files</h2>
@@ -965,7 +1000,7 @@ void MainWindow::onUserManual()
 <ul>
   <li>Select an <b>X variable</b> (e.g. DATE, DAS, DAP) from the dropdown; use the <b>DAS / DAP / DATE</b> quick-switch buttons.</li>
   <li>Select one or more <b>Y variables</b> from the list (use the search box to filter).</li>
-  <li>Click <b>Refresh Plot</b> to render the plot.</li>
+  <li>Click <b>Plot</b> to render the plot.</li>
   <li>The <b>Treatments</b> panel lets you enable/disable individual treatments before plotting.</li>
   <li>Click a legend entry to highlight that series; click again to reset.</li>
   <li>When a DATE x-axis has gaps between discontiguous periods, <b>axis breaks</b> collapse the gap automatically with a visible break mark.</li>
@@ -995,7 +1030,7 @@ void MainWindow::onUserManual()
   <li><b>Plot style:</b> T file data is plotted as <b>scatter points</b> (not lines), reflecting its nature as discrete field observations.</li>
   <li><b>Treatment names:</b> GB2 automatically reads the corresponding <code>.X</code> experiment file (same basename, last extension letter <code>T→X</code>, e.g. <code>KSAS8101.WHX</code>) to retrieve treatment names from the <code>*TREATMENTS</code> section. These names appear in the plot legend.</li>
   <li><b>Date format:</b> T file dates are stored in YYDDD format (5-digit: 2-digit year + 3-digit day-of-year). GB2 converts these automatically to calendar dates for the X axis.</li>
-  <li><b>Variables:</b> after loading, the variable lists populate from the T file columns. Select DATE (or another date column) as X and any measured variable as Y, then click <b>Refresh Plot</b>.</li>
+  <li><b>Variables:</b> after loading, the variable lists populate from the T file columns. Select DATE (or another date column) as X and any measured variable as Y, then click <b>Plot</b>.</li>
   <li><b>Command line:</b> pass the T filename as a positional argument:
     <pre style="background:#F5F5F5; padding:6px; border-radius:4px;">GB2.exe C:/DSSAT48 C:/DSSAT48/Wheat KSAS8101.WHT --xvar DATE --yvar GWAD</pre>
   </li>
@@ -1015,7 +1050,7 @@ void MainWindow::onUserManual()
   <li>Simulated vs. observed values are plotted with a 1:1 reference line.</li>
   <li>Statistics (RMSE, R², d-stat, BIAS, N) are shown inside each panel.</li>
   <li>Configure which stats are shown via <b>Plot Settings → Scatter Panel Metrics</b>.</li>
-  <li>Click <b>Show Metrics</b> to open a detailed metrics table for all variables.</li>
+  <li>Click <b>Statistics</b> to open a detailed metrics table for all variables.</li>
 </ul>
 
 <h2 style="color:#1565C0;">6. Data View Tab</h2>
@@ -1185,11 +1220,11 @@ void MainWindow::onXVariableChanged()
 
     // Show prompt message based on current tab
     if (m_tabWidget && m_tabWidget->currentIndex() == 0) {
-        m_statusWidget->showInfo("X variable changed. Click 'Refresh Plot' to update the time series plot");
+        m_statusWidget->showInfo("X variable changed. Click 'Plot' to update the time series plot");
     } else if (m_tabWidget && m_tabWidget->currentIndex() == 1) {
-        m_statusWidget->showInfo("X variable changed. Click 'Refresh Data' to update the data table");
+        m_statusWidget->showInfo("X variable changed. Click 'Data' to update the data table");
     } else if (m_tabWidget && m_tabWidget->currentIndex() == 2) {
-        m_statusWidget->showInfo("X variable changed. Click 'Refresh Plot' to update the scatter plot");
+        m_statusWidget->showInfo("X variable changed. Click 'Plot' to update the scatter plot");
     }
     // Don't auto-plot, wait for manual refresh
 }
@@ -1219,11 +1254,11 @@ void MainWindow::onYVariableChanged()
 
     // Show prompt message based on current tab
     if (m_tabWidget && m_tabWidget->currentIndex() == 0) {
-        m_statusWidget->showInfo("Y variable selection changed. Click 'Refresh Plot' to update the time series plot");
+        m_statusWidget->showInfo("Y variable selection changed. Click 'Plot' to update the time series plot");
     } else if (m_tabWidget && m_tabWidget->currentIndex() == 1) {
-        m_statusWidget->showInfo("Y variable selection changed. Click 'Refresh Data' to update the data table");
+        m_statusWidget->showInfo("Y variable selection changed. Click 'Data' to update the data table");
     } else if (m_tabWidget && m_tabWidget->currentIndex() == 2) {
-        m_statusWidget->showInfo("Y variable selection changed. Click 'Refresh Plot' to update the scatter plot");
+        m_statusWidget->showInfo("Y variable selection changed. Click 'Plot' to update the scatter plot");
     }
     // Don't auto-plot, wait for manual refresh
 }
@@ -1236,9 +1271,9 @@ void MainWindow::onTreatmentChanged()
 
     // Show prompt message based on current tab
     if (m_tabWidget && m_tabWidget->currentIndex() == 0) {
-        m_statusWidget->showInfo("Treatment selection changed. Click 'Refresh Plot' to update the time series plot");
+        m_statusWidget->showInfo("Treatment selection changed. Click 'Plot' to update the time series plot");
     } else if (m_tabWidget && m_tabWidget->currentIndex() == 1) {
-        m_statusWidget->showInfo("Treatment selection changed. Click 'Refresh Data' to update the data table");
+        m_statusWidget->showInfo("Treatment selection changed. Click 'Data' to update the data table");
     }
     // Don't auto-plot, wait for manual refresh
 }
@@ -1292,7 +1327,7 @@ void MainWindow::onTabChanged(int index)
     if (index == 0) {
         // Time Series tab - don't auto-plot, wait for manual refresh
         if (m_updatePlotButton) {
-            m_updatePlotButton->setText("Refresh Plot");
+            m_updatePlotButton->setText("Plot");
         }
         
         // Show DAS, DAP, DATE buttons for time series plot widget
@@ -1326,7 +1361,7 @@ void MainWindow::onTabChanged(int index)
         // Show prompt message if files are selected but plot needs refresh
         QList<QListWidgetItem*> selectedItems = m_fileListWidget ? m_fileListWidget->selectedItems() : QList<QListWidgetItem*>();
         if (!selectedItems.isEmpty() && (m_currentData.rowCount == 0 || m_variableSelectionChanged || m_dataNeedsRefresh)) {
-            m_statusWidget->showInfo("Click 'Refresh Plot' to view the time series plot with current selections");
+            m_statusWidget->showInfo("Click 'Plot' to view the time series plot with current selections");
         } else if (selectedItems.isEmpty()) {
             m_statusWidget->showInfo("Click outfile and variables, then click 'Refresh Plot' to view time series");
         }
@@ -1334,7 +1369,7 @@ void MainWindow::onTabChanged(int index)
     } else if (index == 1) {
         // Data View tab
         if (m_updatePlotButton) {
-            m_updatePlotButton->setText("Refresh Data");
+            m_updatePlotButton->setText("Data");
         }
 
         // Update file type selector based on available data
@@ -1362,7 +1397,7 @@ void MainWindow::onTabChanged(int index)
     } else if (index == 2) {
         // Scatter Plot tab
         if (m_updatePlotButton) {
-            m_updatePlotButton->setText("Refresh Plot");
+            m_updatePlotButton->setText("Plot");
         }
         
         // Hide DAS, DAP, DATE buttons for scatter plot widget (not applicable)
@@ -1382,7 +1417,7 @@ void MainWindow::onTabChanged(int index)
         // Show prompt message if files are selected but plot needs refresh
         QList<QListWidgetItem*> selectedItems = m_fileListWidget ? m_fileListWidget->selectedItems() : QList<QListWidgetItem*>();
         if (!selectedItems.isEmpty() && (m_evaluateData.rowCount == 0 || m_variableSelectionChanged || m_dataNeedsRefresh)) {
-            m_statusWidget->showInfo("Click 'Refresh Plot' to view the scatter plot with current selections");
+            m_statusWidget->showInfo("Click 'Plot' to view the scatter plot with current selections");
         } else if (selectedItems.isEmpty()) {
             m_statusWidget->showInfo("Select EVALUATE.OUT file and variables, then click 'Refresh Plot' to view scatter plot");
         }
@@ -1981,7 +2016,7 @@ void MainWindow::checkAndAutoSwitchToScatterPlot(bool autoPlot)
         updateScatterPlot();
         m_statusWidget->showSuccess("Automatically switched to scatter plot for EVALUATE.OUT file");
     } else {
-        m_statusWidget->showInfo("Switched to scatter plot tab. Click 'Refresh Plot' to view the scatter plot");
+        m_statusWidget->showInfo("Switched to scatter plot tab. Click 'Plot' to view the scatter plot");
     }
 }
 
@@ -2633,7 +2668,7 @@ void MainWindow::onFileSelectionChanged()
                 }
             }
         } else if (m_tabWidget && m_tabWidget->currentIndex() == 1) {
-            m_statusWidget->showInfo(QString("Loaded %1 file(s). Click 'Refresh Data' to view data table").arg(selectedItems.size()));
+            m_statusWidget->showInfo(QString("Loaded %1 file(s). Click 'Data' to view data table").arg(selectedItems.size()));
         } else if (m_tabWidget && m_tabWidget->currentIndex() == 2) {
             // Scatter Plot tab
             if (hasEvaluateFile) {
@@ -2807,6 +2842,7 @@ void MainWindow::clearMetrics()
     m_scatterMetrics.clear();
     m_currentMetrics.clear();
     updateMetricsButtonState();
+    updateStatisticsTab();
 }
 
 void MainWindow::onPlotWidgetXVariableChanged(const QString &xVariable)
@@ -2868,7 +2904,7 @@ void MainWindow::onUnselectAllYVars()
 
 void MainWindow::onShowMetrics()
 {
-    qDebug() << "MainWindow: Show Metrics button clicked";
+    qDebug() << "MainWindow: Statistics button clicked";
     
     if (m_currentMetrics.isEmpty()) {
         showWarning("No metrics data available. Please ensure both simulated and observed data are loaded and plotted.");
@@ -2902,7 +2938,8 @@ void MainWindow::updateTimeSeriesMetrics(const QVector<QMap<QString, QVariant>> 
     }
 
     updateMetricsButtonState();
-    
+    updateStatisticsTab();
+
     qDebug() << "MainWindow: updateTimeSeriesMetrics() completed";
 }
 
@@ -2922,6 +2959,34 @@ void MainWindow::updateScatterMetrics(const QVector<QMap<QString, QVariant>> &me
     }
 
     updateMetricsButtonState();
+    updateStatisticsTab();
+}
+
+void MainWindow::updateStatisticsTab()
+{
+    if (m_statsTSWidget) {
+        if (!m_timeSeriesMetrics.isEmpty()) {
+            m_statsTSWidget->setMetrics(m_timeSeriesMetrics, false);
+            if (m_statsTSHeader) m_statsTSHeader->setVisible(true);
+            m_statsTSWidget->setVisible(true);
+        } else {
+            m_statsTSWidget->clear();
+            if (m_statsTSHeader) m_statsTSHeader->setVisible(false);
+            m_statsTSWidget->setVisible(false);
+        }
+    }
+
+    if (m_statsScatterWidget) {
+        if (!m_scatterMetrics.isEmpty()) {
+            m_statsScatterWidget->setMetrics(m_scatterMetrics, true);
+            if (m_statsScatterHeader) m_statsScatterHeader->setVisible(true);
+            m_statsScatterWidget->setVisible(true);
+        } else {
+            m_statsScatterWidget->clear();
+            if (m_statsScatterHeader) m_statsScatterHeader->setVisible(false);
+            m_statsScatterWidget->setVisible(false);
+        }
+    }
 }
 
 // Command line integration methods
@@ -3058,16 +3123,17 @@ void MainWindow::hideFileSelectionUI(bool hide)
 {
     if (m_cropGroup) {
         m_cropGroup->setVisible(!hide);
+        m_cropGroup->setMaximumHeight(hide ? 0 : QWIDGETSIZE_MAX);
     }
 
     if (hide) {
-        // In CLI mode: keep the file group visible so the refresh button is accessible,
-        // but hide everything except the "R" button itself.
+        // In CLI mode: hide the entire file group — Refresh is now in the plot bottom bar
+        if (m_fileGroup) { m_fileGroup->setVisible(false); m_fileGroup->setMaximumHeight(0); }
         if (m_fileGroupLabel) m_fileGroupLabel->setVisible(false);
         if (m_fileSearchWidget) m_fileSearchWidget->setVisible(false);
         if (m_fileContainerWidget) m_fileContainerWidget->setVisible(false);
     } else {
-        if (m_fileGroup) m_fileGroup->setVisible(true);
+        if (m_fileGroup) { m_fileGroup->setVisible(true); m_fileGroup->setMaximumHeight(QWIDGETSIZE_MAX); }
         if (m_fileGroupLabel) m_fileGroupLabel->setVisible(true);
         if (m_fileSearchWidget) m_fileSearchWidget->setVisible(true);
         if (m_fileContainerWidget) m_fileContainerWidget->setVisible(true);
@@ -3075,20 +3141,8 @@ void MainWindow::hideFileSelectionUI(bool hide)
 
     if (hide) {
         qDebug() << "MainWindow: Hidden crop and file selection UI for command line mode";
-        // Make Y variable list expand to fill available space
-        if (m_yVariableComboBox) {
-            m_yVariableComboBox->setMinimumHeight(300);  // Reduced from 400
-            m_yVariableComboBox->setMaximumHeight(600);  // Add maximum to prevent buttons from being hidden
-            m_yVariableComboBox->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
-        }
     } else {
         qDebug() << "MainWindow: Showing crop and file selection UI";
-        // Restore original Y variable list size
-        if (m_yVariableComboBox) {
-            m_yVariableComboBox->setMinimumHeight(150);
-            m_yVariableComboBox->setMaximumHeight(400);  // Restore maximum height
-            m_yVariableComboBox->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
-        }
     }
 }
 
