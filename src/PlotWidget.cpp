@@ -174,8 +174,8 @@ void PlotWidget::setupUI()
     
     // Bottom container with X-axis buttons and scaling label
     m_bottomContainer = new QWidget();
-    m_bottomContainer->setFixedHeight(34);
-    m_bottomContainer->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+    m_bottomContainer->setMinimumHeight(34);
+    m_bottomContainer->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Minimum);
     m_bottomLayout = new QHBoxLayout(m_bottomContainer);
     m_bottomLayout->setContentsMargins(6, 2, 6, 2);
     m_bottomLayout->setSpacing(4);
@@ -246,9 +246,9 @@ void PlotWidget::setupUI()
     // Scaling label takes remaining space after Treatments
     m_scalingLabel = new QLabel();
     m_scalingLabel->setStyleSheet("padding: 2px 8px; font-size: 10pt; font-weight: bold; background-color: #fff3cd; border: 1px solid #ffeaa7; border-radius: 3px; color: #856404;");
-    m_scalingLabel->setWordWrap(false);
+    m_scalingLabel->setWordWrap(true);
     m_scalingLabel->setAlignment(Qt::AlignVCenter | Qt::AlignLeft);
-    m_scalingLabel->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+    m_scalingLabel->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Minimum);
     m_scalingLabel->setVisible(false);
     m_bottomLayout->addWidget(m_scalingLabel, 1);
 

@@ -215,6 +215,9 @@ private:
     bool m_showGrid;
     QString m_currentPlotType;
     
+    // Per-file column tracking for grouped Y variable list
+    QMap<QString, QStringList> m_fileColumnMap;  // filename -> column names
+
     // Additional state variables from Python version
     QStringList m_selectedTreatments;
     QString m_selectedExperiment;

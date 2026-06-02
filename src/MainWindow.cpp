@@ -254,7 +254,7 @@ void MainWindow::setupMainWidget()
     setupDataPanel();
     
     // Set splitter proportions
-    m_mainSplitter->setSizes({250, 400, 400});
+    m_mainSplitter->setSizes({180, 800});
     m_mainSplitter->setCollapsible(0, false);
 }
 
@@ -262,7 +262,7 @@ void MainWindow::setupControlPanel()
 {
     QWidget *controlPanel = new QWidget();
     controlPanel->setMaximumWidth(350);
-    controlPanel->setMinimumWidth(280);
+    controlPanel->setMinimumWidth(180);
     
     // Create scroll area for sidebar
     QScrollArea *scrollArea = new QScrollArea();
@@ -413,7 +413,7 @@ void MainWindow::setupControlPanel()
         "QPushButton:disabled { background-color: #aaaaaa; color: #dddddd; }"
     );
     m_updatePlotButton->setEnabled(false);
-    m_updatePlotButton->setMinimumHeight(34);
+    m_updatePlotButton->setFixedHeight(34);
     panelLayout->addWidget(m_updatePlotButton);
     
     // Keep plot group for compatibility but make it minimal
@@ -1688,38 +1688,58 @@ void MainWindow::updateVariableComboBoxes()
     commonVariables.sort();
     simOnlyVariables.sort();
 
-    // Add common variables first (with asterisk)
+    // Add common variables first (with asterisk) to X combo
     for (const QString &columnName : commonVariables) {
         QPair<QString, QString> varInfo = DataProcessor::getVariableInfo(columnName);
         QString displayLabel = varInfo.first.isEmpty() ? columnName : QString("%1 (%2)").arg(varInfo.first).arg(columnName);
-        
-        // Add asterisk to indicate variable has both simulated and observed data
         displayLabel = "* " + displayLabel;
-
-        m_xVariableComboBox->addItem(displayLabel, columnName); // Store column name as user data
-        
-        // Only add to Y variables if not in exclusion list
-        if (!yVariableExclusions.contains(columnName)) {
-            QListWidgetItem *item = new QListWidgetItem();
-            item->setText(displayLabel); // Explicitly set text
-            item->setData(Qt::UserRole, columnName); // Store column name as user data
-            m_yVariableComboBox->addItem(item);
-        }
+        m_xVariableComboBox->addItem(displayLabel, columnName);
     }
-
-    // Add simulated-only variables
     for (const QString &columnName : simOnlyVariables) {
         QPair<QString, QString> varInfo = DataProcessor::getVariableInfo(columnName);
         QString displayLabel = varInfo.first.isEmpty() ? columnName : QString("%1 (%2)").arg(varInfo.first).arg(columnName);
+        m_xVariableComboBox->addItem(displayLabel, columnName);
+    }
 
-        m_xVariableComboBox->addItem(displayLabel, columnName); // Store column name as user data
-        
-        // Only add to Y variables if not in exclusion list
-        if (!yVariableExclusions.contains(columnName)) {
-            QListWidgetItem *item = new QListWidgetItem();
-            item->setText(displayLabel); // Explicitly set text
-            item->setData(Qt::UserRole, columnName); // Store column name as user data
-            m_yVariableComboBox->addItem(item);
+    // Populate Y variable list — grouped by file if multiple files selected
+    bool multiFile = m_fileColumnMap.size() > 1;
+
+    auto addYItem = [&](const QString &columnName, bool hasObs) {
+        if (yVariableExclusions.contains(columnName)) return;
+        QPair<QString, QString> varInfo = DataProcessor::getVariableInfo(columnName);
+        QString displayLabel = varInfo.first.isEmpty() ? columnName : QString("%1 (%2)").arg(varInfo.first).arg(columnName);
+        if (hasObs) displayLabel = "* " + displayLabel;
+        QListWidgetItem *item = new QListWidgetItem(displayLabel);
+        item->setData(Qt::UserRole, columnName);
+        m_yVariableComboBox->addItem(item);
+    };
+
+    if (!multiFile) {
+        // Single file — flat list as before
+        for (const QString &col : commonVariables)  addYItem(col, true);
+        for (const QString &col : simOnlyVariables) addYItem(col, false);
+    } else {
+        // Multiple files — group by file with header separators
+        for (auto it = m_fileColumnMap.constBegin(); it != m_fileColumnMap.constEnd(); ++it) {
+            // Header item
+            QListWidgetItem *header = new QListWidgetItem(QString("── %1 ──").arg(it.key()));
+            header->setFlags(Qt::NoItemFlags);  // non-selectable
+            header->setForeground(QColor("#555555"));
+            QFont f = header->font(); f.setBold(true); header->setFont(f);
+            header->setBackground(QColor("#e8e8e8"));
+            m_yVariableComboBox->addItem(header);
+
+            // Variables for this file, common first then sim-only
+            QStringList fileCols = it.value();
+            QStringList fileCommon, fileSim;
+            for (const QString &col : fileCols) {
+                if (yVariableExclusions.contains(col)) continue;
+                if (commonVariables.contains(col)) fileCommon.append(col);
+                else if (simOnlyVariables.contains(col)) fileSim.append(col);
+            }
+            fileCommon.sort(); fileSim.sort();
+            for (const QString &col : fileCommon) addYItem(col, true);
+            for (const QString &col : fileSim)    addYItem(col, false);
         }
     }
 
@@ -2372,6 +2392,7 @@ void MainWindow::onFileSelectionChanged()
         m_currentData.clear();  // For time series (regular .OUT files)
         m_currentObsData.clear();  // For time series observed data
         m_evaluateData.clear();  // For scatter plots (EVALUATE.OUT files)
+        m_fileColumnMap.clear();  // Reset per-file column tracking
         
         // Load and merge data from all selected files, separating by type
         QSet<QString> uniqueExperimentCodes;
@@ -2445,6 +2466,7 @@ void MainWindow::onFileSelectionChanged()
                         }
                     } else {
                         // Store regular .OUT data for time series plots
+                        m_fileColumnMap[selectedFile] = fileData.columnNames;
                         if (m_currentData.rowCount == 0) {
                             m_currentData = fileData;
                         } else {
