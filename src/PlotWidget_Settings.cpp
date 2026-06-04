@@ -473,6 +473,7 @@ void PlotWidget::saveSettings() const
     // Error bars
     s.setValue("showErrorBars", m_plotSettings.showErrorBars);
     s.setValue("errorBarType",  m_plotSettings.errorBarType);
+    s.setValue("plotMeanReps",  m_plotSettings.plotMeanReps);
 
     // Lines & markers
     s.setValue("lineWidth",  m_plotSettings.lineWidth);
@@ -483,8 +484,24 @@ void PlotWidget::saveSettings() const
     s.setValue("showAxisTitles",   m_plotSettings.showAxisTitles);
     s.setValue("xAxisTitle",       m_plotSettings.xAxisTitle);
     s.setValue("yAxisTitle",       m_plotSettings.yAxisTitle);
-    s.setValue("xAxisTickCount",   m_plotSettings.xAxisTickCount);
-    s.setValue("xAxisTickSpacing", m_plotSettings.xAxisTickSpacing);
+    s.setValue("xAxisTickCount",      m_plotSettings.xAxisTickCount);
+    s.setValue("xAxisTickSpacing",    m_plotSettings.xAxisTickSpacing);
+    s.setValue("xAxisMinorTickCount", m_plotSettings.xAxisMinorTickCount);
+    s.setValue("xAxisDecimals",       m_plotSettings.xAxisDecimals);
+    s.setValue("yAxisTickCount",      m_plotSettings.yAxisTickCount);
+    s.setValue("yAxisTickSpacing",    m_plotSettings.yAxisTickSpacing);
+    s.setValue("yAxisMinorTickCount", m_plotSettings.yAxisMinorTickCount);
+    s.setValue("yAxisDecimals",       m_plotSettings.yAxisDecimals);
+
+    // Axis range overrides
+    s.setValue("useCustomXMin", m_plotSettings.useCustomXMin);
+    s.setValue("xAxisMin",      m_plotSettings.xAxisMin);
+    s.setValue("useCustomXMax", m_plotSettings.useCustomXMax);
+    s.setValue("xAxisMax",      m_plotSettings.xAxisMax);
+    s.setValue("useCustomYMin", m_plotSettings.useCustomYMin);
+    s.setValue("yAxisMin",      m_plotSettings.yAxisMin);
+    s.setValue("useCustomYMax", m_plotSettings.useCustomYMax);
+    s.setValue("yAxisMax",      m_plotSettings.yAxisMax);
 
     // Appearance
     s.setValue("plotTitle",        m_plotSettings.plotTitle);
@@ -501,6 +518,10 @@ void PlotWidget::saveSettings() const
     s.setValue("legendFontSize",    m_plotSettings.legendFontSize);
     s.setValue("boldTitle",         m_plotSettings.boldTitle);
     s.setValue("boldAxisLabels",    m_plotSettings.boldAxisLabels);
+
+    // Metrics overlays
+    s.setValue("scatterMetrics", QStringList(m_plotSettings.scatterMetrics.begin(), m_plotSettings.scatterMetrics.end()));
+    s.setValue("tsMetrics",      QStringList(m_plotSettings.tsMetrics.begin(),      m_plotSettings.tsMetrics.end()));
 
     s.endGroup();
 }
@@ -526,16 +547,32 @@ void PlotWidget::loadSettings()
 
     m_plotSettings.showErrorBars = s.value("showErrorBars", m_plotSettings.showErrorBars).toBool();
     m_plotSettings.errorBarType  = s.value("errorBarType",  m_plotSettings.errorBarType).toString();
+    m_plotSettings.plotMeanReps  = s.value("plotMeanReps",  m_plotSettings.plotMeanReps).toBool();
 
     m_plotSettings.lineWidth  = s.value("lineWidth",  m_plotSettings.lineWidth).toInt();
     m_plotSettings.markerSize = s.value("markerSize", m_plotSettings.markerSize).toInt();
 
-    m_plotSettings.showAxisLabels   = s.value("showAxisLabels",   m_plotSettings.showAxisLabels).toBool();
-    m_plotSettings.showAxisTitles   = s.value("showAxisTitles",   m_plotSettings.showAxisTitles).toBool();
-    m_plotSettings.xAxisTitle       = s.value("xAxisTitle",       m_plotSettings.xAxisTitle).toString();
-    m_plotSettings.yAxisTitle       = s.value("yAxisTitle",       m_plotSettings.yAxisTitle).toString();
-    m_plotSettings.xAxisTickCount   = s.value("xAxisTickCount",   m_plotSettings.xAxisTickCount).toInt();
-    m_plotSettings.xAxisTickSpacing = s.value("xAxisTickSpacing", m_plotSettings.xAxisTickSpacing).toDouble();
+    m_plotSettings.showAxisLabels      = s.value("showAxisLabels",      m_plotSettings.showAxisLabels).toBool();
+    m_plotSettings.showAxisTitles      = s.value("showAxisTitles",      m_plotSettings.showAxisTitles).toBool();
+    m_plotSettings.xAxisTitle          = s.value("xAxisTitle",          m_plotSettings.xAxisTitle).toString();
+    m_plotSettings.yAxisTitle          = s.value("yAxisTitle",          m_plotSettings.yAxisTitle).toString();
+    m_plotSettings.xAxisTickCount      = s.value("xAxisTickCount",      m_plotSettings.xAxisTickCount).toInt();
+    m_plotSettings.xAxisTickSpacing    = s.value("xAxisTickSpacing",    m_plotSettings.xAxisTickSpacing).toDouble();
+    m_plotSettings.xAxisMinorTickCount = s.value("xAxisMinorTickCount", m_plotSettings.xAxisMinorTickCount).toInt();
+    m_plotSettings.xAxisDecimals       = s.value("xAxisDecimals",       m_plotSettings.xAxisDecimals).toInt();
+    m_plotSettings.yAxisTickCount      = s.value("yAxisTickCount",      m_plotSettings.yAxisTickCount).toInt();
+    m_plotSettings.yAxisTickSpacing    = s.value("yAxisTickSpacing",    m_plotSettings.yAxisTickSpacing).toDouble();
+    m_plotSettings.yAxisMinorTickCount = s.value("yAxisMinorTickCount", m_plotSettings.yAxisMinorTickCount).toInt();
+    m_plotSettings.yAxisDecimals       = s.value("yAxisDecimals",       m_plotSettings.yAxisDecimals).toInt();
+
+    m_plotSettings.useCustomXMin = s.value("useCustomXMin", m_plotSettings.useCustomXMin).toBool();
+    m_plotSettings.xAxisMin      = s.value("xAxisMin",      m_plotSettings.xAxisMin).toDouble();
+    m_plotSettings.useCustomXMax = s.value("useCustomXMax", m_plotSettings.useCustomXMax).toBool();
+    m_plotSettings.xAxisMax      = s.value("xAxisMax",      m_plotSettings.xAxisMax).toDouble();
+    m_plotSettings.useCustomYMin = s.value("useCustomYMin", m_plotSettings.useCustomYMin).toBool();
+    m_plotSettings.yAxisMin      = s.value("yAxisMin",      m_plotSettings.yAxisMin).toDouble();
+    m_plotSettings.useCustomYMax = s.value("useCustomYMax", m_plotSettings.useCustomYMax).toBool();
+    m_plotSettings.yAxisMax      = s.value("yAxisMax",      m_plotSettings.yAxisMax).toDouble();
 
     m_plotSettings.plotTitle     = s.value("plotTitle",     m_plotSettings.plotTitle).toString();
     m_plotSettings.backgroundColor = QColor(s.value("backgroundColor", m_plotSettings.backgroundColor.name()).toString());
@@ -550,6 +587,15 @@ void PlotWidget::loadSettings()
     m_plotSettings.legendFontSize    = s.value("legendFontSize",    m_plotSettings.legendFontSize).toInt();
     m_plotSettings.boldTitle         = s.value("boldTitle",         m_plotSettings.boldTitle).toBool();
     m_plotSettings.boldAxisLabels    = s.value("boldAxisLabels",    m_plotSettings.boldAxisLabels).toBool();
+
+    // Metrics overlays
+    QStringList savedScatterMetrics = s.value("scatterMetrics", QStringList()).toStringList();
+    if (!savedScatterMetrics.isEmpty())
+        m_plotSettings.scatterMetrics = QSet<QString>(savedScatterMetrics.begin(), savedScatterMetrics.end());
+
+    QStringList savedTsMetrics = s.value("tsMetrics", QStringList()).toStringList();
+    if (!savedTsMetrics.isEmpty())
+        m_plotSettings.tsMetrics = QSet<QString>(savedTsMetrics.begin(), savedTsMetrics.end());
 
     s.endGroup();
 

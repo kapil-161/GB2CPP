@@ -532,9 +532,9 @@ void PlotSettingsDialog::setupUI()
     connect(m_resetButton, &QPushButton::clicked, this, &PlotSettingsDialog::onResetDefaults);
     buttonLayout->addWidget(m_resetButton);
     
-    m_previewButton = new QPushButton("Preview");
-    connect(m_previewButton, &QPushButton::clicked, this, &PlotSettingsDialog::onPreviewSettings);
-    buttonLayout->addWidget(m_previewButton);
+    m_saveSettingsButton = new QPushButton("Save Settings");
+    connect(m_saveSettingsButton, &QPushButton::clicked, this, &PlotSettingsDialog::onSaveSettings);
+    buttonLayout->addWidget(m_saveSettingsButton);
     
     
     buttonLayout->addStretch();
@@ -647,41 +647,9 @@ void PlotSettingsDialog::onResetDefaults()
 
 }
 
-void PlotSettingsDialog::onPreviewSettings()
+void PlotSettingsDialog::onSaveSettings()
 {
-    // Update settings from controls
-    m_settings.showGrid = m_showGridCheckBox->isChecked();
-    m_settings.showMinorGrid = m_showMinorGridCheckBox->isChecked();
-    m_settings.minorTickCount = m_minorTickCountSpinBox->value();
-    m_settings.showLegend = m_showLegendCheckBox->isChecked();
-    m_settings.legendPosition = "outside-right";
-    m_settings.showErrorBars = m_showErrorBarsCheckBox->isChecked();
-    m_settings.errorBarType = m_errorBarTypeComboBox->currentData().toString();
-    m_settings.lineWidth = m_lineWidthSpinBox->value();
-    m_settings.markerSize = m_markerSizeSpinBox->value();
-    m_settings.showAxisLabels = m_showAxisLabelsCheckBox->isChecked();
-    m_settings.showAxisTitles = m_showAxisTitlesCheckBox->isChecked();
-    m_settings.xAxisTitle = m_xAxisTitleEdit->text();
-    m_settings.yAxisTitle = m_yAxisTitleEdit->text();
-    m_settings.xAxisTickCount = m_xAxisTickCountSpinBox->value();
-    m_settings.xAxisTickSpacing = m_xAxisTickSpacingSpinBox->value();
-    m_settings.plotTitle = m_plotTitleEdit->text();
-    
-    // Show a preview message for now
-    QMessageBox::information(this, "Preview", 
-                            QString("Preview would apply these settings:\n"
-                                   "Grid: %1\n"
-                                   "Minor Grid: %2\n"
-                                   "Minor Ticks: %3\n"
-                                   "Legend: %4\n"
-                                   "Line Width: %5\n"
-                                   "Marker Size: %6")
-                            .arg(m_settings.showGrid ? "On" : "Off")
-                            .arg(m_settings.showMinorGrid ? "On" : "Off")
-                            .arg(m_settings.minorTickCount)
-                            .arg(m_settings.showLegend ? "On" : "Off")
-                            .arg(m_settings.lineWidth)
-                            .arg(m_settings.markerSize));
+    accept();   // collects settings via getSettings() path, then PlotWidget::saveSettings() persists them
 }
 
 

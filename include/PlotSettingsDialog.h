@@ -124,7 +124,7 @@ private slots:
     void onAxisLineColorClicked();
     void onLegendBackgroundColorClicked();
     void onResetDefaults();
-    void onPreviewSettings();
+    void onSaveSettings();
 
 private:
     void setupUI();
@@ -208,7 +208,7 @@ private:
 
     // Buttons
     QPushButton *m_resetButton;
-    QPushButton *m_previewButton;
+    QPushButton *m_saveSettingsButton;
     QPushButton *m_okButton;
     QPushButton *m_cancelButton;
 };
