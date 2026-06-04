@@ -206,6 +206,12 @@ void PlotWidget::setupUI()
     m_dasButton->setStyleSheet(buttonStyle);
     m_dapButton->setStyleSheet(buttonStyle);
     m_dateButton->setStyleSheet(buttonStyle);
+
+    const int btnW = 75;
+    m_refreshButton->setFixedWidth(btnW);
+    m_dasButton->setFixedWidth(btnW);
+    m_dapButton->setFixedWidth(btnW);
+    m_dateButton->setFixedWidth(btnW);
     
     // Settings button with minimal styling - just clickable icon
     QString settingsStyle = "QPushButton { "
@@ -225,6 +231,7 @@ void PlotWidget::setupUI()
     m_dateButton->setChecked(true); // Default to DATE
     
     m_bottomLayout->addWidget(m_refreshButton);
+    m_bottomLayout->addSpacing(8);
     m_bottomLayout->addWidget(m_dasButton);
     m_bottomLayout->addWidget(m_dapButton);
     m_bottomLayout->addWidget(m_dateButton);
@@ -235,13 +242,16 @@ void PlotWidget::setupUI()
     m_boxPlotButton->setChecked(false);
     m_boxPlotButton->setVisible(false);
     m_boxPlotButton->setStyleSheet(buttonStyle);
+    m_boxPlotButton->setFixedWidth(btnW);
     m_bottomLayout->addWidget(m_boxPlotButton);
 
     // Treatments button — opens treatment selection/review panel
     m_treatmentsButton = new QPushButton("Treatments");
     m_treatmentsButton->setStyleSheet(buttonStyle);
+    m_treatmentsButton->setFixedWidth(btnW);
     m_treatmentsButton->setToolTip("Show treatment selection panel");
     m_bottomLayout->addWidget(m_treatmentsButton);
+    m_bottomLayout->addStretch();
 
     // Scaling label takes remaining space after Treatments
     m_scalingLabel = new QLabel();

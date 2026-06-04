@@ -254,15 +254,15 @@ void MainWindow::setupMainWidget()
     setupDataPanel();
     
     // Set splitter proportions
-    m_mainSplitter->setSizes({180, 800});
+    m_mainSplitter->setSizes({200, 800});
     m_mainSplitter->setCollapsible(0, false);
 }
 
 void MainWindow::setupControlPanel()
 {
     QWidget *controlPanel = new QWidget();
-    controlPanel->setMaximumWidth(350);
-    controlPanel->setMinimumWidth(180);
+    controlPanel->setMaximumWidth(220);
+    controlPanel->setMinimumWidth(150);
     
     // Create scroll area for sidebar
     QScrollArea *scrollArea = new QScrollArea();
