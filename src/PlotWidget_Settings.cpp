@@ -443,7 +443,7 @@ void PlotWidget::applyPlotSettings(const PlotSettings &settings)
     // before m_plotSettings is overwritten
     m_plotSettings = settings;
 
-    QTimer::singleShot(50, this, &PlotWidget::enforceAxisColors);
+    enforceAxisColors();
 
 }
 

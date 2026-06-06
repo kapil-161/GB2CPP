@@ -844,7 +844,7 @@ void PlotWidget::autoFitAxes()
         m_chart->update();
     }
 
-    QTimer::singleShot(50, this, &PlotWidget::enforceAxisColors);
+    enforceAxisColors();
 }
 
 double PlotWidget::calculateNiceMax(double rawMax)
@@ -2274,8 +2274,7 @@ void PlotWidget::addSeriesToPlot(const QVector<PlotData> &plotDataList)
         axis->setGridLineVisible(m_showGrid);
     }
 
-    // Qt theme resets axis pens on every addAxis/attachAxis — defer to ensure we run last
-    QTimer::singleShot(50, this, &PlotWidget::enforceAxisColors);
+    enforceAxisColors();
 }
 
 void PlotWidget::updateLegend(const QVector<PlotData> &plotDataList)
