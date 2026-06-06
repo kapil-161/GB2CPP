@@ -2265,13 +2265,9 @@ void PlotWidget::addSeriesToPlot(const QVector<PlotData> &plotDataList)
     }
     
     
-    // Schedule auto-fit using timer (consolidates multiple auto-fit calls)
-    if (m_autoFitTimer && !m_autoFitPending) {
-        m_autoFitPending = true;
-        m_autoFitTimer->start();
-    }
-    
-    
+    // Run auto-fit synchronously so axes are correct on first render (no visible jump)
+    autoFitAxes();
+
     // Style axes
     auto axes = m_chart->axes();
     for (auto axis : axes) {
@@ -3967,13 +3963,6 @@ void PlotWidget::updatePlotWithScaling()
         updateScalingLabel(m_currentYVars);
     }
     
-    // Schedule auto-fit using timer (consolidates multiple auto-fit calls)
-    if (m_autoFitTimer && !m_autoFitPending) {
-        m_autoFitPending = true;
-        m_autoFitTimer->start();
-    }
-    
-
     // Switch between single-chart and multi-panel layout based on settings
     if (!m_isScatterMode && !m_isBoxPlotMode)
         plotTimeSeriesMultiPanel();

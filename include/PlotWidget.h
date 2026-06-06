@@ -516,6 +516,13 @@ private:
     bool m_autoFitPending;
     QTimer *m_autoFitTimer;
 
+    // Cached data bounds from plotDatasets — used by autoFitAxes to skip re-scanning series points
+    double m_cachedMinX = std::numeric_limits<double>::max();
+    double m_cachedMaxX = std::numeric_limits<double>::lowest();
+    double m_cachedMinY = std::numeric_limits<double>::max();
+    double m_cachedMaxY = std::numeric_limits<double>::lowest();
+    bool   m_hasCachedBounds = false;
+
     // Axis break support (DATE x-axis only)
     // Each break: first = gap start (real msec), second = gap end (real msec)
     struct AxisBreak { double gapStart; double gapEnd; };
