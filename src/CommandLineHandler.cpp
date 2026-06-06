@@ -336,9 +336,9 @@ void CommandLineHandler::headlessAutoPlot()
     // Trigger plot update
     m_mainWindow->updateTimeSeriesPlot();
 
-    // After 5000 ms: export plot and/or save metrics, then quit.
-    // Large files (many runs/treatments) need more rendering time than small datasets.
-    QTimer::singleShot(5000, this, [this]() {
+    // After 2000 ms: export plot and/or save metrics, then quit.
+    // Axes are now fitted synchronously so 2s is sufficient for Qt to finish rendering.
+    QTimer::singleShot(2000, this, [this]() {
         PlotWidget *plot = m_mainWindow->getPlotWidget();
         if (plot && !m_args.savePlotPath.isEmpty()) {
             plot->exportPlotComposite(m_args.savePlotPath, "PNG", 1200, 800, 96);
