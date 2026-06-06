@@ -11,6 +11,44 @@
 #include <QClipboard>
 #include <QApplication>
 #include <QHBoxLayout>
+#include <QStyledItemDelegate>
+#include <QPainter>
+#include <QStyleOptionViewItem>
+
+// Delegate that paints cell background from Qt::BackgroundRole, bypassing stylesheet
+class MetricsDelegate : public QStyledItemDelegate
+{
+public:
+    explicit MetricsDelegate(QObject* parent = nullptr) : QStyledItemDelegate(parent) {}
+
+    void paint(QPainter* painter, const QStyleOptionViewItem& option,
+               const QModelIndex& index) const override
+    {
+        QStyleOptionViewItem opt = option;
+        initStyleOption(&opt, index);
+
+        QVariant bg = index.data(Qt::BackgroundRole);
+        if (bg.isValid()) {
+            QBrush brush = bg.value<QBrush>();
+            if (brush.style() != Qt::NoBrush) {
+                // Clear any stylesheet-painted background first
+                painter->fillRect(option.rect, brush);
+                // Remove the background from the option so QStyle doesn't repaint it
+                opt.backgroundBrush = brush;
+            }
+        }
+
+        // Draw selection highlight on top (semi-transparent so color still shows)
+        if (opt.state & QStyle::State_Selected) {
+            QColor sel(0, 120, 215, 80);
+            painter->fillRect(option.rect, sel);
+        }
+
+        // Draw text and other decorations without re-filling background
+        opt.state &= ~QStyle::State_Selected; // prevent QStyle from overpainting
+        QStyledItemDelegate::paint(painter, opt, index);
+    }
+};
 
 // MetricsTableModel Implementation
 MetricsTableModel::MetricsTableModel(const QVariantList& data, bool isScatterPlot, QObject* parent)
@@ -152,30 +190,34 @@ QVariant MetricsTableModel::data(const QModelIndex& index, int role) const
 
     case Qt::BackgroundRole: {
         if (rowData.value("isOverall").toBool())
-            return QColor("#e0e0e0");
+            return QBrush(QColor("#e0e0e0"));
         // Color-code metric quality
         if (columnName == "d-stat" || columnName == "R²") {
-            if (value.canConvert<double>()) {
-                double v = value.toDouble();
-                if (v >= 0.8)  return QColor("#c8e6c9"); // green
-                if (v >= 0.5)  return QColor("#fff9c4"); // yellow
-                return QColor("#ffcdd2");                 // red
+            bool ok = false;
+            double v = value.toDouble(&ok);
+            if (ok) {
+                if (v >= 0.8) return QBrush(QColor("#c8e6c9")); // green
+                if (v >= 0.5) return QBrush(QColor("#fff9c4")); // yellow
+                return QBrush(QColor("#ffcdd2"));                // red
             }
         }
         if (columnName == "NRMSE") {
-            if (value.canConvert<double>()) {
-                double v = value.toDouble(); // in percent
-                if (v <= 10.0) return QColor("#c8e6c9");
-                if (v <= 30.0) return QColor("#fff9c4");
-                return QColor("#ffcdd2");
+            bool ok = false;
+            double v = value.toDouble(&ok); // stored as decimal, e.g. 21.52 (percent)
+            if (ok) {
+                if (v <= 10.0) return QBrush(QColor("#c8e6c9"));
+                if (v <= 30.0) return QBrush(QColor("#fff9c4"));
+                return QBrush(QColor("#ffcdd2"));
             }
         }
         if (columnName == "BIAS") {
-            if (value.canConvert<double>()) {
-                double v = std::abs(value.toDouble());
-                if (v <= 0.05) return QColor("#c8e6c9");
-                if (v <= 0.15) return QColor("#fff9c4");
-                return QColor("#ffcdd2");
+            bool ok = false;
+            double v = value.toDouble(&ok);
+            if (ok) {
+                v = std::abs(v);
+                if (v <= 0.05) return QBrush(QColor("#c8e6c9"));
+                if (v <= 0.15) return QBrush(QColor("#fff9c4"));
+                return QBrush(QColor("#ffcdd2"));
             }
         }
         return QVariant();
@@ -295,7 +337,8 @@ void MetricsTableWidget::setupUI()
     // Table view
     m_tableView = new QTableView();
     m_tableView->setSortingEnabled(true);
-    m_tableView->setAlternatingRowColors(true);
+    m_tableView->setAlternatingRowColors(false);
+    m_tableView->setItemDelegate(new MetricsDelegate(m_tableView));
     m_tableView->horizontalHeader()->setDefaultSectionSize(100); // Default width before auto-fit
     m_tableView->horizontalHeader()->setMinimumSectionSize(50);  // Minimum column width
     m_tableView->verticalHeader()->setVisible(false);

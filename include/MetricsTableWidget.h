@@ -14,6 +14,7 @@
 #include <QMap>
 #include <QFont>
 #include <QColor>
+#include <QBrush>
 #include <QFileDialog>
 #include <QStandardPaths>
 #include <QTextStream>
