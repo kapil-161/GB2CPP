@@ -23,6 +23,7 @@ public:
     void showProgress(const QString &message);
     void hideProgress();
     void clear();
+    void setRightWidget(QWidget *widget);
 
 private slots:
     void onClearTimer();

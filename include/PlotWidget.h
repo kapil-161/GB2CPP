@@ -34,6 +34,8 @@
 #include <QSharedPointer>
 #include <QPointer>
 #include <QtCharts/QAbstractSeries>
+#include <QSlider>
+#include <QTimer>
 #include "DataProcessor.h"
 
 struct ErrorBarData {
@@ -289,6 +291,14 @@ private:
     void setupUI();
     void setupChart();
     void enforceAxisColors();
+
+    // Animation
+    void setupAnimControls();
+    void initAnimFrames();
+    void applyAnimFrame(int frame);
+    void animTick();
+    void updateAnimLabel(int frame);
+    void stopAnim();
     void addSeriesToPlot(const QVector<PlotData> &plotDataList);
     void updateScalingLabel(const QStringList &yVars);
     void updatePlotWithScaling();
@@ -344,6 +354,7 @@ public:
     void resetAllHighlightedItems();
     void highlightPlotItems(const QVector<QAbstractSeries*>& seriesToHighlight);
     void resetPlotItemHighlights();
+    QLabel* scalingLabel() const { return m_scalingLabel; }
 
 private slots:
     void onDasButtonClicked();
@@ -393,6 +404,16 @@ private:
     QPushButton *m_boxPlotButton;
     QPushButton *m_treatmentsButton;
     QLabel *m_scalingLabel;
+
+    // Animation controls
+    QPushButton *m_animResetButton = nullptr;
+    QPushButton *m_animPlayButton  = nullptr;
+    QSlider     *m_animSlider      = nullptr;
+    QLabel      *m_animLabel       = nullptr;
+    QTimer      *m_animTimer       = nullptr;
+    QVector<double> m_animXValues;   // sorted unique x values across all series
+    int  m_animFrame   = 0;
+    bool m_animPlaying = false;
 
     // Legend area
     QScrollArea *m_legendScrollArea;

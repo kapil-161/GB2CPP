@@ -550,6 +550,9 @@ void MainWindow::setupDataPanel()
     dataPanelLayout->addWidget(m_tabWidget, 1);
 
     m_statusWidget = new StatusWidget(this);
+    // Place scaling label in the right half of the status bar
+    if (m_plotWidget)
+        m_statusWidget->setRightWidget(m_plotWidget->scalingLabel());
     dataPanelLayout->addWidget(m_statusWidget, 0);
 
     m_mainSplitter->addWidget(dataPanel);

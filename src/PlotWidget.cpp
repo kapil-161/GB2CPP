@@ -251,16 +251,19 @@ void PlotWidget::setupUI()
     m_treatmentsButton->setFixedWidth(btnW);
     m_treatmentsButton->setToolTip("Show treatment selection panel");
     m_bottomLayout->addWidget(m_treatmentsButton);
+
+    // Animation controls — separator, reset, play/pause, slider, label
+    m_bottomLayout->addSpacing(4);
+    setupAnimControls();
     m_bottomLayout->addStretch();
 
-    // Scaling label takes remaining space after Treatments
+    // Scaling label lives in the status bar (MainWindow wires it via scalingLabel())
     m_scalingLabel = new QLabel();
     m_scalingLabel->setStyleSheet("padding: 2px 8px; font-size: 10pt; font-weight: bold; background-color: #fff3cd; border: 1px solid #ffeaa7; border-radius: 3px; color: #856404;");
     m_scalingLabel->setWordWrap(true);
-    m_scalingLabel->setAlignment(Qt::AlignVCenter | Qt::AlignLeft);
-    m_scalingLabel->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Minimum);
+    m_scalingLabel->setAlignment(Qt::AlignVCenter | Qt::AlignRight);
+    m_scalingLabel->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
     m_scalingLabel->setVisible(false);
-    m_bottomLayout->addWidget(m_scalingLabel, 1);
 
     // Connect button signals
     connect(m_refreshButton, &QPushButton::clicked, this, &PlotWidget::refreshFilesRequested);
@@ -2061,6 +2064,9 @@ void PlotWidget::plotDatasets(const DataTable &simData, const DataTable &obsData
 
     // Add series to chart
     addSeriesToPlot(plotDataList);
+
+    // Initialise animation frames from the newly built plot data
+    if (!m_isScatterMode) initAnimFrames();
     
     // Update error bar data in chart view (ONLY for observed data series, never for simulated data)
     if (m_plotSettings.showErrorBars && m_chartView) {
@@ -2807,6 +2813,9 @@ void PlotWidget::clear()
     // Reset obs/sim toggle state for new plot
     m_obsVisible = true;
     m_simVisible = true;
+
+    // Stop any running animation
+    stopAnim();
 
     // Reset scatter mode and show buttons (they'll be hidden again if scatter mode is set)
     m_isScatterMode = false;
@@ -4850,6 +4859,196 @@ void PlotWidget::showTreatmentSelection()
     // Only switch if there are treatments to show
     if (m_legendStack && m_preplotPanelEnabled && m_treatmentSelectList && m_treatmentSelectList->count() > 0)
         m_legendStack->setCurrentIndex(0);
+}
+
+// ── Animation ─────────────────────────────────────────────────────────────
+
+void PlotWidget::setupAnimControls()
+{
+    QString animBtnStyle =
+        "QPushButton { border: none; background: transparent; padding: 0px; margin: 0px; font-size: 14px; color: #333333; }"
+        "QPushButton:hover { background: rgba(0,0,0,0.08); border-radius: 3px; }"
+        "QPushButton:pressed { background: rgba(0,0,0,0.16); }"
+        "QPushButton:disabled { color: #cccccc; }";
+
+    m_animResetButton = new QPushButton("⏮");
+    m_animResetButton->setFixedSize(12, 24);
+    m_animResetButton->setStyleSheet(animBtnStyle);
+    m_animResetButton->setToolTip("Reset animation");
+    m_animResetButton->setEnabled(false);
+
+    m_animPlayButton = new QPushButton("▶");
+    m_animPlayButton->setFixedSize(12, 24);
+    m_animPlayButton->setStyleSheet(animBtnStyle);
+    m_animPlayButton->setToolTip("Play animation");
+    m_animPlayButton->setEnabled(false);
+
+    m_animSlider = new QSlider(Qt::Horizontal);
+    m_animSlider->setMinimum(0);
+    m_animSlider->setMaximum(0);
+    m_animSlider->setValue(0);
+    m_animSlider->setEnabled(false);
+    m_animSlider->setFixedHeight(20);
+    m_animSlider->setMinimumWidth(100);
+    m_animSlider->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+    m_animSlider->setToolTip("Drag to scrub through time steps");
+
+    m_animLabel = new QLabel("--");
+    m_animLabel->setStyleSheet("font-size: 10px; color: #555555; padding: 0px 4px;");
+    m_animLabel->setFixedWidth(90);
+    m_animLabel->setAlignment(Qt::AlignVCenter | Qt::AlignLeft);
+
+    // Wrap in a tight container so spacing between anim widgets is 2px
+    QWidget *animContainer = new QWidget();
+    QHBoxLayout *animLayout = new QHBoxLayout(animContainer);
+    animLayout->setContentsMargins(0, 0, 0, 0);
+    animLayout->setSpacing(2);
+    animLayout->addWidget(m_animResetButton);
+    animLayout->addWidget(m_animPlayButton);
+    animLayout->addWidget(m_animSlider, 1);
+    animLayout->addWidget(m_animLabel);
+    animContainer->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+    m_bottomLayout->addWidget(animContainer, 1);
+
+    m_animTimer = new QTimer(this);
+    m_animTimer->setInterval(150);
+
+    connect(m_animPlayButton,  &QPushButton::clicked, this, [this]() {
+        if (m_animPlaying) stopAnim();
+        else {
+            if (m_animFrame >= m_animXValues.size() - 1) {
+                m_animFrame = 0;
+                m_animSlider->setValue(0);
+                applyAnimFrame(0);
+            }
+            m_animPlaying = true;
+            m_animPlayButton->setText("⏸");
+            m_animPlayButton->setToolTip("Pause animation");
+            m_animTimer->start();
+        }
+    });
+
+    connect(m_animResetButton, &QPushButton::clicked, this, [this]() {
+        stopAnim();
+        m_animFrame = 0;
+        m_animSlider->setValue(0);
+        applyAnimFrame(0);
+    });
+
+    connect(m_animSlider, &QSlider::valueChanged, this, [this](int val) {
+        if (m_animFrame == val) return;
+        m_animFrame = val;
+        applyAnimFrame(val);
+    });
+
+    connect(m_animTimer, &QTimer::timeout, this, &PlotWidget::animTick);
+}
+
+void PlotWidget::initAnimFrames()
+{
+    m_animXValues.clear();
+    m_animFrame   = 0;
+    m_animPlaying = false;
+
+    QSet<double> xSet;
+    for (const auto &pd : m_plotDataList) {
+        if (!pd || pd->isObserved) continue;
+        for (const QPointF &pt : pd->points)
+            xSet.insert(pt.x());
+    }
+
+    if (xSet.isEmpty()) {
+        m_animSlider->setEnabled(false);
+        m_animPlayButton->setEnabled(false);
+        m_animResetButton->setEnabled(false);
+        m_animLabel->setText("--");
+        return;
+    }
+
+    m_animXValues = QVector<double>(xSet.begin(), xSet.end());
+    std::sort(m_animXValues.begin(), m_animXValues.end());
+
+    int last = m_animXValues.size() - 1;
+    m_animSlider->blockSignals(true);
+    m_animSlider->setMinimum(0);
+    m_animSlider->setMaximum(last);
+    m_animSlider->setValue(last);   // start fully drawn
+    m_animSlider->blockSignals(false);
+    m_animSlider->setEnabled(true);
+    m_animPlayButton->setEnabled(true);
+    m_animResetButton->setEnabled(true);
+    m_animFrame = last;
+    updateAnimLabel(last);
+}
+
+void PlotWidget::applyAnimFrame(int frame)
+{
+    if (m_animXValues.isEmpty() || frame < 0 || frame >= m_animXValues.size()) return;
+
+    double cutoff = m_animXValues[frame];
+
+    for (const auto &pd : m_plotDataList) {
+        if (!pd || !pd->series) continue;
+
+        QVector<QPointF> filtered;
+        for (const QPointF &pt : pd->points) {
+            if (pt.x() <= cutoff)
+                filtered.append(pt);
+        }
+
+        if (QLineSeries *ls = qobject_cast<QLineSeries*>(pd->series.data()))
+            ls->replace(filtered);
+        else if (QScatterSeries *ss = qobject_cast<QScatterSeries*>(pd->series.data()))
+            ss->replace(filtered);
+    }
+
+    updateAnimLabel(frame);
+}
+
+void PlotWidget::animTick()
+{
+    if (m_animFrame >= m_animXValues.size() - 1) {
+        stopAnim();
+        return;
+    }
+    ++m_animFrame;
+    m_animSlider->blockSignals(true);
+    m_animSlider->setValue(m_animFrame);
+    m_animSlider->blockSignals(false);
+    applyAnimFrame(m_animFrame);
+}
+
+void PlotWidget::updateAnimLabel(int frame)
+{
+    if (m_animXValues.isEmpty()) { m_animLabel->setText("--"); return; }
+
+    double x = m_animXValues[frame];
+    QString text;
+
+    bool isDate = (m_currentXVar.toUpper() == "DATE"
+                || m_currentXVar.toUpper() == "SDAT"
+                || m_currentXVar.toUpper() == "PDAT"
+                || m_currentXVar.toUpper() == "HDAT");
+
+    if (isDate) {
+        QDateTime dt = QDateTime::fromMSecsSinceEpoch(static_cast<qint64>(x), QTimeZone::utc());
+        text = dt.toString("MMM d, yyyy");
+    } else {
+        text = QString("%1 / %2")
+               .arg(static_cast<int>(x))
+               .arg(static_cast<int>(m_animXValues.last()));
+    }
+    m_animLabel->setText(text);
+}
+
+void PlotWidget::stopAnim()
+{
+    m_animPlaying = false;
+    if (m_animTimer) m_animTimer->stop();
+    if (m_animPlayButton) {
+        m_animPlayButton->setText("▶");
+        m_animPlayButton->setToolTip("Play animation");
+    }
 }
 
 // onSettingsButtonClicked / applyPlotSettings / saveSettings / loadSettings / setXAxisVariable → see PlotWidget_Settings.cpp

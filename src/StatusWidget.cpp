@@ -29,15 +29,20 @@ void StatusWidget::setupUI()
 
     m_messageLabel = new QLabel(this);
     m_messageLabel->setStyleSheet("padding: 2px 5px;");
-    m_layout->addWidget(m_messageLabel);
-    
+    m_layout->addWidget(m_messageLabel, 1);  // stretch=1, left half
+
     m_progressBar = new QProgressBar(this);
     m_progressBar->setRange(0, 0);  // Indeterminate progress
     m_progressBar->setFixedWidth(100);
     m_progressBar->hide();
     m_layout->addWidget(m_progressBar);
-    
-    m_layout->addStretch(1);
+}
+
+void StatusWidget::setRightWidget(QWidget *widget)
+{
+    if (!widget) return;
+    widget->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
+    m_layout->addWidget(widget, 1);  // stretch=1, right half
 }
 
 void StatusWidget::showCenterMessage(const QString &message, const QColor &bgColor)
