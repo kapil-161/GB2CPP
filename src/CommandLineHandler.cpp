@@ -21,7 +21,6 @@ CommandLineArgs CommandLineHandler::parseCommandLineArgs(const QStringList &args
 
     try {
         if (args.size() < 2) {
-            qDebug() << "No command line arguments provided";
             return result;
         }
 
@@ -114,16 +113,6 @@ CommandLineArgs CommandLineHandler::parseCommandLineArgs(const QStringList &args
 
         result.isValid = true;
 
-        qDebug() << "Parsed command line args:";
-        qDebug() << "  DSSAT Base:" << result.dssatBase;
-        qDebug() << "  Crop Dir:" << result.cropDir;
-        qDebug() << "  Crop Name:" << result.cropName;
-        qDebug() << "  Output Files:" << result.outputFiles;
-        qDebug() << "  xVar:" << result.xVar;
-        qDebug() << "  yVars:" << result.yVars;
-        qDebug() << "  savePlotPath:" << result.savePlotPath;
-        qDebug() << "  saveMetricsPath:" << result.saveMetricsPath;
-        qDebug() << "  headlessMode:" << result.headlessMode;
 
     } catch (const std::exception &e) {
         qCritical() << "Error parsing command line arguments:" << e.what();
@@ -138,12 +127,10 @@ void CommandLineHandler::setupCommandLineIntegration(MainWindow *mainWindow, con
     m_args = parseCommandLineArgs(args);
     
     if (m_args.isValid) {
-        qDebug() << "Processing command line arguments...";
         // UI is already hidden in main.cpp before window is shown
         // Use a timer to apply args after UI is fully initialized
         QTimer::singleShot(0, this, &CommandLineHandler::applyCommandLineArgsToUI);
     } else {
-        qDebug() << "No valid command line arguments provided, starting normally";
     }
 }
 
@@ -154,8 +141,6 @@ void CommandLineHandler::applyCommandLineArgsToUI()
     }
     
     try {
-        qDebug() << "Applying command line args - Crop:" << m_args.cropName 
-                 << "Files:" << m_args.outputFiles;
         
         // Step 1: Select the crop folder
         // For scatter mode, try by directory path first, then by name
@@ -200,7 +185,6 @@ bool CommandLineHandler::selectCropFolder(const QString &cropName)
 void CommandLineHandler::selectOutputFiles()
 {
     if (!m_mainWindow || m_args.outputFiles.isEmpty()) {
-        qDebug() << "No output files specified in command line";
         // For scatter headless mode, no output files needed — go straight to scatter plot
         if (m_args.scatterMode)
             QTimer::singleShot(100, this, &CommandLineHandler::loadInitialContent);
@@ -212,7 +196,6 @@ void CommandLineHandler::selectOutputFiles()
         if (selectedCount > 0) {
             QString message = QString("Loaded %1 with %2 output files")
                                 .arg(m_args.cropName).arg(selectedCount);
-            qDebug() << "CommandLineHandler:" << message;
 
             // Load the first tab content
             QTimer::singleShot(100, this, &CommandLineHandler::loadInitialContent);
@@ -260,7 +243,6 @@ void CommandLineHandler::loadInitialContent()
                 }
             }
             
-            qDebug() << "Loaded initial content for tab" << currentTab;
         }
         
     } catch (const std::exception &e) {
@@ -307,7 +289,6 @@ QString CommandLineHandler::extractCropNameFromPath(const QString &cropDirPath)
     // Try to match the fallback name against known crop names
     for (const CropDetails &crop : cropDetails) {
         if (crop.cropName.compare(fallbackName, Qt::CaseInsensitive) == 0) {
-            qDebug() << "CommandLineHandler: Fallback matched crop name:" << fallbackName;
             return crop.cropName;
         }
     }
@@ -361,15 +342,11 @@ void CommandLineHandler::headlessAutoPlot()
         PlotWidget *plot = m_mainWindow->getPlotWidget();
         if (plot && !m_args.savePlotPath.isEmpty()) {
             plot->exportPlotComposite(m_args.savePlotPath, "PNG", 1200, 800, 96);
-            qDebug() << "CommandLineHandler (headless): plot saved to" << m_args.savePlotPath;
         }
         if (!m_args.saveMetricsPath.isEmpty()) {
             if (!m_mainWindow->saveMetricsToFile(m_args.saveMetricsPath)) {
                 qWarning() << "CommandLineHandler (headless): failed to save metrics to"
                            << m_args.saveMetricsPath;
-            } else {
-                qDebug() << "CommandLineHandler (headless): metrics saved to"
-                         << m_args.saveMetricsPath;
             }
         }
         QApplication::quit();

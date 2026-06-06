@@ -77,11 +77,9 @@ PlotWidget::PlotWidget(QWidget *parent)
     , m_isScatterMode(false)
     , m_isBoxPlotMode(false)
 {
-    qDebug() << "PlotWidget::PlotWidget() - CONSTRUCTOR CALLED";
     
     setupUI();
     setupChart();
-    qDebug() << "PlotWidget::PlotWidget() - setupChart() completed";
     
     // Initialize plot colors (matching Python PLOT_COLORS)
     m_plotColors = {
@@ -113,7 +111,6 @@ PlotWidget::~PlotWidget()
 
 void PlotWidget::testScalingFunctionality()
 {
-    qDebug() << "PlotWidget: Testing scaling functionality...";
     
     // Create test data with different magnitudes
     DataTable testSimData;
@@ -140,18 +137,14 @@ void PlotWidget::testScalingFunctionality()
     QMap<QString, QMap<QString, ScalingInfo>> scaleFactors = 
         calculateScalingFactors(testSimData, testObsData, testYVars);
     
-    qDebug() << "PlotWidget: Test scaling results:";
     for (auto expIt = scaleFactors.begin(); expIt != scaleFactors.end(); ++expIt) {
         for (auto varIt = expIt.value().begin(); varIt != expIt.value().end(); ++varIt) {
-            qDebug() << "  " << varIt.key() << ": scale factor ="
-                     << varIt.value().scaleFactor << ", offset =" << varIt.value().offset;
         }
     }
     
     // Apply the test and update UI to verify scaling works
     m_scaleFactors = scaleFactors;
     updateScalingLabel(testYVars);
-    qDebug() << "PlotWidget: Test scaling label should now be visible if scaling is working";
 }
 
 void PlotWidget::setupUI()
@@ -261,7 +254,7 @@ void PlotWidget::setupUI()
     m_scalingLabel = new QLabel();
     m_scalingLabel->setStyleSheet("padding: 2px 8px; font-size: 10pt; font-weight: bold; background-color: #fff3cd; border: 1px solid #ffeaa7; border-radius: 3px; color: #856404;");
     m_scalingLabel->setWordWrap(true);
-    m_scalingLabel->setAlignment(Qt::AlignVCenter | Qt::AlignRight);
+    m_scalingLabel->setAlignment(Qt::AlignVCenter | Qt::AlignLeft);
     m_scalingLabel->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
     m_scalingLabel->setVisible(false);
 
@@ -388,6 +381,12 @@ void PlotWidget::setupUI()
 
 }
 
+void PlotWidget::setBottomStatusWidget(QWidget *widget)
+{
+    if (widget && m_leftLayout)
+        m_leftLayout->addWidget(widget, 0);
+}
+
 void PlotWidget::setupChart()
 {
     if (m_chart) {
@@ -476,11 +475,9 @@ void PlotWidget::styleChart()
 
 void PlotWidget::setupAxes(const QString &xVar)
 {
-    qDebug() << "PlotWidget::setupAxes() - CALLED with X variable:" << xVar;
     
     // Remove existing axes
     auto existingAxes = m_chart->axes();
-    qDebug() << "PlotWidget::setupAxes() - Removing" << existingAxes.size() << "existing axes";
     for (auto axis : existingAxes) {
         m_chart->removeAxis(axis);
     }
@@ -494,7 +491,6 @@ void PlotWidget::setupAxes(const QString &xVar)
         int optimalTicks = calculateOptimalDateTickCount();
         dateAxis->setTickCount(optimalTicks);
         xAxis = dateAxis;
-        qDebug() << "PlotWidget::setupAxes() - Created QDateTimeAxis for DATE variable";
     } else if (xVar == "DATE" && !m_axisBreaks.isEmpty()) {
         // Axis breaks active: use QValueAxis with hidden labels (we paint our own)
         QValueAxis *valueAxis = new QValueAxis();
@@ -504,7 +500,6 @@ void PlotWidget::setupAxes(const QString &xVar)
         valueAxis->setMinorTickCount(0);
         valueAxis->setMinorGridLineVisible(false);
         xAxis = valueAxis;
-        qDebug() << "PlotWidget::setupAxes() - Created QValueAxis (axis-break mode) for DATE variable";
     } else {
         QValueAxis *valueAxis = new QValueAxis();
         
@@ -527,7 +522,6 @@ void PlotWidget::setupAxes(const QString &xVar)
         valueAxis->setMinorGridLineVisible(m_plotSettings.showMinorGrid);
 
         xAxis = valueAxis;
-        qDebug() << "PlotWidget::setupAxes() - Created QValueAxis for" << xVar;
     }
     
     // Create Y-axis (always value axis)
@@ -560,7 +554,6 @@ void PlotWidget::setupAxes(const QString &xVar)
     yAxis->setLinePen(QPen(Qt::black));
     yAxis->setLabelsBrush(QBrush(Qt::black));
     
-    qDebug() << "PlotWidget::setupAxes() - Added axes for X variable:" << xVar;
 }
 
 void PlotWidget::enforceAxisColors()
@@ -583,11 +576,9 @@ void PlotWidget::autoFitAxes()
     m_autoFitPending = false;
     m_isZoomed = false;
     
-    qDebug() << "PlotWidget::autoFitAxes() - CALLED";
     
     auto series = m_chart->series();
     if (series.isEmpty()) {
-        qDebug() << "PlotWidget::autoFitAxes() - No series to fit";
         return;
     }
     
@@ -626,7 +617,6 @@ void PlotWidget::autoFitAxes()
     }
     
     if (!hasData) {
-        qDebug() << "PlotWidget::autoFitAxes() - No data points found";
         return;
     }
     
@@ -718,7 +708,6 @@ void PlotWidget::autoFitAxes()
                     else
                         valueAxis->setLabelFormat("%.0f");
 
-                    qDebug() << "PlotWidget::autoFitAxes() - Set X day-based axis: range" << cleanMinX << "to" << cleanMaxX << "interval:" << tickInterval << "tickCount:" << xTickCount;
                 } else {
                     // Label format: user decimals or auto (2dp default)
                     if (m_plotSettings.xAxisDecimals >= 0)
@@ -729,7 +718,6 @@ void PlotWidget::autoFitAxes()
 
                 valueAxis->setMinorTickCount(m_plotSettings.xAxisMinorTickCount);
                 valueAxis->setMinorGridLineVisible(m_plotSettings.showMinorGrid);
-                qDebug() << "PlotWidget::autoFitAxes() - Set X ValueAxis range:" << (minX - xLeftPadding) << "to" << (maxX + xRightPadding);
             } else if (auto dateAxis = qobject_cast<QDateTimeAxis*>(axis)) {
                 QDateTime minDateTime = QDateTime::fromMSecsSinceEpoch(static_cast<qint64>(minX - xLeftPadding));
                 QDateTime maxDateTime = QDateTime::fromMSecsSinceEpoch(static_cast<qint64>(maxX + xRightPadding));
@@ -738,7 +726,6 @@ void PlotWidget::autoFitAxes()
                 dateAxis->setTickCount(optimalTicks);
                 dateAxis->setLinePen(QPen(Qt::black));
                 dateAxis->setLabelsBrush(QBrush(Qt::black));
-                qDebug() << "PlotWidget::autoFitAxes() - Set X DateTimeAxis range:" << minDateTime.toString() << "to" << maxDateTime.toString();
             }
         } else if (axis->orientation() == Qt::Vertical) {
             if (auto valueAxis = qobject_cast<QValueAxis*>(axis)) {
@@ -789,12 +776,10 @@ void PlotWidget::autoFitAxes()
                     valueAxis->setLabelFormat(QString("%.%1f").arg(autoDecimals));
                 }
 
-                qDebug() << "PlotWidget::autoFitAxes() - Y-axis: alignedMax=" << alignedMax << "interval=" << tickInterval << "tickCount=" << tickCount;
             }
         }
     }
     
-    qDebug() << "PlotWidget::autoFitAxes() - Completed with data bounds: X(" << minX << "," << maxX << ") Y(" << minY << "," << maxY << ")";
 
     // Apply user-defined axis range overrides (override auto-fit result)
     if (!m_isScatterMode) {
@@ -926,7 +911,6 @@ double PlotWidget::calculateNiceXInterval(double range)
         }
     }
     
-    qDebug() << "calculateNiceXInterval: range=" << range << "ideal=" << idealInterval << "chosen=" << bestInterval << "ticks=" << (range/bestInterval);
     return bestInterval;
 }
 
@@ -952,7 +936,6 @@ double PlotWidget::calculateNiceYInterval(double max)
         }
     }
     
-    qDebug() << "calculateNiceYInterval: max=" << max << "ideal=" << idealInterval << "chosen=" << bestInterval << "ticks=" << (max/bestInterval);
     return bestInterval;
 }
 
@@ -967,7 +950,6 @@ int PlotWidget::calculateOptimalDateTickCount() const
         plotWidth = this->width() * 0.8; // Estimate plot area as 80% of widget width
     }
     
-    qDebug() << "PlotWidget::calculateOptimalDateTickCount() - Plot width:" << plotWidth;
     
     // Base calculation: "MMM dd, yyyy" labels are ~110px wide at typical DPI,
     // so use 110px per tick to prevent Qt from clipping tick labels.
@@ -990,8 +972,6 @@ int PlotWidget::calculateOptimalDateTickCount() const
         optimalTicks = qBound(6, baseTicks, 13);
     }
     
-    qDebug() << "PlotWidget::calculateOptimalDateTickCount() - Width:" << plotWidth 
-             << "Base ticks:" << baseTicks << "Optimal ticks:" << optimalTicks;
     
     return optimalTicks;
 }
@@ -1136,11 +1116,8 @@ void PlotWidget::plotTimeSeries(
         updatePlotWithScaling();
 
         if (m_obsData.rowCount > 0) {
-            qDebug() << "PlotWidget: Current Y vars:" << m_currentYVars;
-            qDebug() << "PlotWidget: Current treatments:" << m_currentTreatments;
             calculateMetrics();
         } else {
-            qDebug() << "PlotWidget: No observed data for metrics calculation";
         }
 
         emit plotUpdated();
@@ -1161,11 +1138,9 @@ QMap<QString, QMap<QString, ScalingInfo>> PlotWidget::calculateScalingFactors(co
 {
     QMap<QString, QMap<QString, ScalingInfo>> scaleFactors;
     
-    qDebug() << "PlotWidget: calculateScalingFactors called with" << yVars.size() << "variables:" << yVars;
     
     // If only one variable, no scaling needed (matching Python logic)
     if (yVars.size() <= 1) {
-        qDebug() << "PlotWidget: Single variable detected, no scaling applied";
         for (const QString &var : yVars) {
             ScalingInfo info;
             info.scaleFactor = 1.0;
@@ -1176,7 +1151,6 @@ QMap<QString, QMap<QString, ScalingInfo>> PlotWidget::calculateScalingFactors(co
         return scaleFactors;
     }
     
-    qDebug() << "PlotWidget: Multiple variables detected, calculating scaling factors...";
     
     QMap<QString, double> magnitudes;
     QMap<QString, double> maxValues;
@@ -1210,7 +1184,6 @@ QMap<QString, QMap<QString, ScalingInfo>> PlotWidget::calculateScalingFactors(co
         }
         
         if (values.isEmpty()) {
-            qDebug() << "PlotWidget: No valid values found for variable" << var;
             continue;
         }
         
@@ -1219,7 +1192,6 @@ QMap<QString, QMap<QString, ScalingInfo>> PlotWidget::calculateScalingFactors(co
         
         // Skip if constant values or very small range
         if (qAbs(maxVal - minVal) < 1e-10) {
-            qDebug() << "PlotWidget: Variable" << var << "has constant values, skipping scaling";
             continue;
         }
         
@@ -1236,14 +1208,9 @@ QMap<QString, QMap<QString, ScalingInfo>> PlotWidget::calculateScalingFactors(co
             if (meanAbs > 0) {
                 magnitudes[var] = std::floor(std::log10(meanAbs));
                 maxValues[var] = maxVal;
-                qDebug() << "PlotWidget: Variable" << var << "- values count:" << values.size() 
-                         << "min:" << minVal << "max:" << maxVal << "meanAbs:" << meanAbs 
-                         << "magnitude:" << magnitudes[var] << "(from sim + obs data)";
             } else {
-                qDebug() << "PlotWidget: Variable" << var << "has zero mean absolute value, skipping";
             }
         } else {
-            qDebug() << "PlotWidget: Variable" << var << "has no non-zero values, skipping";
         }
     }
     
@@ -1278,29 +1245,24 @@ QMap<QString, QMap<QString, ScalingInfo>> PlotWidget::calculateScalingFactors(co
     double targetThreshold = targetMax * 1.1;
     
     // Calculate scaling factors
-    qDebug() << "PlotWidget: Target threshold:" << targetThreshold << "Magnitudes found:" << magnitudes.size();
     if (magnitudes.size() >= 2) {
         double referenceMagnitude = 0;
         if (!magnitudes.isEmpty()) {
             // Use MAXIMUM magnitude as reference to scale smaller values UP
             referenceMagnitude = *std::max_element(magnitudes.begin(), magnitudes.end());
         }
-        qDebug() << "PlotWidget: Reference magnitude (maximum):" << referenceMagnitude;
         
         for (auto it = magnitudes.begin(); it != magnitudes.end(); ++it) {
             QString var = it.key();
             double magnitude = it.value();
             
             double scaleFactor = std::pow(10.0, referenceMagnitude - magnitude);
-            qDebug() << "PlotWidget: Variable" << var << "initial scale factor:" << scaleFactor;
             
             // Ensure scale factor is reasonable (between 0.001 and 1000)
             if (scaleFactor > 1000.0) {
                 scaleFactor = 1000.0;
-                qDebug() << "PlotWidget: Clamped scale factor to maximum 1000 for variable" << var;
             } else if (scaleFactor < 0.001) {
                 scaleFactor = 0.001;
-                qDebug() << "PlotWidget: Clamped scale factor to minimum 0.001 for variable" << var;
             }
             
             // Additional check: if scaled max would be too large, reduce scale factor
@@ -1310,7 +1272,6 @@ QMap<QString, QMap<QString, ScalingInfo>> PlotWidget::calculateScalingFactors(co
                     scaleFactor /= 10.0;
                     scaledMax = maxValues[var] * scaleFactor;
                 }
-                qDebug() << "PlotWidget: Variable" << var << "final scale factor:" << scaleFactor;
             }
             
             ScalingInfo info;
@@ -1327,7 +1288,6 @@ QMap<QString, QMap<QString, ScalingInfo>> PlotWidget::calculateScalingFactors(co
         info.offset = 0.0;
         info.originalUnit = "";
         scaleFactors["default"][var] = info;
-        qDebug() << "PlotWidget: Single variable" << var << "assigned scale factor 1.0";
     }
     
     // Add default scaling for remaining variables
@@ -1338,16 +1298,13 @@ QMap<QString, QMap<QString, ScalingInfo>> PlotWidget::calculateScalingFactors(co
             info.offset = 0.0;
             info.originalUnit = "";
             scaleFactors["default"][var] = info;
-            qDebug() << "PlotWidget: Variable" << var << "assigned default scale factor 1.0";
         }
     }
     
-    qDebug() << "PlotWidget: Final scaling factors summary:";
     bool hasSignificantScaling = false;
     for (const QString &var : yVars) {
         if (scaleFactors["default"].contains(var)) {
             const ScalingInfo &info = scaleFactors["default"][var];
-            qDebug() << "  " << var << ": scale =" << info.scaleFactor << ", offset =" << info.offset;
             if (qAbs(info.scaleFactor - 1.0) > 0.01) {
                 hasSignificantScaling = true;
             }
@@ -1359,7 +1316,6 @@ QMap<QString, QMap<QString, ScalingInfo>> PlotWidget::calculateScalingFactors(co
         double minMag = *std::min_element(magnitudes.begin(), magnitudes.end());
         double maxMag = *std::max_element(magnitudes.begin(), magnitudes.end());
         if (maxMag - minMag >= 2) {
-            qDebug() << "PlotWidget: Variables have very different magnitudes (" << minMag << " to " << maxMag << ") but scaling was not applied";
         }
     }
     
@@ -1372,35 +1328,26 @@ DataTable PlotWidget::applyScaling(const DataTable &data, const QStringList &yVa
     
     // Clear previous scaling factors for label
     m_appliedScalingFactors.clear();
-    qDebug() << "PlotWidget: applyScaling called for variables:" << yVars;
-    qDebug() << "PlotWidget: Available scale factors keys:" << m_scaleFactors.keys();
     if (m_scaleFactors.contains("default")) {
-        qDebug() << "PlotWidget: Default scale factors for variables:" << m_scaleFactors["default"].keys();
     }
     
     for (const QString &var : yVars) {
         if (!m_scaleFactors.contains("default") || !m_scaleFactors["default"].contains(var)) {
-            qDebug() << "PlotWidget: No scale factor found for variable:" << var;
             continue;
         }
         
         const ScalingInfo &info = m_scaleFactors["default"][var];
-        qDebug() << "PlotWidget: Applying scaling to" << var << "- factor:" << info.scaleFactor << "offset:" << info.offset;
         
         // Always store the scale factor for label display, even if it's 1.0
         m_appliedScalingFactors[var] = info.scaleFactor;
-        qDebug() << "PlotWidget: Stored scaling factor for label:" << var << "=" << info.scaleFactor;
         
         if (qAbs(info.scaleFactor - 1.0) < 0.001 && qAbs(info.offset) < 0.001) {
-            qDebug() << "PlotWidget: No significant scaling needed for" << var << "- factor:" << info.scaleFactor;
             continue;
         }
         
-        qDebug() << "PlotWidget: WILL APPLY SCALING to" << var << "- factor:" << info.scaleFactor;
 
         DataColumn *column = scaledData.getColumn(var);
         if (!column) {
-            qDebug() << "PlotWidget: Column not found for variable:" << var;
             continue;
         }
 
@@ -1409,12 +1356,10 @@ DataTable PlotWidget::applyScaling(const DataTable &data, const QStringList &yVa
             DataColumn originalColumn(originalVarName);
             originalColumn.data = column->data;
             scaledData.addColumn(originalColumn);
-            qDebug() << "PlotWidget: Created backup column:" << originalVarName;
             
             // Get column reference again after adding backup column
             column = scaledData.getColumn(var);
             if (!column) {
-                qDebug() << "PlotWidget: Column disappeared after backup creation:" << var;
                 continue;
             }
         }
@@ -1446,9 +1391,7 @@ DataTable PlotWidget::applyScaling(const DataTable &data, const QStringList &yVa
                 }
             }
         }
-        qDebug() << "PlotWidget: Scaled" << scaledCount << "values for variable" << var;
         if (hasSample) {
-            qDebug() << "PlotWidget: Sample transformation:" << var << ":" << sampleOriginal << "->" << sampleScaled;
         }
     }
     
@@ -1531,13 +1474,11 @@ void PlotWidget::plotDatasets(const DataTable &simData, const DataTable &obsData
         m_chart->setMargins(QMargins(0, 0, 0, 0));  // Use default margins
     }
 
-    qDebug() << "PlotWidget::plotDatasets() - ENTRY with Y vars:" << yVars;
     
     // Debug: Check if we're receiving scaled data
     for (const QString &yVar : yVars) {
         const DataColumn *column = simData.getColumn(yVar);
         if (column && !column->data.isEmpty()) {
-            qDebug() << "PlotWidget::plotDatasets() - First value of" << yVar << "=" << column->data[0];
         }
     }
     
@@ -1561,45 +1502,45 @@ void PlotWidget::plotDatasets(const DataTable &simData, const DataTable &obsData
     // Keep track of which actual sim TRT corresponds to the matchKey for SQ
     QMap<QString, QString> sqDateToSimTrt;
     
-    qDebug() << "PlotWidget: plotDatasets - Plotting simulated data...";
+    // Hoist all column lookups and file-type detection outside the per-yVar loop
+    const DataColumn *xColumnSim    = simData.getColumn(xVar);
+    const DataColumn *trtColumnSim  = simData.getColumn("TRT");
+    const DataColumn *expColumnSim  = simData.getColumn("EXPERIMENT");
+    const DataColumn *cropColumnSim = simData.getColumn("CROP");
+    const DataColumn *runColumnSim  = simData.getColumn("RUN");
+    const DataColumn *rseqColumnSim = simData.getColumn("R#");
+    const DataColumn *pnumColumnSim = simData.getColumn("P#");
+    const DataColumn *dateColumnSim = simData.getColumn("DATE");
+    const DataColumn *srcFileColumn = simData.getColumn("__SRCFILE__");
+    const DataColumn *tnameColumnSim = simData.getColumn("TNAME");
+
+    bool isSummaryOsu = simData.columnNames.contains("WYEAR") &&
+                        !simData.columnNames.contains("DAS") &&
+                        !simData.columnNames.contains("DAP");
+    bool isSequenceOsu = false;
+    if (isSummaryOsu && rseqColumnSim && trtColumnSim) {
+        QSet<QString> uniqueTrts, uniqueRseq;
+        for (const QVariant &v : trtColumnSim->data) uniqueTrts.insert(v.toString().trimmed());
+        for (const QVariant &v : rseqColumnSim->data) uniqueRseq.insert(v.toString().trimmed());
+        isSequenceOsu = (uniqueTrts.size() == 1) && (uniqueRseq.size() > 1);
+    }
+
     // Plot simulated data
     for (const QString &yVar : yVars) {
-        const DataColumn *xColumn = simData.getColumn(xVar);
+        const DataColumn *xColumn = xColumnSim;
         const DataColumn *yColumn = simData.getColumn(yVar);
-        const DataColumn *trtColumn = simData.getColumn("TRT");
-        const DataColumn *expColumn = simData.getColumn("EXPERIMENT");
-        
+        const DataColumn *trtColumn = trtColumnSim;
+        const DataColumn *expColumn = expColumnSim;
+        const DataColumn *rseqColumn = rseqColumnSim;
+
         if (!xColumn || !yColumn || !trtColumn) {
-            qDebug() << "PlotWidget: Missing column for simulated data:" << xVar << "," << yVar << "or TRT";
-            qDebug() << "PlotWidget: Available columns:" << simData.columnNames;
             continue;
         }
-        
-        qDebug() << "PlotWidget: EXPERIMENT column exists:" << (expColumn != nullptr);
-        
+
         // Group data by experiment and treatment combination
         QMap<QString, QVector<QPointF>> experimentTreatmentData;
 
-        // Detect summary OSU files (seasonal/yearly rows, no time-series DAS/DAP).
-        // For these files the RUN column enumerates one row per year — do NOT split by RUN.
-        bool isSummaryOsu = simData.columnNames.contains("WYEAR") &&
-                            !simData.columnNames.contains("DAS") &&
-                            !simData.columnNames.contains("DAP");
-
-        // Detect sequence OSU: all TRT values identical but R# column has multiple unique values.
-        // For these files each R# slot is a distinct crop in the rotation.
-        const DataColumn *rseqColumn = simData.getColumn("R#");
-        const DataColumn *tnameColumnSim = simData.getColumn("TNAME");
-        bool isSequenceOsu = false;
-        if (isSummaryOsu && rseqColumn) {
-            QSet<QString> uniqueTrts, uniqueRseq;
-            for (const QVariant &v : trtColumn->data) uniqueTrts.insert(v.toString().trimmed());
-            for (const QVariant &v : rseqColumn->data) uniqueRseq.insert(v.toString().trimmed());
-            isSequenceOsu = (uniqueTrts.size() == 1) && (uniqueRseq.size() > 1);
-        }
-
-        // Pre-fetch source file column for per-var file filtering
-        const DataColumn *srcFileColumn = simData.getColumn("__SRCFILE__");
+        // Pre-fetch source file filter for this variable
         QString requiredSrcFile = yVarFileFilter.value(yVar);
 
         for (int row = 0; row < simData.rowCount; ++row) {
@@ -1645,35 +1586,25 @@ void PlotWidget::plotDatasets(const DataTable &simData, const DataTable &obsData
             }
 
             // Get crop for this row if available
-            QString crop = "XX";  // Default crop code
-            const DataColumn* cropColumn = simData.getColumn("CROP");
-            if (cropColumn && row < cropColumn->data.size()) {
-                QString cropFromData = cropColumn->data[row].toString();
-                if (!cropFromData.isEmpty()) {
-                    crop = cropFromData;
-                }
+            QString crop = "XX";
+            if (cropColumnSim && row < cropColumnSim->data.size()) {
+                QString cropFromData = cropColumnSim->data[row].toString();
+                if (!cropFromData.isEmpty()) crop = cropFromData;
             }
 
             // Create unique key for crop-experiment-treatment(+run) combination
             QString runStr;
-            const DataColumn* runColumn = simData.getColumn("RUN");
-            if (runColumn && row < runColumn->data.size()) {
-                QString rv = runColumn->data[row].toString();
-                if (!rv.isEmpty()) {
-                    runStr = QString("RUN%1").arg(rv);
-                }
+            if (runColumnSim && row < runColumnSim->data.size()) {
+                QString rv = runColumnSim->data[row].toString();
+                if (!rv.isEmpty()) runStr = QString("RUN%1").arg(rv);
             }
-            // For summary OSU files each row is one year; don't split by RUN.
-            // For sequence OSU, split by P# (rep) unless plotMeanReps is on.
             QString expTrtKey;
             if (isSequenceOsu) {
                 if (m_plotSettings.plotMeanReps) {
-                    // Merge all reps into one key per R# slot — will be averaged below
                     expTrtKey = QString("%1__%2__%3").arg(crop).arg(experiment).arg(effectiveTrt);
                 } else {
-                    const DataColumn* pnumCol = simData.getColumn("P#");
-                    QString pnum = (pnumCol && row < pnumCol->data.size())
-                        ? pnumCol->data[row].toString().trimmed() : QString();
+                    QString pnum = (pnumColumnSim && row < pnumColumnSim->data.size())
+                        ? pnumColumnSim->data[row].toString().trimmed() : QString();
                     expTrtKey = pnum.isEmpty()
                         ? QString("%1__%2__%3").arg(crop).arg(experiment).arg(effectiveTrt)
                         : QString("%1__%2__%3__P%4").arg(crop).arg(experiment).arg(effectiveTrt).arg(pnum);
@@ -1693,9 +1624,8 @@ void PlotWidget::plotDatasets(const DataTable &simData, const DataTable &obsData
             
             // Map the date for sequence experiments so we can find exactly which TRT this simulated output was from
             if (crop == "SQ") {
-                const DataColumn* dateColumn = simData.getColumn("DATE");
-                if (dateColumn && row < dateColumn->data.size()) {
-                    QString simDateStr = dateColumn->data[row].toString();
+                if (dateColumnSim && row < dateColumnSim->data.size()) {
+                    QString simDateStr = dateColumnSim->data[row].toString();
                     if (!simDateStr.isEmpty()) {
                         QString sqKey = QString("SQ_ALL_%1_%2").arg(experiment, simDateStr);
                         sqDateToSimTrt[sqKey] = trt;
@@ -1719,8 +1649,6 @@ void PlotWidget::plotDatasets(const DataTable &simData, const DataTable &obsData
                        xVar == "EDAT" || xVar == "ADAT") {
                 // Handle DSSAT YYYYDOY format dates
                 QString dateStr = xVal.toString();
-                qDebug() << "PlotWidget: *** DSSAT DATE PARSING ***";
-                qDebug() << "PlotWidget: Variable:" << xVar << "Value:" << dateStr << "Length:" << dateStr.length();
                 
                 if (dateStr.length() == 7 && dateStr != "-99") {
                     int year = dateStr.left(4).toInt();
@@ -1730,23 +1658,18 @@ void PlotWidget::plotDatasets(const DataTable &simData, const DataTable &obsData
                         if (dateTime.isValid()) {
                             x = dateTime.toMSecsSinceEpoch();
                             xOk = true;
-                            qDebug() << "PlotWidget: *** SUCCESS *** Parsed" << xVar << dateStr << "-> Year:" << year << "DOY:" << doy << "-> timestamp:" << x;
                         } else {
-                            qDebug() << "PlotWidget: Failed to convert" << xVar << dateStr << "to valid date";
                             continue;
                         }
                     } else {
-                        qDebug() << "PlotWidget: Invalid year/doy in" << xVar << ":" << year << "/" << doy;
                         continue;
                     }
                 } else {
-                    qDebug() << "PlotWidget: Invalid" << xVar << "format:" << dateStr;
                     continue;
                 }
             } else {
                 x = xVal.toDouble(&xOk);
                 if (!xOk) {
-                    qDebug() << "PlotWidget: Failed to convert" << xVar << "to double:" << xVal.toString();
                     continue; // Skip non-numeric X values
                 }
             }
@@ -1774,7 +1697,6 @@ void PlotWidget::plotDatasets(const DataTable &simData, const DataTable &obsData
             }
         }
 
-        qDebug() << "PlotWidget: Selected treatments filter:" << treatments;
         
         // Collect treatment keys from this variable's data (including run when present).
         // Also add base keys (crop__experiment__treatment) so observed data (no run) can match.
@@ -1858,30 +1780,32 @@ void PlotWidget::plotDatasets(const DataTable &simData, const DataTable &obsData
     // Collect treatment keys from simulated data to filter observed data
     // Keys are collected inside the yVar loop above, so simulatedTreatmentKeys is already populated
     
-    qDebug() << "PlotWidget: plotDatasets - Plotting observed data (if available). Row count:" << obsData.rowCount << ", Columns:" << obsData.columnNames;
-    qDebug() << "PlotWidget: Available simulated treatment keys:" << simulatedTreatmentKeys;
     
+    // Hoist obs column lookups outside the per-yVar loop
+    const DataColumn *xColumnObs    = obsData.getColumn(xVar);
+    const DataColumn *trtColumnObs  = obsData.getColumn("TRT");
+    const DataColumn *expColumnObs  = obsData.getColumn("EXPERIMENT");
+    const DataColumn *cropColumnObs = obsData.getColumn("CROP");
+    const DataColumn *dateColumnObs = obsData.getColumn("DATE");
+
     // Plot observed data (if available) - only for treatments that match simulated data
     if (obsData.rowCount > 0) {
         for (const QString &yVar : yVars) {
             // Check if required columns exist in observed data
             if (!obsData.columnNames.contains(xVar)) {
-                qDebug() << "PlotWidget: Observed data missing X variable column:" << xVar;
                 continue;
             }
             if (!obsData.columnNames.contains(yVar)) {
-                qDebug() << "PlotWidget: Observed data missing Y variable column:" << yVar;
                 continue;
             }
             if (!obsData.columnNames.contains("TRT")) {
-                qDebug() << "PlotWidget: Observed data missing TRT column.";
                 continue;
             }
 
-            const DataColumn *xColumn = obsData.getColumn(xVar);
+            const DataColumn *xColumn = xColumnObs;
             const DataColumn *yColumn = obsData.getColumn(yVar);
-            const DataColumn *trtColumn = obsData.getColumn("TRT");
-            const DataColumn *expColumn = obsData.getColumn("EXPERIMENT");
+            const DataColumn *trtColumn = trtColumnObs;
+            const DataColumn *expColumn = expColumnObs;
             
             
             // Group observed data by experiment and treatment combination
@@ -1916,20 +1840,16 @@ void PlotWidget::plotDatasets(const DataTable &simData, const DataTable &obsData
                 }
 
                 // Get crop for this row if available
-                QString crop = "XX";  // Default crop code
-                const DataColumn* cropColumn = obsData.getColumn("CROP");
-                if (cropColumn && row < cropColumn->data.size()) {
-                    QString cropFromData = cropColumn->data[row].toString();
-                    if (!cropFromData.isEmpty()) {
-                        crop = cropFromData;
-                    }
+                QString crop = "XX";
+                if (cropColumnObs && row < cropColumnObs->data.size()) {
+                    QString cropFromData = cropColumnObs->data[row].toString();
+                    if (!cropFromData.isEmpty()) crop = cropFromData;
                 }
 
                 // If it's SQ, remap the generic `trt` ('1') using the date to match the simulated granular TRT
                 if (crop == "SQ") {
-                    const DataColumn* obsDateCol = obsData.getColumn("DATE");
-                    if (obsDateCol && row < obsDateCol->data.size()) {
-                        QString obsDateMask = obsDateCol->data[row].toString();
+                    if (dateColumnObs && row < dateColumnObs->data.size()) {
+                        QString obsDateMask = dateColumnObs->data[row].toString();
                         if (!obsDateMask.isEmpty()) {
                             QString sqKey = QString("SQ_ALL_%1_%2").arg(experiment, obsDateMask);
                             if (sqDateToSimTrt.contains(sqKey)) {
@@ -1944,7 +1864,6 @@ void PlotWidget::plotDatasets(const DataTable &simData, const DataTable &obsData
                 
                 // Skip observed data if base treatment key doesn't exist in simulated data
                 if (!simulatedTreatmentKeys.contains(expTrtKey)) {
-                    qDebug() << "PlotWidget: Skipping observed data for treatment key not found in simulated data:" << expTrtKey;
                     continue;
                 }
                 
@@ -2041,7 +1960,6 @@ void PlotWidget::plotDatasets(const DataTable &simData, const DataTable &obsData
         }
     }
     
-    qDebug() << "plotDatasets: Generated" << plotDataList.size() << "plot data items before adding to chart";
 
     // Compute axis breaks (DATE x-axis only) — must happen before setupAxes so
     // setupAxes can pick QValueAxis vs QDateTimeAxis based on whether breaks exist.
@@ -2144,22 +2062,13 @@ QString PlotWidget::getVariableGroup(const QString &variable)
 
 void PlotWidget::addSeriesToPlot(const QVector<PlotData> &plotDataList)
 {
-    qDebug() << "addSeriesToPlot: Called with" << plotDataList.size() << "plot data items";
     if (!m_chart) {
-        qDebug() << "addSeriesToPlot: No chart available!";
         return;
     }
     
     // Debug: Print details of each plot data item
     for (int i = 0; i < plotDataList.size(); ++i) {
         const PlotData &plotData = plotDataList[i];
-        qDebug() << "addSeriesToPlot: Item" << i << ":";
-        qDebug() << "  Treatment:" << plotData.treatment;
-        qDebug() << "  TreatmentName:" << plotData.treatmentName;
-        qDebug() << "  Variable:" << plotData.variable;
-        qDebug() << "  IsObserved:" << plotData.isObserved;
-        qDebug() << "  Experiment:" << plotData.experiment;
-        qDebug() << "  Points:" << plotData.points.size();
     }
     
     // Clear previous series mappings and plot data
@@ -2169,8 +2078,6 @@ void PlotWidget::addSeriesToPlot(const QVector<PlotData> &plotDataList)
     for (int i = 0; i < plotDataList.size(); ++i) {
         const PlotData &plotData = plotDataList[i]; // Use const reference
         if (plotData.points.isEmpty()) {
-            qDebug() << "addSeriesToPlot: Including empty data for legend:" << plotData.treatment 
-                     << "experiment:" << plotData.experiment << "crop:" << plotData.crop;
             // Still add to plot data list for legend, but don't create series
             QSharedPointer<PlotData> sharedPlotData = QSharedPointer<PlotData>::create(plotData);
             m_plotDataList.append(sharedPlotData);
@@ -2352,13 +2259,11 @@ void PlotWidget::addSeriesToPlot(const QVector<PlotData> &plotDataList)
                 if (xAxis && yAxis) {
                     series->attachAxis(xAxis);
                     series->attachAxis(yAxis);
-                    qDebug() << "addSeriesToPlot: Attached series to custom axes";
                 }
             }
         }
     }
     
-    qDebug() << "addSeriesToPlot: Chart has" << m_chart->series().count() << "series and" << m_chart->axes().count() << "axes";
     
     // Schedule auto-fit using timer (consolidates multiple auto-fit calls)
     if (m_autoFitTimer && !m_autoFitPending) {
@@ -2369,13 +2274,8 @@ void PlotWidget::addSeriesToPlot(const QVector<PlotData> &plotDataList)
     
     // Style axes
     auto axes = m_chart->axes();
-    qDebug() << "addSeriesToPlot: Chart has" << axes.count() << "axes";
     for (auto axis : axes) {
         axis->setGridLineVisible(m_showGrid);
-        if (auto valueAxis = qobject_cast<QValueAxis*>(axis))
-            qDebug() << "addSeriesToPlot: ValueAxis range:" << valueAxis->min() << "to" << valueAxis->max();
-        else if (auto dateAxis = qobject_cast<QDateTimeAxis*>(axis))
-            qDebug() << "addSeriesToPlot: DateTimeAxis range:" << dateAxis->min() << "to" << dateAxis->max();
     }
 
     // Qt theme resets axis pens on every addAxis/attachAxis — defer to ensure we run last
@@ -2384,7 +2284,6 @@ void PlotWidget::addSeriesToPlot(const QVector<PlotData> &plotDataList)
 
 void PlotWidget::updateLegend(const QVector<PlotData> &plotDataList)
 {
-    qDebug() << "updateLegend: m_plotDataList has" << m_plotDataList.size() << "items";
     
     clearLegend();
     
@@ -2395,18 +2294,14 @@ void PlotWidget::updateLegend(const QVector<PlotData> &plotDataList)
     for (const QSharedPointer<PlotData>& plotData : m_plotDataList) { // Iterate directly over m_plotDataList
         QString category = plotData->isObserved ? "Observed" : "Simulated";
         
-        qDebug() << "updateLegend: Processing" << category << "data for variable" << plotData->variable 
-                 << "treatment" << plotData->treatment << "name" << plotData->treatmentName;
         
         // For scatter mode, allow empty treatment (we group by variable only)
         // For other modes, require both variable and treatment
         if (plotData->variable.isEmpty()) {
-            qDebug() << "updateLegend: Skipping invalid plot data - variable is empty";
             continue;
         }
         
         if (!m_isScatterMode && plotData->treatment.isEmpty()) {
-            qDebug() << "updateLegend: Skipping invalid plot data - treatment is empty (non-scatter mode)";
             continue;
         }
         
@@ -2416,11 +2311,8 @@ void PlotWidget::updateLegend(const QVector<PlotData> &plotDataList)
         legendEntries[category][plotData->variable].append(plotData);
     }
     
-    qDebug() << "updateLegend: Legend entries organized:";
     for (auto catIt = legendEntries.begin(); catIt != legendEntries.end(); ++catIt) {
-        qDebug() << "  Category:" << catIt.key() << "has" << catIt.value().size() << "variables";
         for (auto varIt = catIt.value().begin(); varIt != catIt.value().end(); ++varIt) {
-            qDebug() << "    Variable:" << varIt.key() << "has" << varIt.value().size() << "treatments";
         }
     }
     
@@ -2429,12 +2321,8 @@ void PlotWidget::updateLegend(const QVector<PlotData> &plotDataList)
 
 void PlotWidget::calculateMetrics()
 {
-    qDebug() << "PlotWidget::calculateMetrics() - ENTRY";
-    qDebug() << "PlotWidget: Sim data rows:" << m_simData.rowCount;
-    qDebug() << "PlotWidget: Obs data rows:" << m_obsData.rowCount;
     
     if (m_simData.rowCount == 0 || m_obsData.rowCount == 0) {
-        qDebug() << "PlotWidget: No data available for metrics calculation";
         return;
     }
     
@@ -2442,7 +2330,6 @@ void PlotWidget::calculateMetrics()
     
     // Calculate metrics for each Y variable and treatment combination
     for (const QString &yVar : m_currentYVars) {
-        qDebug() << "[DEBUG] PlotWidget::calculateMetrics - Processing Y variable:" << yVar;
 
         const DataColumn *simYColumn = m_simData.getColumn(yVar);
         const DataColumn *obsYColumn = m_obsData.getColumn(yVar);
@@ -2450,7 +2337,6 @@ void PlotWidget::calculateMetrics()
         const DataColumn *obsTrtColumn = m_obsData.getColumn("TRT");
         
         if (!simYColumn || !obsYColumn || !simTrtColumn || !obsTrtColumn) {
-            qDebug() << "[DEBUG] PlotWidget::calculateMetrics - Skip" << yVar << "(missing sim/obs Y or TRT column)";
             continue;
         }
         
@@ -2464,7 +2350,6 @@ void PlotWidget::calculateMetrics()
         const DataColumn *simRunColumn = m_simData.getColumn("RUN");
         
         if (!simDateColumn || !obsDateColumn) {
-            qDebug() << "PlotWidget: Missing DATE column for metrics calculation";
             continue;
         }
         
@@ -2512,8 +2397,6 @@ void PlotWidget::calculateMetrics()
 
         int nSimKeys = simDataByBaseKeyToRuns.size();
         QStringList sampleSimKeys = simDataByBaseKeyToRuns.keys().mid(0, 5);
-        qDebug() << "[DEBUG] PlotWidget::calculateMetrics - simDataByBaseKeyToRuns:"
-                 << nSimKeys << "match keys (trt_exp_crop_date). Sample:" << sampleSimKeys;
         
         // Collect observed data with match keys and create matched pairs grouped by treatment+variable+experiment+crop(+run)
         QMap<QString, QVector<double>> simByTreatmentVarExpCrop;
@@ -2585,17 +2468,8 @@ void PlotWidget::calculateMetrics()
             }
         }
 
-        qDebug() << "[DEBUG] PlotWidget::calculateMetrics - Obs data flow for" << yVar
-                 << ": obs rows with valid" << yVar << "=" << obsRowsWithVal
-                 << ", matched (sim exists for matchKey)=" << obsRowsMatched
-                 << ", skipped (no sim for matchKey)=" << obsRowsNoSim
-                 << ", matchedPairs added=" << matchedPairs;
-        if (!sampleNoSimKeys.isEmpty())
-            qDebug() << "[DEBUG] PlotWidget::calculateMetrics - Sample matchKeys with no sim:" << sampleNoSimKeys;
-        qDebug() << "[DEBUG] PlotWidget::calculateMetrics - Group keys (trt_var_exp_crop):" << simByTreatmentVarExpCrop.size();
         if (!simByTreatmentVarExpCrop.isEmpty()) {
             auto gk = simByTreatmentVarExpCrop.keys();
-            qDebug() << "[DEBUG] PlotWidget::calculateMetrics - Sample group keys:" << gk.mid(0, qMin(8, gk.size()));
         }
         
         // Calculate metrics for each treatment+variable+experiment+crop(+run) combination
@@ -2629,9 +2503,6 @@ void PlotWidget::calculateMetrics()
                 continue;
             }
             
-            qDebug() << "[DEBUG] PlotWidget::calculateMetrics - Calling MetricsCalculator: groupKey=" << groupKey
-                     << "trt=" << trt << "variable=" << variable << "n_sim=" << simValues.size()
-                     << "n_obs=" << obsValues.size();
             // Use MetricsCalculator
             QVariantMap result = MetricsCalculator::calculateMetrics(simValues, obsValues, trt.toInt());
             
@@ -2664,7 +2535,6 @@ void PlotWidget::calculateMetrics()
         }
     }
     
-    qDebug() << "PlotWidget::calculateMetrics() - Calculated" << metrics.size() << "metrics";
     
     // Sort metrics by Treatment (numerically), then by Variable, Experiment, and Crop
     if (!metrics.isEmpty()) {
@@ -2709,10 +2579,8 @@ void PlotWidget::calculateMetrics()
             return cropA < cropB;
         });
         
-        qDebug() << "PlotWidget: Emitting metricsCalculated signal with" << metrics.size() << "metrics (sorted by Treatment)";
         emit metricsCalculated(metrics);
     } else {
-        qDebug() << "PlotWidget: No metrics to emit - metrics vector is empty";
     }
 }
 
@@ -2867,9 +2735,7 @@ bool PlotWidget::parseDateCached(const QString &dateStr, double &timestamp, bool
     
     // Only log errors, not every parse attempt
     if (!isObserved) {
-        qDebug() << "PlotWidget: Failed to parse DATE string:" << dateStr;
     } else {
-        qDebug() << "PlotWidget: Failed to parse observed DATE string:" << dateStr;
     }
     return false;
 }
@@ -3435,7 +3301,6 @@ void PlotWidget::exportPlot(const QString &filePath, const QString &format)
     if (m_legendStack && !insideLegend) m_legendStack->setVisible(legendStackWasVisible);
     if (m_bottomContainer) m_bottomContainer->setVisible(bottomWasVisible);
 
-    qDebug() << "exportPlot: filePath=" << filePath << "format=" << format << "pixmap=" << pixmap.size();
     bool ok = false;
     if (filePath.endsWith(".pdf", Qt::CaseInsensitive)) {
         // Verify the path is writable before handing to QPdfWriter
@@ -3461,7 +3326,6 @@ void PlotWidget::exportPlot(const QString &filePath, const QString &format)
         writer.setResolution(pdfDpi);
         QPainter pdfPainter(&writer);
         ok = pdfPainter.isActive();
-        qDebug() << "exportPlot PDF: painter active=" << ok << "writer size=" << writer.width() << "x" << writer.height();
         if (ok) {
             pdfPainter.drawPixmap(0, 0, writer.width(), writer.height(), pixmap);
             pdfPainter.end();
@@ -3591,9 +3455,6 @@ void PlotWidget::exportPlot(const QString &filePath, const QString &format, int 
     
     // Get the actual widget size
     QSize actualSize = this->size();
-    qDebug() << "Export: PlotWidget size is" << actualSize;
-    qDebug() << "Export: Left container size is" << (m_leftContainer ? m_leftContainer->size() : QSize());
-    qDebug() << "Export: Legend area size is" << (m_legendScrollArea ? m_legendScrollArea->size() : QSize());
     
     // Create a high-resolution pixmap
     QPixmap pixmap(width, height);
@@ -3618,7 +3479,6 @@ void PlotWidget::exportPlot(const QString &filePath, const QString &format, int 
         double scale = qMin(scaleX, scaleY);
         painter.scale(scale, scale);
         
-        qDebug() << "Export: Using scale factor" << scale << "(scaleX:" << scaleX << "scaleY:" << scaleY << ")";
     }
     
     // Hide bottom button bar so it doesn't appear in the exported image
@@ -3659,7 +3519,6 @@ void PlotWidget::exportPlot(const QString &filePath, const QString &format, int 
     // Save the pixmap
     bool saved = pixmap.save(filePath, format.toUtf8().constData());
     
-    qDebug() << "Export: Saved plot to" << filePath << "with dimensions" << width << "x" << height << "- Success:" << saved;
 }
 
 QPixmap PlotWidget::cropToContent(const QPixmap &source)
@@ -3783,7 +3642,6 @@ void PlotWidget::exportPlotComposite(const QString &filePath, const QString &for
 
     // Save the result
     bool saved = outputPixmap.save(filePath, format.toUtf8().constData());
-    qDebug() << "Simple composite export: Final size" << outputPixmap.size() << "- Success:" << saved;
 
     // Restore original window size
     if (width > 0 && height > 0) {
@@ -3981,17 +3839,13 @@ void PlotWidget::setAxisTitles(const QString &xTitle, const QString &yTitle)
 
 void PlotWidget::updateScalingLabel(const QStringList &yVars)
 {
-    qDebug() << "PlotWidget: updateScalingLabel called with variables:" << yVars;
-    qDebug() << "PlotWidget: m_appliedScalingFactors keys:" << m_appliedScalingFactors.keys();
     QStringList scalingInfo;
 
     // Use the simpler applied scaling factors storage
     for (const QString &yVar : yVars) {
-        qDebug() << "PlotWidget: Checking variable:" << yVar << "in applied scaling factors";
         
         if (m_appliedScalingFactors.contains(yVar)) {
             double scaleFactor = m_appliedScalingFactors[yVar];
-            qDebug() << "PlotWidget: Variable" << yVar << "has applied scale factor:" << scaleFactor;
             
             if (qAbs(scaleFactor - 1.0) > 0.001) {  // More precise check for scaling
                 // Get full variable name
@@ -4005,28 +3859,22 @@ void PlotWidget::updateScalingLabel(const QStringList &yVars)
                     scaleText = QString("%1: ×%2").arg(displayName).arg(scaleFactor, 0, 'g', 3);
                 }
                 scalingInfo.append(scaleText);
-                qDebug() << "PlotWidget: Added to scaling info:" << scaleText;
             } else {
-                qDebug() << "PlotWidget: Variable" << yVar << "has scale factor 1.0 (no scaling)";
             }
         } else {
-            qDebug() << "PlotWidget: Variable" << yVar << "not found in applied scaling factors";
         }
     }
     
     QString labelText;
     if (!scalingInfo.isEmpty()) {
         labelText = "Scaling applied: " + scalingInfo.join(", ");
-        qDebug() << "PlotWidget: Setting scaling label:" << labelText;
     } else {
         // Don't show any text when no scaling is applied
         labelText = ""; // Hide when no scaling is needed
-        qDebug() << "PlotWidget: No scaling applied, hiding scaling label";
     }
     
     m_scalingLabel->setText(labelText);
     m_scalingLabel->setVisible(!labelText.isEmpty());
-    qDebug() << "PlotWidget: Scaling label visibility set to:" << !labelText.isEmpty() << "with text:" << labelText;
 }
 
 // Removed complex legend controls - keeping simple legend like Python
@@ -4068,14 +3916,8 @@ void PlotWidget::changeXAxis(const QString &newXVar)
 
 void PlotWidget::updatePlotWithScaling()
 {
-    qDebug() << "PlotWidget::updatePlotWithScaling() - ENTRY POINT";
-    qDebug() << "PlotWidget: Sim data rows:" << m_simData.rowCount;
-    qDebug() << "PlotWidget: Current Y vars count:" << m_currentYVars.size();
-    qDebug() << "PlotWidget: Current Y vars list:" << m_currentYVars;
-    qDebug() << "PlotWidget: Current X var:" << m_currentXVar;
     
     if (m_simData.rowCount == 0) {
-        qDebug() << "PlotWidget::updatePlotWithScaling() - NO DATA, returning";
         return;
     }
 
@@ -4097,8 +3939,6 @@ void PlotWidget::updatePlotWithScaling()
     }
 
     // Update the plot with scaled data
-    qDebug() << "PlotWidget::updatePlotWithScaling() - About to plot datasets";
-    qDebug() << "PlotWidget::updatePlotWithScaling() - Plotting with SCALED data";
     
     // Clear the chart first to ensure fresh plotting
     if (m_chart) {
@@ -4119,7 +3959,6 @@ void PlotWidget::updatePlotWithScaling()
     } else {
         plotDatasets(scaledSimData, scaledObsData, m_currentXVar, m_currentYVars, m_currentTreatments, m_selectedExperiment, m_yVarFileFilter);
     }
-    qDebug() << "PlotWidget::updatePlotWithScaling() - Datasets plotted";
 
     // Update the scaling label (hidden in multi-panel mode — no scaling applied)
     if (isMultiPanel) {
@@ -4134,7 +3973,6 @@ void PlotWidget::updatePlotWithScaling()
         m_autoFitTimer->start();
     }
     
-    qDebug() << "PlotWidget::updatePlotWithScaling() - COMPLETED";
 
     // Switch between single-chart and multi-panel layout based on settings
     if (!m_isScatterMode && !m_isBoxPlotMode)
@@ -4688,19 +4526,16 @@ void PlotWidget::setBoxPlotMode(bool enabled)
 // X-axis button handlers
 void PlotWidget::onDasButtonClicked()
 {
-    qDebug() << "PlotWidget: DAS button clicked";
     setXAxisVariable("DAS");
 }
 
 void PlotWidget::onDapButtonClicked()
 {
-    qDebug() << "PlotWidget: DAP button clicked";
     setXAxisVariable("DAP");
 }
 
 void PlotWidget::onDateButtonClicked()
 {
-    qDebug() << "PlotWidget: DATE button clicked";
     setXAxisVariable("DATE");
 }
 

@@ -91,8 +91,6 @@ void DataTableWidget::setupUI()
 
 void DataTableWidget::setData(const DataTable& simData, const DataTable& obsData)
 {
-    qDebug() << "DataTableWidget: setData called. Sim data rows:" << simData.rowCount 
-             << "Obs data rows:" << obsData.rowCount;
     
     // Clean data by removing empty columns
     if (simData.rowCount > 0) {
@@ -106,7 +104,6 @@ void DataTableWidget::setData(const DataTable& simData, const DataTable& obsData
         m_simTableView->setModel(m_simModel);
         m_simTableView->resizeColumnsToContents();
         
-        qDebug() << "DataTableWidget: Simulated data loaded successfully. Row count:" << m_simModel->rowCount();
     } else {
         m_simData.clear();
         m_filteredSimData.clear();
@@ -115,12 +112,10 @@ void DataTableWidget::setData(const DataTable& simData, const DataTable& obsData
             m_simModel = nullptr;
         }
         m_simTableView->setModel(nullptr);
-        qDebug() << "DataTableWidget: No simulation data provided or data is empty";
     }
     
     // Handle observed data
     if (obsData.rowCount > 0) {
-        qDebug() << "DataTableWidget: Observed data columns:" << obsData.columnNames;
         
         m_obsData = removeEmptyColumns(obsData);
         m_filteredObsData = m_obsData;
@@ -132,9 +127,7 @@ void DataTableWidget::setData(const DataTable& simData, const DataTable& obsData
         m_obsTableView->setModel(m_obsModel);
         m_obsTableView->resizeColumnsToContents();
         
-        qDebug() << "DataTableWidget: Observed data loaded successfully. Row count:" << m_obsModel->rowCount();
     } else {
-        qDebug() << "DataTableWidget: No observed data provided or data is empty";
         m_obsData.clear();
         m_filteredObsData.clear();
         if (m_obsModel) {
@@ -352,10 +345,8 @@ DataTable DataTableWidget::removeEmptyColumns(const DataTable& data)
         if (hasValidData) {
             result.addColumn(*column);
         } else {
-            qDebug() << "DataTableWidget: Removing empty column:" << columnName;
         }
     }
-    qDebug() << "DataTableWidget: removeEmptyColumns - Original columns:" << data.columnNames.size() << ", Remaining columns:" << result.columnNames.size();
     return result;
 }
 

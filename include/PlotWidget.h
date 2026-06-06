@@ -239,6 +239,7 @@ public:
     void setBoxPlotButtonVisible(bool visible); // Show/hide Box Plot toggle button
     void setBoxPlotMode(bool enabled);          // Programmatically enable/disable box plot mode
     void setPreplotPanelVisible(bool visible);  // Show/hide treatment pre-selection panel and button
+    void setBottomStatusWidget(QWidget *widget); // Embed a widget below the bottom bar (plot-area-only, does not extend under legend)
 
     // Treatment pre-selection panel (shown in white area before first plot)
     void setAvailableTreatments(const QStringList &treatments,

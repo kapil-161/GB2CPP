@@ -169,17 +169,14 @@ bool DataProcessor::readFile(const QString &filePath, DataTable &table)
 
 bool DataProcessor::readOutFile(const QString &filePath, DataTable &table)
 {
-    qDebug() << "DataProcessor::readOutFile() called with:" << filePath;
     
     try {
         QFile file(filePath);
         if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
-            qDebug() << "DataProcessor: Cannot open file:" << filePath;
             emit errorOccurred(QString("Cannot open file: %1").arg(filePath));
             return false;
         }
         
-        qDebug() << "DataProcessor: File opened successfully, size:" << file.size();
         
         QTextStream in(&file);
         // Try UTF-8 first, fallback to Latin-1 if needed
@@ -192,12 +189,10 @@ bool DataProcessor::readOutFile(const QString &filePath, DataTable &table)
             lines.append(line);
             lineCount++;
             if (lineCount % 1000 == 0) {
-                qDebug() << "DataProcessor: Read" << lineCount << "lines so far...";
             }
         }
         file.close();
         
-        qDebug() << "DataProcessor: Read" << lineCount << "total lines";
     
     // If UTF-8 failed, try Latin-1
     if (lines.isEmpty()) {
@@ -211,12 +206,10 @@ bool DataProcessor::readOutFile(const QString &filePath, DataTable &table)
     }
     
         if (lines.isEmpty()) {
-            qDebug() << "DataProcessor: No lines read from file";
             emit errorOccurred(QString("Cannot read file or file is empty: %1").arg(filePath));
             return false;
         }
         
-        qDebug() << "DataProcessor: Starting file parsing...";
         table.clear();
         table.tableName = QFileInfo(filePath).baseName();
         
@@ -475,15 +468,12 @@ bool DataProcessor::readOutFile(const QString &filePath, DataTable &table)
     standardizeDataTypes(table);
     
         emit dataProcessed(QString("Successfully loaded %1 rows from %2").arg(table.rowCount).arg(filePath));
-        qDebug() << "DataProcessor: readOutFile completed successfully";
         return true;
         
     } catch (const std::exception& e) {
-        qDebug() << "DataProcessor: Exception in readOutFile:" << e.what();
         emit errorOccurred(QString("Error parsing file: %1").arg(e.what()));
         return false;
     } catch (...) {
-        qDebug() << "DataProcessor: Unknown exception in readOutFile";
         emit errorOccurred("Unknown error parsing file");
         return false;
     }
@@ -491,7 +481,6 @@ bool DataProcessor::readOutFile(const QString &filePath, DataTable &table)
 
 bool DataProcessor::readCsvFile(const QString &filePath, DataTable &table)
 {
-    qDebug() << "DataProcessor::readCsvFile() called with:" << filePath;
 
     QFile file(filePath);
     if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
@@ -625,7 +614,6 @@ bool DataProcessor::readCsvFile(const QString &filePath, DataTable &table)
             }
         }
 
-        qDebug() << "readCsvFile TNAME lookup: csvDir=" << csvDir << "expCodes=" << expCodes;
         // Search for {expCode}.??X files in the CSV directory, then all DSSAT crop dirs
         for (const QString &expCode : expCodes) {
             QDir dir(csvDir);
@@ -643,7 +631,6 @@ bool DataProcessor::readCsvFile(const QString &filePath, DataTable &table)
             };
 
             QStringList xFiles = findXFiles(dir, expCode);
-            qDebug() << "readCsvFile TNAME lookup: expCode=" << expCode << "xFiles in csvDir=" << xFiles;
             if (xFiles.isEmpty()) {
                 QString dssatBase = getDSSATBase();
                 if (!dssatBase.isEmpty()) {
@@ -689,8 +676,6 @@ bool DataProcessor::readCsvFile(const QString &filePath, DataTable &table)
 
     standardizeDataTypes(table);
 
-    qDebug() << "DataProcessor::readCsvFile() completed:"
-             << table.rowCount << "rows," << table.columnNames.size() << "columns";
     return true;
 }
 
@@ -699,7 +684,6 @@ QMap<QString, QString> DataProcessor::readTreatmentNamesFromXFile(const QString 
     QMap<QString, QString> trtNames; // trtNum (string) -> TNAME
     QFile file(xFilePath);
     if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
-        qDebug() << "DataProcessor::readTreatmentNamesFromXFile: cannot open" << xFilePath;
         return trtNames;
     }
 
@@ -741,7 +725,6 @@ QMap<QString, QString> DataProcessor::readTreatmentNamesFromXFile(const QString 
         }
     }
     file.close();
-    qDebug() << "DataProcessor::readTreatmentNamesFromXFile: read" << trtNames.size() << "treatment names from" << xFilePath;
     return trtNames;
 }
 
@@ -1023,7 +1006,6 @@ bool DataProcessor::readOsuFile(const QString &filePath, DataTable &table)
     }
     
     
-    qDebug() << "OSU parsed:" << table.rowCount << "rows," << table.columnNames.size() << "columns from" << filePath;
     
     emit dataProcessed(QString("Successfully loaded %1 rows from OSU file %2").arg(table.rowCount).arg(filePath));
     return true;
@@ -1034,13 +1016,11 @@ static QString getDirectoryFromDssatProByThreeLetterCode(const QString &threeLet
 {
     QString dssatProPath = DataProcessor::findDssatProFile();
     if (dssatProPath.isEmpty()) {
-        qDebug() << "getDirectoryFromDssatProByThreeLetterCode: DSSATPRO file not found";
         return QString();
     }
     
     QFile proFile(dssatProPath);
     if (!proFile.open(QIODevice::ReadOnly | QIODevice::Text)) {
-        qDebug() << "getDirectoryFromDssatProByThreeLetterCode: Cannot open DSSATPRO file";
         return QString();
     }
     
@@ -1084,7 +1064,6 @@ static QString getDirectoryFromDssatProByThreeLetterCode(const QString &threeLet
                         }
                         
                         proFile.close();
-                        qDebug() << "getDirectoryFromDssatProByThreeLetterCode: Found directory for" << threeLetterCode << "->" << directory;
                         return directory;
                     }
                 }
@@ -1107,7 +1086,6 @@ static QString getDirectoryFromDssatProByThreeLetterCode(const QString &threeLet
                     }
                     
                     proFile.close();
-                    qDebug() << "getDirectoryFromDssatProByThreeLetterCode: Found directory for" << threeLetterCode << "->" << directory;
                     return directory;
                 }
             }
@@ -1115,13 +1093,11 @@ static QString getDirectoryFromDssatProByThreeLetterCode(const QString &threeLet
     }
     
     proFile.close();
-    qDebug() << "getDirectoryFromDssatProByThreeLetterCode: No directory found for" << threeLetterCode;
     return QString();
 }
 
 bool DataProcessor::readObservedData(const QString &simulatedFilePath, const QString &experimentCode, const QString &cropCode, DataTable &table)
 {
-    qDebug() << "DataProcessor: Attempting to find and read observed data for:" << simulatedFilePath << ", Exp Code:" << experimentCode << ", Crop Code:" << cropCode;
     table.clear(); // Clear the table before populating
 
     // Use DSSATPRO directory path using 3-letter code (cropCode + "D")
@@ -1137,11 +1113,9 @@ bool DataProcessor::readObservedData(const QString &simulatedFilePath, const QSt
         };
         QString up = cropCode.toUpper();
         QString threeLetterCode = detailCodeToDssatproDir.value(up, up + "D");
-        qDebug() << "DataProcessor: Looking up directory in DSSATPRO using 3-letter code:" << threeLetterCode;
         
         folderPath = getDirectoryFromDssatProByThreeLetterCode(threeLetterCode);
         if (!folderPath.isEmpty()) {
-            qDebug() << "DataProcessor: Using DSSATPRO directory for observed data:" << folderPath;
         }
     }
     
@@ -1149,7 +1123,6 @@ bool DataProcessor::readObservedData(const QString &simulatedFilePath, const QSt
     if (folderPath.isEmpty()) {
         QFileInfo simFileInfo(simulatedFilePath);
         folderPath = simFileInfo.absolutePath();
-        qDebug() << "DataProcessor: DSSATPRO directory not found, falling back to simulated file path:" << folderPath;
     }
 
     QString baseName = experimentCode; // Use the passed experimentCode as the base name for the T file
@@ -1162,25 +1135,18 @@ bool DataProcessor::readObservedData(const QString &simulatedFilePath, const QSt
     }
 
     QString foundTFile;
-    qDebug() << "DataProcessor: Searching for observed files in directory:" << folderPath;
-    qDebug() << "DataProcessor: File patterns to search:" << tFilePatterns;
     
     for (const QString& pattern : tFilePatterns) {
         QString fullPath = QDir(folderPath).absoluteFilePath(pattern);
-        qDebug() << "DataProcessor: Checking for observed file:" << fullPath;
         bool exists = QFile::exists(fullPath);
-        qDebug() << "DataProcessor: File exists:" << exists;
         if (exists) {
             foundTFile = fullPath;
-            qDebug() << "DataProcessor: Found observed data file:" << foundTFile;
             break;
         }
     }
 
     if (!foundTFile.isEmpty()) {
-        qDebug() << "DataProcessor: Reading observed data file:" << foundTFile;
         bool success = readTFile(foundTFile, table);
-        qDebug() << "DataProcessor: readTFile result:" << success << "Rows:" << table.rowCount << "Columns:" << table.columnNames.size();
         if (success) {
             // Add EXPERIMENT column to tag data with experiment code
             if (!table.columnNames.contains("EXPERIMENT")) {
@@ -1189,7 +1155,6 @@ bool DataProcessor::readObservedData(const QString &simulatedFilePath, const QSt
                     expCol.data.append(experimentCode);
                 }
                 table.addColumn(expCol);
-                qDebug() << "DataProcessor: Added EXPERIMENT column with code:" << experimentCode;
             }
             
             // Add CROP column to tag data with crop code
@@ -1199,18 +1164,11 @@ bool DataProcessor::readObservedData(const QString &simulatedFilePath, const QSt
                     cropCol.data.append(cropCode);
                 }
                 table.addColumn(cropCol);
-                qDebug() << "DataProcessor: Added CROP column with code:" << cropCode;
             }
-            qDebug() << "DataProcessor: Successfully read observed data. Rows:" << table.rowCount << ", Columns:" << table.columnNames.size();
         } else {
-            qDebug() << "DataProcessor: Failed to parse observed data from:" << foundTFile;
         }
         return success;
     } else {
-        qDebug() << "DataProcessor: No observed data file found for:" << simulatedFilePath;
-        qDebug() << "DataProcessor: Searched in directory:" << folderPath;
-        qDebug() << "DataProcessor: Patterns searched:" << tFilePatterns;
-        qDebug() << "DataProcessor: Experiment code:" << experimentCode << "Crop code:" << cropCode;
         return false;
     }
 }
@@ -1368,7 +1326,6 @@ QStringList DataProcessor::prepareOutFiles(const QString &folderName)
         // Special handling for SensWork - sensitivity analysis folder
         if (folderName.compare("SensWork", Qt::CaseInsensitive) == 0) {
             actualPath = QDir(getDSSATBase()).absoluteFilePath("SensWork");
-            qDebug() << "prepareOutFiles: Using special SensWork path:" << actualPath;
         } else {
             // Regular crop folders - lookup in DETAIL.CDE mapping
             for (const CropDetails &crop : cropDetails) {
@@ -1381,18 +1338,14 @@ QStringList DataProcessor::prepareOutFiles(const QString &folderName)
     }
     
     if (actualPath.isEmpty()) {
-        qDebug() << "prepareOutFiles: Could not resolve folder path for:" << folderName;
         return outFiles;
     }
     
     QDir dir(actualPath);
-    qDebug() << "prepareOutFiles: Checking if directory exists:" << actualPath;
     if (!dir.exists()) {
-        qDebug() << "prepareOutFiles: Directory does not exist:" << actualPath;
         return outFiles;
     }
     
-    qDebug() << "prepareOutFiles: Directory exists, looking for files...";
     
     // Get all .OUT files (and other O-files like .OSU, .OVT, .OPT, .OPG, etc.)
     QStringList filters;
@@ -1419,7 +1372,6 @@ QStringList DataProcessor::prepareOutFiles(const QString &folderName)
             << "*.OWE" << "*.owe";
     QStringList allFiles = dir.entryList(filters, QDir::Files, QDir::Name);
     
-    qDebug() << "prepareOutFiles: Found" << allFiles.size() << "total files:" << allFiles;
     
     // Filter out non-plottable files with more selective approach
     // Note: Removed "evaluate" as Evaluate.OUT files contain important simulated vs observed comparisons
@@ -1445,7 +1397,6 @@ QStringList DataProcessor::prepareOutFiles(const QString &folderName)
             // Always allow EVALUATE.OUT files (they're for scatter plots, not time series)
             if (baseName.contains("evaluate")) {
                 outFiles.append(file);
-                qDebug() << "prepareOutFiles: Allowing EVALUATE.OUT file:" << file;
                 continue;
             }
             
@@ -1472,7 +1423,6 @@ QStringList DataProcessor::prepareOutFiles(const QString &folderName)
         if (isPlottable) {
             outFiles.append(file);
         } else {
-            qDebug() << "prepareOutFiles: Filtering out non-plottable file:" << file << "(" << filterReason << ")";
         }
     }
     
@@ -1673,13 +1623,11 @@ void DataProcessor::parseDataCDE()
 
     QString cdeFile = findDataCde();
     if (cdeFile.isEmpty() || !QFile::exists(cdeFile)) {
-        qDebug() << "DATA.CDE file not found:" << cdeFile;
         return;
     }
 
     QFile file(cdeFile);
     if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
-        qDebug() << "Cannot open DATA.CDE file:" << cdeFile;
         return;
     }
 
@@ -1700,7 +1648,6 @@ void DataProcessor::parseDataCDE()
     }
 
     if (headerIdx == -1) {
-        qDebug() << "No header found in DATA.CDE file";
         return;
     }
 
@@ -1731,7 +1678,6 @@ QVector<CropDetails> DataProcessor::getCropDetails()
         return m_cropDetailsCache;
     }
 
-    qDebug() << "DataProcessor::getCropDetails() - Reading DETAIL.CDE and DSSATPRO files (first time or cache cleared)";
 
     QVector<CropDetails> cropDetails;
 
@@ -1850,26 +1796,20 @@ QVector<CropDetails> DataProcessor::getCropDetails()
                     QString canonicalPath = dir.canonicalPath();
                     if (!canonicalPath.isEmpty()) {
                         directory = canonicalPath;
-                        qDebug() << "DSSATPRO: Normalized directory path to actual folder:" << directory;
                     } else {
                         // Fallback to absolutePath if canonicalPath fails
                         directory = dir.absolutePath();
-                        qDebug() << "DSSATPRO: Using absolute path (canonical failed):" << directory;
                     }
                 } else {
-                    qDebug() << "DSSATPRO: Directory does not exist, using as-is:" << directory;
                 }
                 
                 if (folderCode.endsWith("D") && folderCode.length() >= 3) {
                     QString code = folderCode.left(folderCode.length() - 1); // Remove 'D'
-                    qDebug() << "DSSATPRO: Found directory mapping:" << folderCode << "(" << code << ") ->" << directory;
 
                     // Update matching crop (standard crops only — application types handled separately below)
                     if (cropMap.contains(code)) {
                         cropMap[code].directory = directory;
-                        qDebug() << "DSSATPRO: Updated directory for code" << code;
                     } else {
-                        qDebug() << "DSSATPRO: No matching crop found for code" << code;
                     }
                 }
             }
@@ -1901,14 +1841,12 @@ QVector<CropDetails> DataProcessor::getCropDetails()
             cd.cropName  = QString(app.name);
             cd.directory = dir;
             cropDetails.append(cd);
-            qDebug() << "getCropDetails: Added application type" << app.name << "code" << app.code << "dir" << dir;
         }
     }
 
     // Cache the results
     m_cropDetailsCache = cropDetails;
     m_cropDetailsCached = true;
-    qDebug() << "DataProcessor::getCropDetails() - Cached" << cropDetails.size() << "crop details";
 
     return cropDetails;
 }
@@ -1918,7 +1856,6 @@ QPair<QString, QString> DataProcessor::extractSensWorkCodes(const QString &fileP
     QString experimentCode;
     QString cropCode;
     
-    qDebug() << "DataProcessor::extractSensWorkCodes - Reading from:" << filePath;
     
     // Read the file to extract EXPERIMENT and CROP codes
     DataTable tempData;
@@ -1950,7 +1887,6 @@ QPair<QString, QString> DataProcessor::extractSensWorkCodes(const QString &fileP
                 QString crop = value.toString().trimmed();
                 if (!crop.isEmpty()) {
                     cropCode = crop;
-                    qDebug() << "DataProcessor::extractSensWorkCodes - Found crop code in CROP column:" << cropCode;
                     break; // Use first valid crop code
                 }
             }
@@ -1965,7 +1901,6 @@ QPair<QString, QString> DataProcessor::extractSensWorkCodes(const QString &fileP
                 QString crop = value.toString().trimmed();
                 if (!crop.isEmpty()) {
                     cropCode = crop;
-                    qDebug() << "DataProcessor::extractSensWorkCodes - Found crop code in CR column:" << cropCode;
                     break; // Use first valid crop code
                 }
             }
@@ -1974,7 +1909,6 @@ QPair<QString, QString> DataProcessor::extractSensWorkCodes(const QString &fileP
     
     // 3. Try to parse MODEL line from file header if no column found
     if (cropCode.isEmpty()) {
-        qDebug() << "DataProcessor::extractSensWorkCodes - No CROP/CR column found, parsing MODEL line";
         
         QFile file(filePath);
         if (file.open(QIODevice::ReadOnly | QIODevice::Text)) {
@@ -1990,19 +1924,16 @@ QPair<QString, QString> DataProcessor::extractSensWorkCodes(const QString &fileP
                 // Look for MODEL line: "MODEL          : CSCER048 - Wheat"
                 if (line.startsWith("MODEL") && line.contains(":")) {
                     QString modelInfo = line.split(":").last().trimmed();
-                    qDebug() << "DataProcessor::extractSensWorkCodes - Found MODEL line:" << modelInfo;
                     
                     // Extract crop name from model info (e.g., "CSCER048 - Wheat")
                     if (modelInfo.contains(" - ")) {
                         QString cropName = modelInfo.split(" - ").last().trimmed();
-                        qDebug() << "DataProcessor::extractSensWorkCodes - Extracted crop name:" << cropName;
                         
                         // Map crop name to crop code using DETAIL.CDE
                         QVector<CropDetails> cropDetails = getCropDetails();
                         for (const CropDetails &crop : cropDetails) {
                             if (crop.cropName.compare(cropName, Qt::CaseInsensitive) == 0) {
                                 cropCode = crop.cropCode.toUpper();
-                                qDebug() << "DataProcessor::extractSensWorkCodes - Mapped crop name to code:" << cropName << "->" << cropCode;
                                 break;
                             }
                         }
@@ -2013,7 +1944,6 @@ QPair<QString, QString> DataProcessor::extractSensWorkCodes(const QString &fileP
                                 if (crop.cropName.contains(cropName, Qt::CaseInsensitive) || 
                                     cropName.contains(crop.cropName, Qt::CaseInsensitive)) {
                                     cropCode = crop.cropCode.toUpper();
-                                    qDebug() << "DataProcessor::extractSensWorkCodes - Partial match crop name to code:" << cropName << "->" << cropCode;
                                     break;
                                 }
                             }
@@ -2028,18 +1958,15 @@ QPair<QString, QString> DataProcessor::extractSensWorkCodes(const QString &fileP
         // Fallback if still no crop code found
         if (cropCode.isEmpty()) {
             cropCode = "XX"; // Default unknown crop
-            qDebug() << "DataProcessor::extractSensWorkCodes - Could not determine crop code, using default: XX";
         }
     }
     
-    qDebug() << "DataProcessor::extractSensWorkCodes - Extracted experiment:" << experimentCode << "crop:" << cropCode;
     
     return qMakePair(experimentCode, cropCode);
 }
 
 bool DataProcessor::readSensWorkObservedData(const QString &sensWorkFilePath, DataTable &observedData)
 {
-    qDebug() << "DataProcessor::readSensWorkObservedData - Processing SensWork file:" << sensWorkFilePath;
     
     // Extract experiment and crop codes from the SensWork file
     QPair<QString, QString> codes = extractSensWorkCodes(sensWorkFilePath);
@@ -2053,11 +1980,9 @@ bool DataProcessor::readSensWorkObservedData(const QString &sensWorkFilePath, Da
     
     // Construct observed data file pattern: experiment_code.crop_code+T
     QString observedFileName = QString("%1.%2T").arg(experimentCode).arg(cropCode);
-    qDebug() << "DataProcessor::readSensWorkObservedData - Looking for observed data file:" << observedFileName;
     
     // Search for observed data file ONLY in SensWork directory
     QString sensWorkDir = QFileInfo(sensWorkFilePath).absolutePath();
-    qDebug() << "DataProcessor::readSensWorkObservedData - Searching only in SensWork directory:" << sensWorkDir;
     
     // Search for the observed data file in SensWork directory only
     QString observedFilePath;
@@ -2067,7 +1992,6 @@ bool DataProcessor::readSensWorkObservedData(const QString &sensWorkFilePath, Da
         QString candidatePath = dir.absoluteFilePath(observedFileName);
         if (QFile::exists(candidatePath)) {
             observedFilePath = candidatePath;
-            qDebug() << "DataProcessor::readSensWorkObservedData - Found observed data at:" << observedFilePath;
         } else {
             // Try case-insensitive search
             QStringList filters;
@@ -2077,7 +2001,6 @@ bool DataProcessor::readSensWorkObservedData(const QString &sensWorkFilePath, Da
             QStringList matches = dir.entryList(filters, QDir::Files);
             if (!matches.isEmpty()) {
                 observedFilePath = dir.absoluteFilePath(matches.first());
-                qDebug() << "DataProcessor::readSensWorkObservedData - Found observed data (case-insensitive):" << observedFilePath;
             }
         }
     }
@@ -2090,7 +2013,6 @@ bool DataProcessor::readSensWorkObservedData(const QString &sensWorkFilePath, Da
     // Read the observed data file
     bool success = readTFile(observedFilePath, observedData);
     if (success) {
-        qDebug() << "DataProcessor::readSensWorkObservedData - Successfully loaded observed data:" << observedData.rowCount << "rows";
         
         // Add CROP column to observed data if it doesn't exist
         if (!observedData.columnNames.contains("CROP")) {
@@ -2099,7 +2021,6 @@ bool DataProcessor::readSensWorkObservedData(const QString &sensWorkFilePath, Da
                 cropCol.data.append(cropCode);
             }
             observedData.addColumn(cropCol);
-            qDebug() << "DataProcessor::readSensWorkObservedData - Added CROP column to observed data";
         }
         
         // Add EXPERIMENT column to observed data if it doesn't exist
@@ -2109,7 +2030,6 @@ bool DataProcessor::readSensWorkObservedData(const QString &sensWorkFilePath, Da
                 expCol.data.append(experimentCode);
             }
             observedData.addColumn(expCol);
-            qDebug() << "DataProcessor::readSensWorkObservedData - Added EXPERIMENT column to observed data";
         }
     } else {
         qWarning() << "DataProcessor::readSensWorkObservedData - Failed to read observed data file:" << observedFilePath;
@@ -2400,7 +2320,6 @@ void DataProcessor::processDateColumn(DataColumn &column)
 
 bool DataProcessor::readTFile(const QString &filePath, DataTable &table)
 {
-    qDebug() << "DataProcessor: Reading T file:" << filePath;
     QFile file(filePath);
     if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
         emit errorOccurred(QString("Cannot open T file: %1").arg(filePath));
@@ -2529,10 +2448,8 @@ bool DataProcessor::readTFile(const QString &filePath, DataTable &table)
                     tnameCol.data.append(trtNames.value(trt, trt));
                 }
                 table.addColumn(tnameCol);
-                qDebug() << "DataProcessor: readTFile - Added TNAME column from" << xFilePath;
             }
         } else {
-            qDebug() << "DataProcessor: readTFile - No matching X file found at" << xFilePath;
         }
     }
 
@@ -2569,7 +2486,6 @@ bool DataProcessor::readTFile(const QString &filePath, DataTable &table)
     standardizeDataTypes(table);
 
     table.isObservedOnly = true;  // T files are observed data — plot as scatter, not lines
-    qDebug() << "DataProcessor: readTFile - Final table columns:" << table.columnNames << ", rows:" << table.rowCount;
     return true;
 }
 
@@ -2642,21 +2558,17 @@ DataTable DataProcessor::filterData(const DataTable &data, const QString &column
 
 void DataProcessor::addDasDapColumns(DataTable &observedData, const DataTable &simulatedData)
 {
-    qDebug() << "DataProcessor: Adding DAS/DAP columns to observed data";
     
     // Check if required columns exist
     if (!observedData.columnNames.contains("DATE") || !simulatedData.columnNames.contains("DATE")) {
-        qDebug() << "DataProcessor: Missing DATE column in observed or simulated data";
         return;
     }
     
     if (!observedData.columnNames.contains("TRT") || !simulatedData.columnNames.contains("TRT")) {
-        qDebug() << "DataProcessor: Missing TRT column in observed or simulated data";
         return;
     }
     
     if (!simulatedData.columnNames.contains("DAS") || !simulatedData.columnNames.contains("DAP")) {
-        qDebug() << "DataProcessor: Missing DAS or DAP column in simulated data";
         return;
     }
     
@@ -2674,7 +2586,6 @@ void DataProcessor::addDasDapColumns(DataTable &observedData, const DataTable &s
     const DataColumn* simDapCol = simulatedData.getColumn("DAP");
     
     if (!obsDateCol || !obsTrtCol || !simDateCol || !simTrtCol || !simDasCol || !simDapCol) {
-        qDebug() << "DataProcessor: Failed to get required columns";
         return;
     }
     
@@ -2690,7 +2601,6 @@ void DataProcessor::addDasDapColumns(DataTable &observedData, const DataTable &s
         }
         
         if (!obsDate.isValid()) {
-            qDebug() << "DataProcessor: Invalid date format in observed data:" << obsDateStr;
             dasColumn.data.append(QVariant());
             dapColumn.data.append(QVariant());
             continue;
@@ -2789,23 +2699,18 @@ void DataProcessor::addDasDapColumns(DataTable &observedData, const DataTable &s
     observedData.addColumn(dasColumn);
     observedData.addColumn(dapColumn);
     
-    qDebug() << "DataProcessor: Successfully added DAS/DAP columns to observed data";
 }
 
 QString DataProcessor::findOutfileCde()
 {
     QString dssatBase = getDSSATBase();
-    qDebug() << "DataProcessor::findOutfileCde() - DSSAT Base:" << dssatBase;
     
     if (!dssatBase.isEmpty()) {
         QString outfilePath = dssatBase + QDir::separator() + "OUTPUT.CDE";
-        qDebug() << "DataProcessor::findOutfileCde() - Looking for:" << outfilePath;
         
         if (QFile::exists(outfilePath)) {
-            qDebug() << "DataProcessor::findOutfileCde() - Found OUTPUT.CDE at:" << outfilePath;
             return outfilePath;
         } else {
-            qDebug() << "DataProcessor::findOutfileCde() - OUTPUT.CDE not found at:" << outfilePath;
         }
     }
     
@@ -2823,14 +2728,12 @@ QMap<QString, QString> DataProcessor::getOutfileDescriptions()
     
     QString outfilePath = findOutfileCde();
     if (outfilePath.isEmpty()) {
-        qDebug() << "DataProcessor::getOutfileDescriptions() - OUTPUT.CDE not found";
         loaded = true;
         return outfileDescriptions;
     }
     
     QFile file(outfilePath);
     if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
-        qDebug() << "DataProcessor::getOutfileDescriptions() - Cannot open OUTPUT.CDE:" << outfilePath;
         loaded = true;
         return outfileDescriptions;
     }
@@ -2881,7 +2784,6 @@ QMap<QString, QString> DataProcessor::getOutfileDescriptions()
                 
                 if (!baseFilename.isEmpty() && !description.isEmpty()) {
                     outfileDescriptions[baseFilename] = description;
-                    qDebug() << "DataProcessor::getOutfileDescriptions() - Loaded:" << baseFilename << "=" << description;
                 }
             }
         }
@@ -2890,7 +2792,6 @@ QMap<QString, QString> DataProcessor::getOutfileDescriptions()
     file.close();
     loaded = true;
     
-    qDebug() << "DataProcessor::getOutfileDescriptions() - Loaded" << outfileDescriptions.size() << "descriptions from" << outfilePath;
     return outfileDescriptions;
 }
 

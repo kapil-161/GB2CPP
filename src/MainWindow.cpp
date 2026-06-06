@@ -447,13 +447,6 @@ void MainWindow::setupControlPanel()
     // Don't add stretch here - it pushes buttons out of view when window is small
     // The scroll area will handle scrolling if needed
     
-    qDebug() << "Widget creation status:";
-    qDebug() << "m_fileComboBox:" << (m_fileComboBox ? "OK" : "NULL");
-    qDebug() << "m_xVariableComboBox:" << (m_xVariableComboBox ? "OK" : "NULL");
-    qDebug() << "m_yVariableComboBox:" << (m_yVariableComboBox ? "OK" : "NULL");
-    qDebug() << "m_updatePlotButton:" << (m_updatePlotButton ? "OK" : "NULL");
-    qDebug() << "m_fileListWidget height - min:" << m_fileListWidget->minimumHeight() << "max:" << m_fileListWidget->maximumHeight();
-    qDebug() << "m_yVariableComboBox height - min:" << m_yVariableComboBox->minimumHeight() << "max:" << m_yVariableComboBox->maximumHeight();
     
     m_mainSplitter->addWidget(controlPanel);
 }
@@ -468,11 +461,8 @@ void MainWindow::setupDataPanel()
     QVBoxLayout *timeSeriesLayout = new QVBoxLayout(timeSeriesWidget);
     
     // Use PlotWidget for time series (matching Python PyQtGraph usage)
-    qDebug() << "MainWindow: About to create PlotWidget";
     m_plotWidget = new PlotWidget();
-    qDebug() << "MainWindow: PlotWidget created successfully";
     timeSeriesLayout->addWidget(m_plotWidget);
-    qDebug() << "MainWindow: PlotWidget added to layout";
     
     m_tabWidget->addTab(timeSeriesWidget, "Time Series");
     
@@ -553,7 +543,9 @@ void MainWindow::setupDataPanel()
     // Place scaling label in the right half of the status bar
     if (m_plotWidget)
         m_statusWidget->setRightWidget(m_plotWidget->scalingLabel());
-    dataPanelLayout->addWidget(m_statusWidget, 0);
+    // Embed inside PlotWidget's left layout so the status bar ends at the plot edge, not under the legend
+    if (m_plotWidget)
+        m_plotWidget->setBottomStatusWidget(m_statusWidget);
 
     m_mainSplitter->addWidget(dataPanel);
     
@@ -660,14 +652,12 @@ void MainWindow::connectSignals()
 
 void MainWindow::onOpenFile()
 {
-    qDebug() << "MainWindow::onOpenFile() - Starting file dialog...";
     
     // Observed data must come from the same DSSATPRO-configured directory as simulated data
     QString cropDirectory;
     if (m_dataProcessor && m_fileComboBox && m_fileComboBox->currentText() != "No DSSAT folders found") {
         QString currentFolder = m_fileComboBox->currentText();
         cropDirectory = m_dataProcessor->getActualFolderPath(currentFolder);
-        qDebug() << "MainWindow::onOpenFile() - Using DSSATPRO crop directory:" << cropDirectory;
     }
     
     // If no valid DSSATPRO crop directory, show error
@@ -695,14 +685,10 @@ void MainWindow::onOpenFile()
         QString("Observed Data Files (*%1*);;DSSAT Files (*.OUT *.DAT);;All Files (*)").arg(observedPattern)
     );
     
-    qDebug() << "MainWindow::onOpenFile() - Selected file:" << fileName;
     
     if (!fileName.isEmpty()) {
-        qDebug() << "MainWindow::onOpenFile() - About to call loadFile...";
         loadFile(fileName);
-        qDebug() << "MainWindow::onOpenFile() - loadFile returned";
     } else {
-        qDebug() << "MainWindow::onOpenFile() - No file selected";
     }
 }
 
@@ -886,7 +872,6 @@ void MainWindow::onExportPlot()
     if (fi.suffix().isEmpty())
         fileName += ext;
 
-    qDebug() << "ExportPlot: fileName=" << fileName << "format=" << format << "selectedFilter=" << selectedFilter;
 
     bool isScatterTab = (m_tabWidget && m_tabWidget->currentIndex() == 2);
     PlotWidget *activeWidget = (isScatterTab && m_scatterPlotWidget) ? m_scatterPlotWidget : m_plotWidget;
@@ -1217,7 +1202,6 @@ void MainWindow::onXVariableChanged()
             m_scatterPlotWidget->clear();
         }
         clearMetrics();
-        qDebug() << "MainWindow: Cleared plots and metrics due to X variable unselected";
         return;
     }
 
@@ -1248,7 +1232,6 @@ void MainWindow::onYVariableChanged()
             m_scatterPlotWidget->clear();
         }
         clearMetrics();
-        qDebug() << "MainWindow: Cleared plots and metrics due to no Y variables selected";
         return;
     }
 
@@ -1289,12 +1272,10 @@ void MainWindow::onPlotTypeChanged()
 
 void MainWindow::onUpdatePlot()
 {
-    qDebug() << "MainWindow::onUpdatePlot() - Refresh button clicked!";
     
     // Check which tab we're on and perform appropriate action
     if (m_tabWidget && m_tabWidget->currentIndex() == 0) {
         // Time Series tab - refresh time series plot
-        qDebug() << "MainWindow::onUpdatePlot() - Refreshing plot for Time Series tab";
         updatePlot();
     } else if (m_tabWidget && m_tabWidget->currentIndex() == 1) {
         // Data View tab - refresh data table based on selected file type
@@ -1302,7 +1283,6 @@ void MainWindow::onUpdatePlot()
         m_dataNeedsRefresh = false;
     } else if (m_tabWidget && m_tabWidget->currentIndex() == 2) {
         // Scatter Plot tab - refresh scatter plot
-        qDebug() << "MainWindow::onUpdatePlot() - Refreshing scatter plot";
         updateScatterPlot();
     }
     
@@ -1474,7 +1454,6 @@ void MainWindow::onProgressUpdate(int percentage)
 
 void MainWindow::loadFile(const QString &filePath)
 {
-    qDebug() << "MainWindow::loadFile() called with:" << filePath;
     resetInterface(); // Clear existing data before loading new file
     
     try {
@@ -1486,44 +1465,35 @@ void MainWindow::loadFile(const QString &filePath)
         // Check if file exists
         QFileInfo fileInfo(filePath);
         if (!fileInfo.exists()) {
-            qDebug() << "MainWindow: File does not exist:" << filePath;
             m_statusWidget->showError("File does not exist: " + filePath);
             m_progressBar->hide();
             return;
         }
         
         if (!fileInfo.isReadable()) {
-            qDebug() << "MainWindow: File is not readable:" << filePath;
             m_statusWidget->showError("File is not readable: " + filePath);
             m_progressBar->hide();
             return;
         }
         
-        qDebug() << "MainWindow: File size:" << fileInfo.size() << "bytes";
-        qDebug() << "MainWindow: Calling readFile on DataProcessor...";
         
         // Load file in data processor with error handling
         bool readResult = m_dataProcessor->readFile(filePath, m_currentData);
-        qDebug() << "MainWindow: readFile result:" << readResult;
         
         if (readResult) {
-            qDebug() << "MainWindow: File loaded successfully, rows:" << m_currentData.rowCount;
             // File loaded successfully - manually call onDataProcessed since signal might not be emitted
             onDataProcessed(QString("Successfully loaded observed data: %1 rows, %2 columns")
                           .arg(m_currentData.rowCount)
                           .arg(m_currentData.columns.size()));
         } else {
-            qDebug() << "MainWindow: Failed to read file";
             m_statusWidget->showError("Failed to read file: " + filePath);
             m_progressBar->hide();
         }
         
     } catch (const std::exception& e) {
-        qDebug() << "MainWindow: Exception in loadFile:" << e.what();
         m_statusWidget->showError("Error loading file: " + QString(e.what()));
         m_progressBar->hide();
     } catch (...) {
-        qDebug() << "MainWindow: Unknown exception in loadFile";
         m_statusWidget->showError("Unknown error loading file");
         m_progressBar->hide();
     }
@@ -1564,14 +1534,12 @@ void MainWindow::updateVariableComboBoxes()
     if (isScatterTab) {
         isEvaluateFile = (m_evaluateData.rowCount > 0);
         if (!isEvaluateFile) {
-            qDebug() << "MainWindow::updateVariableComboBoxes() - Scatter tab but no EVALUATE data";
             unblockAll();
             return;
         }
     } else {
         isEvaluateFile = false;
         if (m_currentData.rowCount == 0) {
-            qDebug() << "MainWindow::updateVariableComboBoxes() - Time series tab but no regular data";
             unblockAll();
             return;
         }
@@ -1637,7 +1605,6 @@ void MainWindow::updateVariableComboBoxes()
             m_yVariableComboBox->addItem(item);
         }
 
-        qDebug() << "MainWindow::updateVariableComboBoxes() - Scatter tab: populated" << baseNames.size() << "base variables";
         unblockAll();
         return;
     }
@@ -1679,10 +1646,8 @@ void MainWindow::updateVariableComboBoxes()
             
             if (hasValidObsData) {
                 commonVariables.append(columnName);
-                qDebug() << "MainWindow: Variable" << columnName << "has both simulated and observed data";
             } else {
                 simOnlyVariables.append(columnName);
-                qDebug() << "MainWindow: Variable" << columnName << "has column in observed data but no valid values";
             }
         } else {
             simOnlyVariables.append(columnName);
@@ -1905,7 +1870,6 @@ void MainWindow::updateTreatmentComboBox()
 
 void MainWindow::updateScatterPlot()
 {
-    qDebug() << "MainWindow::updateScatterPlot() - ENTRY POINT";
 
     if (m_evaluateData.rowCount == 0) {
         m_statusWidget->showWarning("No EVALUATE.OUT data available. Please select an EVALUATE file.");
@@ -1927,11 +1891,9 @@ void MainWindow::updateScatterPlot()
     // Cap at 9
     if (selectedVars.size() > 9) selectedVars = selectedVars.mid(0, 9);
 
-    qDebug() << "MainWindow::updateScatterPlot() - Variables:" << selectedVars;
 
     if (m_scatterPlotWidget) {
         m_scatterPlotWidget->plotScatter(m_evaluateData, selectedVars);
-        qDebug() << "MainWindow::updateScatterPlot() - Scatter plot updated";
     } else {
         qWarning() << "MainWindow::updateScatterPlot() - Scatter plot widget is null!";
     }
@@ -1939,11 +1901,8 @@ void MainWindow::updateScatterPlot()
 
 void MainWindow::updatePlot()
 {
-    qDebug() << "MainWindow::updatePlot() - ENTRY POINT";
-    qDebug() << "MainWindow::updatePlot() - Plot widget exists:" << (m_plotWidget != nullptr);
     
     if (m_currentData.rowCount == 0) {
-        qDebug() << "MainWindow::updatePlot() - No data available (simulated or observed). Aborting plot update.";
         return;
     }
     
@@ -1967,11 +1926,8 @@ void MainWindow::updatePlot()
         }
     }
     
-    qDebug() << "MainWindow::updatePlot() - X variable:" << xVar;
-    qDebug() << "MainWindow::updatePlot() - Y variables:" << yVars << "Count:" << yVars.size();
     
     if (xVar.isEmpty() || yVars.isEmpty()) {
-        qDebug() << "MainWindow::updatePlot() - X or Y variables not selected. Aborting plot update.";
         
         // Clear plot and axis labels when variables are not selected
         if (m_plotWidget) {
@@ -2010,7 +1966,6 @@ void MainWindow::updatePlot()
 
         // Clear data table if no files are selected
         if (selectedFiles.isEmpty()) {
-            qDebug() << "MainWindow::updatePlot() - No files selected, clearing data table";
             if (m_dataTableWidget) {
                 m_dataTableWidget->clear();
             }
@@ -2018,13 +1973,6 @@ void MainWindow::updatePlot()
         }
 
         // Debug observed data before plotting
-        qDebug() << "MainWindow::updatePlot() - Observed data status:";
-        qDebug() << "  Observed data rows:" << m_currentObsData.rowCount;
-        qDebug() << "  Observed data columns:" << m_currentObsData.columnNames;
-        qDebug() << "  X variable:" << xVar;
-        qDebug() << "  Y variables:" << yVars;
-        qDebug() << "  Treatments filter:" << treatments;
-        qDebug() << "  Selected experiment:" << m_selectedExperiment;
 
         // Call the enhanced plotTimeSeries method
         m_plotWidget->plotTimeSeries(
@@ -2040,9 +1988,7 @@ void MainWindow::updatePlot()
             yVarFileFilter
         );
         
-        qDebug() << "MainWindow::updatePlot() - plotTimeSeries call completed";
     } else {
-        qDebug() << "MainWindow::updatePlot() - ERROR: m_plotWidget is null!";
     }
 }
 
@@ -2060,7 +2006,6 @@ void MainWindow::checkAndAutoSwitchToScatterPlot(bool autoPlot)
     if (!isEvaluateFile || m_evaluateData.rowCount == 0)
         return;
 
-    qDebug() << "MainWindow: Auto-switching to scatter plot tab for EVALUATE.OUT file";
     m_tabWidget->setCurrentIndex(2);
 
     if (autoPlot) {
@@ -2260,23 +2205,19 @@ void MainWindow::addDroppedOutFile(const QString &filePath)
 void MainWindow::populateFiles(const QString &folderName)
 {
     if (!m_fileListWidget || !m_dataProcessor || folderName.isEmpty()) {
-        qDebug() << "populateFiles: Missing widgets, data processor, or empty folder name:" << folderName;
         return;
     }
     
-    qDebug() << "populateFiles: Looking for files in folder:" << folderName;
     
     m_fileListWidget->clear();
     m_availableFiles.clear();
     
     QStringList outFiles = m_dataProcessor->prepareOutFiles(folderName);
     
-    qDebug() << "populateFiles: Found" << outFiles.size() << "files:" << outFiles;
     
     if (outFiles.isEmpty()) {
         m_fileListWidget->addItem("No .OUT files found");
         m_statusWidget->showInfo(QString("No output files found in folder: %1").arg(folderName));
-        qDebug() << "populateFiles: No files found in folder:" << folderName;
         return;
     }
     
@@ -2284,7 +2225,6 @@ void MainWindow::populateFiles(const QString &folderName)
     
     // Get outfile descriptions from OUTFILE.CDE
     QMap<QString, QString> outfileDescriptions = DataProcessor::getOutfileDescriptions();
-    qDebug() << "populateFiles: Loaded" << outfileDescriptions.size() << "outfile descriptions";
     
     for (const QString &file : outFiles) {
         QListWidgetItem *item = new QListWidgetItem(file);
@@ -2293,14 +2233,11 @@ void MainWindow::populateFiles(const QString &folderName)
         QString baseFilename = QFileInfo(file).baseName();
         QString description = outfileDescriptions.value(baseFilename, QString());
         
-        qDebug() << "populateFiles: File" << file << "BaseFilename:" << baseFilename << "Description:" << description;
         
         if (!description.isEmpty()) {
             item->setToolTip(QString("%1: %2").arg(file).arg(description));
-            qDebug() << "populateFiles: Set tooltip to:" << item->toolTip();
         } else {
             item->setToolTip(QString("DSSAT output file: %1").arg(file));
-            qDebug() << "populateFiles: Using default tooltip for:" << file;
         }
         
         m_fileListWidget->addItem(item);
@@ -2367,17 +2304,13 @@ void MainWindow::onRefreshFiles()
 
 void MainWindow::onFileSelectionChanged()
 {
-    qDebug() << "MainWindow::onFileSelectionChanged() - File selection changed!";
     if (!m_fileListWidget) {
-        qDebug() << "MainWindow::onFileSelectionChanged() - No file list widget!";
         return;
     }
 
     QList<QListWidgetItem*> selectedItems = m_fileListWidget->selectedItems();
-    qDebug() << "MainWindow::onFileSelectionChanged() - Selected items count:" << selectedItems.size();
 
     if (selectedItems.isEmpty()) {
-        qDebug() << "MainWindow::onFileSelectionChanged() - No items selected, clearing data and variables";
         m_updatePlotButton->setEnabled(false);
 
         // Clear data when no files are selected
@@ -2413,12 +2346,10 @@ void MainWindow::onFileSelectionChanged()
     }
 
     // Enable the update button when files are selected
-    qDebug() << "MainWindow::onFileSelectionChanged() - Enabling update button";
     m_updatePlotButton->setEnabled(true);
 
     // Load data from all selected files to get comprehensive Y variable list
     if (!selectedItems.isEmpty()) {
-        qDebug() << "MainWindow::onFileSelectionChanged() - Processing" << selectedItems.size() << "selected files...";
         
         // Clear previous data - separate storage for different file types
         m_currentData.clear();  // For time series (regular .OUT files)
@@ -2436,13 +2367,9 @@ void MainWindow::onFileSelectionChanged()
         
         for (QListWidgetItem* selectedItem : selectedItems) {
             QString selectedFile = selectedItem->text();
-            qDebug() << "MainWindow::onFileSelectionChanged() - Processing file:" << selectedFile;
         
             if (selectedFile != "No .OUT files found") {
-                qDebug() << "MainWindow::onFileSelectionChanged() - Getting DSSAT base path...";
                 QString dssatBase = m_dataProcessor->getDSSATBase();
-                qDebug() << "MainWindow::onFileSelectionChanged() - DSSAT base:" << dssatBase;
-                qDebug() << "MainWindow::onFileSelectionChanged() - Selected folder:" << m_selectedFolder;
                 
                 // Dropped external files store their full path in UserRole
                 QString droppedPath = selectedItem->data(Qt::UserRole).toString();
@@ -2455,7 +2382,6 @@ void MainWindow::onFileSelectionChanged()
                 } else {
                     filePath = QDir(dssatBase).absoluteFilePath(m_selectedFolder + QDir::separator() + selectedFile);
                 }
-                qDebug() << "MainWindow: Selected simulated file path:" << filePath;
                 
                 // Check if THIS specific file is EVALUATE.OUT or evaluate.csv
                 QString upperFileName = selectedFile.toUpper();
@@ -2468,7 +2394,6 @@ void MainWindow::onFileSelectionChanged()
                         firstValidRegularFile = filePath;
                     }
                 }
-                qDebug() << "MainWindow::onFileSelectionChanged() - File" << selectedFile << "is EVALUATE:" << isEvaluateFile;
 
                 // Load data from current file using appropriate reader
                 DataTable fileData;
@@ -2481,7 +2406,6 @@ void MainWindow::onFileSelectionChanged()
                 }
                 
                 if (readSuccess) {
-                    qDebug() << "MainWindow::onFileSelectionChanged() - Successfully loaded file:" << selectedFile;
                     
                     // Keep track of first valid file for later processing
                     if (firstValidFile.isEmpty()) {
@@ -2536,25 +2460,19 @@ void MainWindow::onFileSelectionChanged()
                         }
                     }
                 } else {
-                    qDebug() << "MainWindow::onFileSelectionChanged() - Failed to load file:" << selectedFile;
                 }
             }
         }
         
         // Process regular .OUT files (for time series plots)
         if (m_currentData.rowCount > 0) {
-            qDebug() << "MainWindow::onFileSelectionChanged() - Merged data from" << selectedItems.size() << "files, total rows:" << m_currentData.rowCount;
-            qDebug() << "MainWindow: Extracted unique Experiment Codes from all files:" << QList<QString>(uniqueExperimentCodes.values());
-            qDebug() << "MainWindow: Extracted Treatment Names:" << extractedTreatmentNames;
             m_treatmentNames = extractedTreatmentNames; // Assign to member variable
 
             // Set m_selectedExperiment to the first available experiment code
             if (!uniqueExperimentCodes.isEmpty()) {
                 m_selectedExperiment = uniqueExperimentCodes.values().first();
-                qDebug() << "MainWindow: Setting m_selectedExperiment to:" << m_selectedExperiment;
             } else {
                 m_selectedExperiment = ""; // Or a default value if no experiments are found
-                qDebug() << "MainWindow: No experiment codes found, m_selectedExperiment set to empty.";
             }
 
             // Determine crop code
@@ -2562,13 +2480,10 @@ void MainWindow::onFileSelectionChanged()
             
             // Special handling for SensWork - extract crop code from the file itself
             if (m_selectedFolder.compare("SensWork", Qt::CaseInsensitive) == 0 && !firstValidFile.isEmpty()) {
-                qDebug() << "MainWindow: SensWork detected - extracting crop code from file";
                 QPair<QString, QString> sensWorkCodes = m_dataProcessor->extractSensWorkCodes(firstValidFile);
                 if (!sensWorkCodes.second.isEmpty()) {
                     cropCode = sensWorkCodes.second.toUpper();
-                    qDebug() << "MainWindow: SensWork crop code extracted:" << cropCode;
                 } else {
-                    qDebug() << "MainWindow: Could not extract crop code from SensWork file, using default";
                 }
             } else {
                 // Regular crop folder - try to get crop code from the selected folder name by matching with crop details
@@ -2604,7 +2519,6 @@ void MainWindow::onFileSelectionChanged()
                 if (cropCode == "XX" && !partialCode.isEmpty())
                     cropCode = partialCode;
             }
-            qDebug() << "MainWindow: Determined Crop Code:" << cropCode;
 
             // Add CROP column to simulated data if it doesn't exist
             if (!m_currentData.columnNames.contains("CROP")) {
@@ -2613,58 +2527,42 @@ void MainWindow::onFileSelectionChanged()
                     cropCol.data.append(cropCode);
                 }
                 m_currentData.addColumn(cropCol);
-                qDebug() << "MainWindow: Added CROP column with code:" << cropCode << "to simulated data";
             }
 
             // Attempt to load and merge observed data for each unique experiment code (only for regular files)
             // Special handling for SensWork files
             if (m_selectedFolder.compare("SensWork", Qt::CaseInsensitive) == 0) {
-                qDebug() << "MainWindow: Detected SensWork folder - using dynamic observed data lookup";
                 
                 // For SensWork, use the dynamic observed data lookup
                 if (!firstValidRegularFile.isEmpty()) {
                     DataTable sensWorkObsData;
                     if (m_dataProcessor->readSensWorkObservedData(firstValidRegularFile, sensWorkObsData)) {
                         m_currentObsData.merge(sensWorkObsData);
-                        qDebug() << "MainWindow: Successfully loaded SensWork observed data:" << sensWorkObsData.rowCount << "rows";
                     } else {
-                        qDebug() << "MainWindow: No observed data found for SensWork file";
                     }
                 }
             } else {
                 // Regular crop folder - use standard observed data lookup
-                qDebug() << "MainWindow: Attempting to load observed data for crop code:" << cropCode;
-                qDebug() << "MainWindow: Unique experiment codes:" << uniqueExperimentCodes;
-                qDebug() << "MainWindow: First valid regular file:" << firstValidRegularFile;
                 
                 for (const QString& expCode : uniqueExperimentCodes) {
                     DataTable tempObsData;
-                    qDebug() << "MainWindow: Trying to read observed data for experiment:" << expCode;
                     // Use the first valid regular file path for observed data lookup
                     if (!firstValidRegularFile.isEmpty() && m_dataProcessor->readObservedData(firstValidRegularFile, expCode, cropCode, tempObsData)) {
-                        qDebug() << "MainWindow: Successfully loaded observed data for" << expCode << "- Rows:" << tempObsData.rowCount << "Columns:" << tempObsData.columnNames;
                         m_currentObsData.merge(tempObsData);
-                        qDebug() << "MainWindow: Total observed data after merge - Rows:" << m_currentObsData.rowCount << "Columns:" << m_currentObsData.columnNames;
                     } else {
-                        qDebug() << "MainWindow: Failed to load observed data for experiment:" << expCode;
                     }
                 }
             }
             
             // Add DAS/DAP columns to observed data if it exists
             if (m_currentObsData.rowCount > 0) {
-                qDebug() << "MainWindow: Adding DAS/DAP columns to observed data. Current rows:" << m_currentObsData.rowCount;
-                qDebug() << "MainWindow: Observed data columns:" << m_currentObsData.columnNames;
                 m_dataProcessor->addDasDapColumns(m_currentObsData, m_currentData);
-                qDebug() << "MainWindow: After adding DAS/DAP - Rows:" << m_currentObsData.rowCount << "Columns:" << m_currentObsData.columnNames;
             } else {
-                qDebug() << "MainWindow: No observed data loaded (rowCount = 0)";
             }
         }
         
         // Process EVALUATE.OUT files (for scatter plots)
         if (m_evaluateData.rowCount > 0) {
-            qDebug() << "MainWindow::onFileSelectionChanged() - Loaded EVALUATE.OUT data, total rows:" << m_evaluateData.rowCount;
         }
         
         // Update variable combo boxes based on current tab
@@ -2675,10 +2573,6 @@ void MainWindow::onFileSelectionChanged()
 
         // Mark data as needing refresh for the data table, but don't set it yet
         markDataNeedsRefresh();
-        qDebug() << "MainWindow::onFileSelectionChanged() - Data loaded from" << selectedItems.size() << "files";
-        qDebug() << "  Regular .OUT files:" << (hasRegularFile ? "Yes" : "No") << "rows:" << m_currentData.rowCount;
-        qDebug() << "  EVALUATE.OUT files:" << (hasEvaluateFile ? "Yes" : "No") << "rows:" << m_evaluateData.rowCount;
-        qDebug() << "MainWindow::onFileSelectionChanged() - Function completed successfully; table data not yet set.";
         
         // If we're on Data View tab, update file type selector and refresh data
         if (m_tabWidget && m_tabWidget->currentIndex() == 1) {
@@ -2708,7 +2602,6 @@ void MainWindow::onFileSelectionChanged()
         if (isCommandLineMode && hasEvaluateFile && !hasRegularFile) {
             if (m_tabWidget) {
                 m_tabWidget->setCurrentIndex(2); // Switch to scatter plot tab
-                qDebug() << "MainWindow::onFileSelectionChanged() - Command line mode: Auto-switched to scatter plot tab for EVALUATE.OUT files";
                 // Update variables for scatter plot tab after switching
                 updateVariableComboBoxes();
             }
@@ -2737,7 +2630,6 @@ void MainWindow::onFileSelectionChanged()
             }
         }
     }
-    qDebug() << "MainWindow::onFileSelectionChanged() - Function finished";
 }
 
 // Additional methods from Python version
@@ -2764,7 +2656,6 @@ void MainWindow::extractExperimentFromOutputFile()
             // Try to extract experiment and treatment info from file
             // This would need access to DataProcessor methods for reading files
             // For now, we'll store the basic info
-            qDebug() << "Processing file for experiment extraction:" << filePath;
         }
         
         // If we found experiment codes, select the first one
@@ -2779,12 +2670,10 @@ void MainWindow::extractExperimentFromOutputFile()
 
 void MainWindow::selectExperimentByCode(const QString &expCode, const QStringList &treatmentNumbers)
 {
-    qDebug() << "Setting experiment code:" << expCode;
     
     m_selectedExperiment = expCode;
     
     if (!treatmentNumbers.isEmpty()) {
-        qDebug() << "Setting treatments:" << treatmentNumbers;
         m_selectedTreatments = treatmentNumbers;
     }
 }
@@ -2792,7 +2681,6 @@ void MainWindow::selectExperimentByCode(const QString &expCode, const QStringLis
 void MainWindow::selectTreatmentsByNumbers(const QStringList &treatmentNumbers)
 {
     m_selectedTreatments = treatmentNumbers;
-    qDebug() << "Selected treatments:" << m_selectedTreatments;
 }
 
 
@@ -2906,7 +2794,6 @@ void MainWindow::clearMetrics()
 
 void MainWindow::onPlotWidgetXVariableChanged(const QString &xVariable)
 {
-    qDebug() << "MainWindow: PlotWidget X variable changed to:" << xVariable;
     
     // Update the X variable combo box to reflect the change
     if (m_xVariableComboBox) {
@@ -2918,25 +2805,20 @@ void MainWindow::onPlotWidgetXVariableChanged(const QString &xVariable)
             m_xVariableComboBox->setCurrentIndex(index);
             m_xVariableComboBox->blockSignals(false);
             
-            qDebug() << "MainWindow: Updated X variable combo box to:" << xVariable;
             
             // Refresh the plot with the new X variable
-            qDebug() << "MainWindow: Refreshing plot with new X variable:" << xVariable;
             updatePlot();
         } else {
-            qDebug() << "MainWindow: X variable" << xVariable << "not found in combo box";
         }
     }
 }
 
 void MainWindow::onUnselectAllFiles()
 {
-    qDebug() << "MainWindow: Unselect All Files button clicked";
     
     if (m_fileListWidget) {
         // Clear all selections in the file list
         m_fileListWidget->clearSelection();
-        qDebug() << "MainWindow: Cleared all file selections";
         
         // Trigger the selection changed event to update the interface
         onFileSelectionChanged();
@@ -2945,16 +2827,13 @@ void MainWindow::onUnselectAllFiles()
 
 void MainWindow::onUnselectAllYVars()
 {
-    qDebug() << "MainWindow: Unselect All Y Variables button clicked";
     
     if (m_yVariableComboBox) {
         // Clear all selections in the Y variable list
         m_yVariableComboBox->clearSelection();
-        qDebug() << "MainWindow: Cleared all Y variable selections";
         
         // Clear metrics data since no variables are selected
         clearMetrics();
-        qDebug() << "MainWindow: Cleared metrics data";
         
         // Trigger the selection changed event to update the plot
         onYVariableChanged();
@@ -2963,7 +2842,6 @@ void MainWindow::onUnselectAllYVars()
 
 void MainWindow::onShowMetrics()
 {
-    qDebug() << "MainWindow: Statistics button clicked";
     
     if (m_currentMetrics.isEmpty()) {
         showWarning("No metrics data available. Please ensure both simulated and observed data are loaded and plotted.");
@@ -2981,12 +2859,10 @@ void MainWindow::onShowMetrics()
 
 void MainWindow::updateTimeSeriesMetrics(const QVector<QMap<QString, QVariant>> &metrics)
 {
-    qDebug() << "MainWindow::updateTimeSeriesMetrics() - RECEIVED SIGNAL with" << metrics.size() << "metrics";
     
     // Convert QVector<QMap> to QVariantList for compatibility
     QVariantList metricList;
     for (const auto &metric : metrics) {
-        qDebug() << "MainWindow: Processing metric:" << metric;
         metricList.append(QVariant(metric));
     }
     
@@ -2999,12 +2875,10 @@ void MainWindow::updateTimeSeriesMetrics(const QVector<QMap<QString, QVariant>> 
     updateMetricsButtonState();
     updateStatisticsTab();
 
-    qDebug() << "MainWindow: updateTimeSeriesMetrics() completed";
 }
 
 void MainWindow::updateScatterMetrics(const QVector<QMap<QString, QVariant>> &metrics)
 {
-    qDebug() << "MainWindow::updateScatterMetrics() - RECEIVED SIGNAL with" << metrics.size() << "metrics";
 
     QVariantList metricList;
     for (const auto &metric : metrics) {
@@ -3092,7 +2966,6 @@ void MainWindow::loadExperiments()
     // For now, we'll trigger the existing folder selection logic
     if (!m_selectedFolder.isEmpty()) {
         populateFiles(m_selectedFolder);
-        qDebug() << "MainWindow: Loaded experiments for folder:" << m_selectedFolder;
     }
 }
 
@@ -3101,7 +2974,6 @@ void MainWindow::loadOutputFiles()
     // This method would refresh the output files list
     // Using existing method if available
     refreshOutputFiles();
-    qDebug() << "MainWindow: Loaded output files";
 }
 
 int MainWindow::selectOutputFiles(const QStringList &fileNames)
@@ -3166,7 +3038,6 @@ int MainWindow::selectOutputFiles(const QStringList &fileNames)
         onFileSelectionChanged();
     }
 
-    qDebug() << "MainWindow: Selected" << selectedCount << "of" << fileNames.size() << "files";
     return selectedCount;
 }
 
@@ -3175,7 +3046,6 @@ void MainWindow::loadVariables()
     // This method would load variables for the selected files
     // Using existing variable update logic
     updateVariableComboBoxes();
-    qDebug() << "MainWindow: Loaded variables";
 }
 
 void MainWindow::hideFileSelectionUI(bool hide)
@@ -3199,9 +3069,7 @@ void MainWindow::hideFileSelectionUI(bool hide)
     }
 
     if (hide) {
-        qDebug() << "MainWindow: Hidden crop and file selection UI for command line mode";
     } else {
-        qDebug() << "MainWindow: Showing crop and file selection UI";
     }
 }
 
@@ -3211,7 +3079,6 @@ void MainWindow::updateTimeSeriesPlot()
     // Using existing plot update logic
     if (m_plotWidget) {
         onUpdatePlot();
-        qDebug() << "MainWindow: Updated time series plot";
     } else {
         qWarning() << "MainWindow: Plot widget not initialized";
     }
@@ -3314,20 +3181,17 @@ void MainWindow::onDataViewFileTypeChanged()
     }
     
     QString selectedType = m_dataViewFileTypeComboBox->currentData().toString();
-    qDebug() << "MainWindow::onDataViewFileTypeChanged() - Selected file type:" << selectedType;
     
     if (selectedType == "evaluate") {
         m_dataTableWidget->setTabsVisible(true);
         if (m_evaluateData.rowCount > 0) {
             m_dataTableWidget->setData(m_evaluateData, DataTable());
-            qDebug() << "MainWindow::onDataViewFileTypeChanged() - Showing EVALUATE.OUT data";
         }
     } else if (selectedType == "plot") {
         m_dataTableWidget->setTabsVisible(false);
         QString csv = m_plotWidget ? m_plotWidget->getPlotCSV() : QString();
         if (!csv.isEmpty()) {
             m_dataTableWidget->setData(parseCsvToDataTable(csv), DataTable());
-            qDebug() << "MainWindow::onDataViewFileTypeChanged() - Showing current plot data";
         } else {
             m_dataTableWidget->clear();
         }
@@ -3335,7 +3199,6 @@ void MainWindow::onDataViewFileTypeChanged()
         m_dataTableWidget->setTabsVisible(true);
         if (m_currentData.rowCount > 0) {
             m_dataTableWidget->setData(m_currentData, m_currentObsData);
-            qDebug() << "MainWindow::onDataViewFileTypeChanged() - Showing regular .OUT data";
         }
     }
 }
