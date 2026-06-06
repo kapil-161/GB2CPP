@@ -227,13 +227,15 @@ if not defined NSIS_PATH (
     goto :skip_nsis
 )
 
-REM Extract version from version_generated.h and pass to NSIS
-set GB2_VERSION=unknown
-for /f "tokens=3" %%v in ('findstr /c:"#define GB2_VERSION " "%PROJECT_DIR%include\version_generated.h"') do set GB2_VERSION=%%v
-set GB2_VERSION=%GB2_VERSION:"=%
-if not defined QUIET_MODE echo Packaging version: %GB2_VERSION%
+REM Extract full version (includes git hash) from version_generated.h and pass to NSIS
+REM Using GB2_VERSION_FULL (e.g. 2.0.120-45f9a34) ensures each unique build gets a unique
+REM marker file, so the launcher always re-extracts the latest exe without manual temp clearing.
+set GB2_VERSION_FULL=unknown
+for /f "tokens=3" %%v in ('findstr /c:"#define GB2_VERSION_FULL " "%PROJECT_DIR%include\version_generated.h"') do set GB2_VERSION_FULL=%%v
+set GB2_VERSION_FULL=%GB2_VERSION_FULL:"=%
+if not defined QUIET_MODE echo Packaging version: %GB2_VERSION_FULL%
 
-"%NSIS_PATH%" /DVERSION=%GB2_VERSION% gb2_launcher.nsi
+"%NSIS_PATH%" /DVERSION=%GB2_VERSION_FULL% gb2_launcher.nsi
 if %ERRORLEVEL% neq 0 (
     echo ERROR: NSIS packaging failed!
     goto :skip_nsis
