@@ -13,7 +13,6 @@
 
 void PlotWidget::onSettingsButtonClicked()
 {
-    qDebug() << "PlotWidget: Settings button clicked";
 
     // Populate available experiments and treatments from current data
     QStringList availableExperiments;
@@ -144,7 +143,6 @@ void PlotWidget::onSettingsButtonClicked()
 
 void PlotWidget::applyPlotSettings(const PlotSettings &settings)
 {
-    qDebug() << "PlotWidget: Applying plot settings";
 
     // Apply grid settings
     setShowGrid(settings.showGrid);
@@ -447,7 +445,6 @@ void PlotWidget::applyPlotSettings(const PlotSettings &settings)
 
     QTimer::singleShot(50, this, &PlotWidget::enforceAxisColors);
 
-    qDebug() << "PlotWidget: Plot settings applied successfully";
 }
 
 void PlotWidget::saveSettings() const
@@ -605,7 +602,6 @@ void PlotWidget::loadSettings()
 
 void PlotWidget::setXAxisVariable(const QString &xVar)
 {
-    qDebug() << "PlotWidget: Setting X-axis variable to" << xVar;
 
     // Update button states
     m_dasButton->setChecked(xVar == "DAS");
@@ -620,9 +616,7 @@ void PlotWidget::setXAxisVariable(const QString &xVar)
 
     // Re-plot with new X variable if we have data
     if (m_simData.rowCount > 0 && !m_currentYVars.isEmpty()) {
-        qDebug() << "PlotWidget: Re-plotting with new X variable:" << xVar;
         updatePlotWithScaling();
     } else {
-        qDebug() << "PlotWidget: No data to re-plot with new X variable";
     }
 }

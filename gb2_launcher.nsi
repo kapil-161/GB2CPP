@@ -23,10 +23,10 @@ Section
     System::Call 'kernel32::GetCurrentDirectory(i 1024, t .r0)'
     System::Call 'kernel32::SetEnvironmentVariable(t "GB2_WORKING_DIR", t r0)'
 
-    ; Skip extraction only if this exact version marker exists
+    ; Skip extraction only if this exact version+hash marker exists
     IfFileExists "$TEMP\GB2_runtime\version_${VERSION}.marker" launch
 
-    ; Remove stale runtime (old version) before extracting new one
+    ; Remove stale runtime (any old version/hash) before extracting new one
     RMDir /r "$TEMP\GB2_runtime"
 
     SetOutPath "$TEMP\GB2_runtime"

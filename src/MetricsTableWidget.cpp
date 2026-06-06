@@ -613,6 +613,5 @@ void MetricsTableWidget::exportMetrics()
         QDesktopServices::openUrl(QUrl::fromLocalFile(fileName));
     }
     
-    qDebug() << "Metrics exported to:" << fileName;
 }
 

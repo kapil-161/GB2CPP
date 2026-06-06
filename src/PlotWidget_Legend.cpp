@@ -111,7 +111,6 @@ void PlotWidget::updateLegendAdvanced(const QMap<QString, QMap<QString, QVector<
         }
     }
 
-    qDebug() << "updateLegendAdvanced: Found" << variables.size() << "variables:" << variables;
 
     // If no data, show a placeholder message
     if (variables.isEmpty()) {
@@ -242,7 +241,6 @@ void PlotWidget::updateLegendAdvanced(const QMap<QString, QMap<QString, QVector<
 
             // Remove if no actual data points for this variable
             if (!hasSimData && !hasObsData) {
-                qDebug() << "updateLegendAdvanced: Removing treatment with no data points:" << it.key();
                 it = varTreatments.erase(it);
             } else {
                 ++it;

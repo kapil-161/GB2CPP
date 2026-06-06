@@ -41,7 +41,11 @@ void StatusWidget::setupUI()
 void StatusWidget::setRightWidget(QWidget *widget)
 {
     if (!widget) return;
-    widget->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
+    // Left label: left-aligned, capped at half width
+    m_messageLabel->setAlignment(Qt::AlignVCenter | Qt::AlignLeft);
+    m_messageLabel->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Preferred);
+    // Right widget: left-aligned within its half, capped at half width
+    widget->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Preferred);
     m_layout->addWidget(widget, 1);  // stretch=1, right half
 }
 

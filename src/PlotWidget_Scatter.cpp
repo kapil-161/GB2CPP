@@ -73,7 +73,6 @@ void PlotWidget::plotScatter(
     const DataTable &evaluateData,
     const QStringList &varNames)
 {
-    qDebug() << "PlotWidget::plotScatter() - ENTRY, vars:" << varNames;
     m_isScatterMode = true;
     m_simData = evaluateData;      // store so settings changes can trigger replot
     m_currentYVars = varNames;     // store so replot from settings dialog works
@@ -255,7 +254,6 @@ void PlotWidget::plotScatter(
         const DataColumn *simCol  = findCol(simVar);
         const DataColumn *measCol = findCol(measVar);
         if (!simCol || !measCol) {
-            qDebug() << "plotScatter: skipping" << baseVar << "- missing columns";
             continue;
         }
 
