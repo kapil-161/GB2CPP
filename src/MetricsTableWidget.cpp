@@ -45,6 +45,7 @@ MetricsTableModel::MetricsTableModel(const QVariantList& data, bool isScatterPlo
     m_keyMap["MSEu"]     = {"MSEu", "MSE unsystematic", "MSE_unsystematic", "MSE_u"};
     m_keyMap["MSEs/MSE"] = {"MSEs", "MSE systematic", "MSE_systematic", "MSE_s"};
     m_keyMap["MSEu/MSE"] = {"MSEu", "MSE unsystematic", "MSE_unsystematic", "MSE_u"};
+    m_keyMap["MSE"]      = {"MSE"};
 }
 
 int MetricsTableModel::rowCount(const QModelIndex& parent) const
@@ -117,11 +118,14 @@ QVariant MetricsTableModel::data(const QModelIndex& index, int role) const
                 } else if (columnName == "NRMSE") {
                     return QString::number(value.toDouble(), 'f', 2) + "%";
                 } else if (columnName == "BIAS") {
-                    // Dimensionless bias index (Eq. 7) – show 4 decimals
                     return QString::number(value.toDouble(), 'f', 4);
-                } else if (columnName == "MSEs" || columnName == "MSEu" ||
-                           columnName == "MSEs/MSE" || columnName == "MSEu/MSE") {
-                    return QString::number(value.toDouble(), 'f', 4);
+                } else if (columnName == "MSEs/MSE" || columnName == "MSEu/MSE") {
+                    // Show as fraction of total MSE
+                    double mses = getValueForColumn(rowData, "MSEs").toDouble();
+                    double mseu = getValueForColumn(rowData, "MSEu").toDouble();
+                    double mseTotal = mses + mseu;
+                    double fraction = (mseTotal > 0) ? value.toDouble() / mseTotal : 0.0;
+                    return QString::number(fraction, 'f', 4);
                 } else {
                     return QString::number(value.toDouble(), 'f', 4);
                 }
@@ -149,6 +153,31 @@ QVariant MetricsTableModel::data(const QModelIndex& index, int role) const
     case Qt::BackgroundRole: {
         if (rowData.value("isOverall").toBool())
             return QColor("#e0e0e0");
+        // Color-code metric quality
+        if (columnName == "d-stat" || columnName == "R²") {
+            if (value.canConvert<double>()) {
+                double v = value.toDouble();
+                if (v >= 0.8)  return QColor("#c8e6c9"); // green
+                if (v >= 0.5)  return QColor("#fff9c4"); // yellow
+                return QColor("#ffcdd2");                 // red
+            }
+        }
+        if (columnName == "NRMSE") {
+            if (value.canConvert<double>()) {
+                double v = value.toDouble(); // in percent
+                if (v <= 10.0) return QColor("#c8e6c9");
+                if (v <= 30.0) return QColor("#fff9c4");
+                return QColor("#ffcdd2");
+            }
+        }
+        if (columnName == "BIAS") {
+            if (value.canConvert<double>()) {
+                double v = std::abs(value.toDouble());
+                if (v <= 0.05) return QColor("#c8e6c9");
+                if (v <= 0.15) return QColor("#fff9c4");
+                return QColor("#ffcdd2");
+            }
+        }
         return QVariant();
     }
     
@@ -202,6 +231,12 @@ void MetricsTableModel::sort(int column, Qt::SortOrder order)
         std::sort(regular.begin(), regular.end(), [keyToSort, order](const QVariant& a, const QVariant& b) {
             const QVariant va = a.toMap().value(keyToSort, 0);
             const QVariant vb = b.toMap().value(keyToSort, 0);
+            bool aOk = false, bOk = false;
+            double da = va.toDouble(&aOk);
+            double db = vb.toDouble(&bOk);
+            if (aOk && bOk) {
+                return order == Qt::AscendingOrder ? da < db : da > db;
+            }
             return order == Qt::AscendingOrder ? va.toString() < vb.toString()
                                                : va.toString() > vb.toString();
         });
@@ -485,111 +520,20 @@ void MetricsTableWidget::exportMetrics()
     }
     out << escapedHeaders.join(",") << "\n";
     
-    // Write data rows
-    for (const QVariant& item : m_metricsData) {
-        const QVariantMap rowData = item.toMap();
+    // Write data rows — delegate all formatting to the model to avoid duplication
+    for (int row = 0; row < model->rowCount(); ++row) {
         QStringList rowValues;
-        
-    // Use the model's key mapping if available, otherwise use fallback
-    // Headers are already obtained from model above, so they respect scatter plot mode
-    
-    // Extract values for each column
-    for (const QString& header : headers) {
-            QVariant value;
-            
-            // Extract value using same key mapping logic as the model
-            // (Model's keyMap is private, so we replicate the logic here)
-            QStringList possibleKeys;
-            if (header == "Treatment") {
-                possibleKeys = {"Treatment", "treatment", "trt", "TRT"};
-            } else if (header == "Treatment Name") {
-                possibleKeys = {"TreatmentName", "Treatment Name", "treatment_name", "trt_name"};
-            } else if (header == "Experiment") {
-                possibleKeys = {"Experiment", "experiment", "exp", "EXP"};
-            } else if (header == "Crop") {
-                // Prefer CropName (display name), fallback to Crop (code)
-                possibleKeys = {"CropName", "Crop", "crop", "CROP"};
-            } else if (header == "Variable") {
-                // Prefer VariableName (display name), fallback to Variable (code)
-                possibleKeys = {"VariableName", "Variable", "variable", "var"};
-            } else if (header == "n") {
-                possibleKeys = {"n", "N", "samples", "count"};
-            } else if (header == "R²") {
-                possibleKeys = {"R²", "R2", "r_squared", "rsquared", "r-squared"};
-            } else if (header == "Obs. Mean") {
-                possibleKeys = {"ObsMean", "obs_mean", "mean_obs"};
-            } else if (header == "Sim. Mean") {
-                possibleKeys = {"SimMean", "sim_mean", "mean_sim"};
-            } else if (header == "RMSE") {
-                possibleKeys = {"RMSE", "rmse", "root_mean_square_error"};
-            } else if (header == "NRMSE") {
-                possibleKeys = {"NRMSE", "nrmse", "normalized_rmse"};
-            } else if (header == "d-stat") {
-                possibleKeys = {"d-stat", "Willmott's d-stat", "d_stat", "dstat", "willmott_d"};
-            } else if (header == "BIAS") {
-                possibleKeys = {"BIAS", "BiasIndex", "Bias Index", "Bias index", "bias_index"};
-            } else if (header == "MSEs") {
-                possibleKeys = {"MSEs", "MSE systematic", "MSE_systematic", "MSE_s"};
-            } else if (header == "MSEu") {
-                possibleKeys = {"MSEu", "MSE unsystematic", "MSE_unsystematic", "MSE_u"};
-            }
-            
-            for (const QString& key : possibleKeys) {
-                if (rowData.contains(key)) {
-                    value = rowData[key];
-                    break;
-                }
-            }
-            
-            // Format the value based on column type
-            QString cellValue;
-            if (!value.isValid() || value.isNull()) {
+        for (int col = 0; col < model->columnCount(); ++col) {
+            QString header = headers[col];
+            QString cellValue = model->data(model->index(row, col), Qt::DisplayRole).toString();
+            // Strip "%" suffix from NRMSE for clean numeric CSV
+            if (header == "NRMSE" && cellValue.endsWith('%'))
+                cellValue.chop(1);
+            // "NA" → empty in export
+            if (cellValue == "NA" || cellValue == "-")
                 cellValue = "";
-            } else if (header == "Treatment" || header == "Treatment Name" || 
-                       header == "Experiment" || header == "Crop" || header == "Variable") {
-                // These are ALWAYS text fields - convert to string regardless of stored type
-                cellValue = value.toString();
-            } else if (header == "R²") {
-                // R² is not calculated for time series data - always show "-"
-                cellValue = "-";
-            } else if (header == "n" || header == "Obs. Mean" || header == "Sim. Mean" ||
-                       header == "RMSE" || header == "NRMSE" || header == "d-stat" ||
-                       header == "BIAS" || header == "MSEs" || header == "MSEu" ||
-                       header == "MSEs/MSE" || header == "MSEu/MSE") {
-                // These are numeric fields - check if we can convert to number
-                if (value.canConvert<double>()) {
-                    double numValue = value.toDouble();
-                    // Format numbers with appropriate precision
-                    if (header == "n") {
-                        cellValue = QString::number((int)numValue);
-                    } else if (header == "d-stat") {
-                        cellValue = QString::number(numValue, 'f', 4);
-                    } else if (header == "Obs. Mean" || header == "Sim. Mean") {
-                        cellValue = QString::number(numValue, 'f', 3);
-                    } else if (header == "RMSE") {
-                        cellValue = QString::number(numValue, 'f', 3);
-                    } else if (header == "NRMSE") {
-                        cellValue = QString::number(numValue, 'f', 2);
-                    } else if (header == "BIAS") {
-                        cellValue = QString::number(numValue, 'f', 4);
-                    } else if (header == "MSEs" || header == "MSEu" ||
-                               header == "MSEs/MSE" || header == "MSEu/MSE") {
-                        cellValue = QString::number(numValue, 'f', 4);
-                    } else {
-                        cellValue = QString::number(numValue, 'f', 4);
-                    }
-                } else {
-                    // Can't convert to number, treat as string
-                    cellValue = value.toString();
-                }
-            } else {
-                // Unknown column - convert to string
-                cellValue = value.toString();
-            }
-            
             rowValues << escapeCsvValue(cellValue);
         }
-        
         out << rowValues.join(",") << "\n";
     }
     

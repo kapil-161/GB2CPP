@@ -466,6 +466,7 @@ void PlotWidget::saveSettings() const
     // Interaction & Layout
     s.setValue("showHoverTooltip", m_plotSettings.showHoverTooltip);
     s.setValue("multiPanelTimeSeries", m_plotSettings.multiPanelTimeSeries);
+    s.setValue("rememberLastCropFolder", m_plotSettings.rememberLastCropFolder);
 
     // Legend
     s.setValue("showLegend",      m_plotSettings.showLegend);
@@ -534,6 +535,7 @@ void PlotWidget::loadSettings()
 
     m_plotSettings.showHoverTooltip = s.value("showHoverTooltip", m_plotSettings.showHoverTooltip).toBool();
     m_plotSettings.multiPanelTimeSeries = s.value("multiPanelTimeSeries", m_plotSettings.multiPanelTimeSeries).toBool();
+    m_plotSettings.rememberLastCropFolder = s.value("rememberLastCropFolder", m_plotSettings.rememberLastCropFolder).toBool();
 
     m_plotSettings.showLegend     = s.value("showLegend",     m_plotSettings.showLegend).toBool();
     m_plotSettings.legendPosition = s.value("legendPosition", m_plotSettings.legendPosition).toString();

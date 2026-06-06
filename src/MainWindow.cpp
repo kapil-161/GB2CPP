@@ -3,6 +3,7 @@
 #include "PlotWidget.h"
 #include "CDECodesDialog.h"
 #include <QApplication>
+#include <QSettings>
 #include <QClipboard>
 #include <QMessageBox>
 #include <QCloseEvent>
@@ -2097,13 +2098,22 @@ void MainWindow::populateFolders()
         return;
     }
     
+    m_fileComboBox->blockSignals(true);
     for (const QString &folder : folders) {
         m_fileComboBox->addItem(folder);
     }
-    
-    // Select first folder by default
+    m_fileComboBox->blockSignals(false);
+
+    // Restore last selected crop folder if the setting is enabled
     if (m_fileComboBox->count() > 0) {
-        m_fileComboBox->setCurrentIndex(0);
+        QSettings s("DSSAT", "GB2");
+        int idx = 0;
+        if (s.value("PlotSettings/rememberLastCropFolder", false).toBool()) {
+            QString lastFolder = s.value("lastCropFolder").toString();
+            int found = lastFolder.isEmpty() ? -1 : m_fileComboBox->findText(lastFolder);
+            if (found >= 0) idx = found;
+        }
+        m_fileComboBox->setCurrentIndex(idx);
         onFolderSelectionChanged();
     }
 }
@@ -2253,6 +2263,10 @@ void MainWindow::onFolderSelectionChanged()
     }
     
     QString selectedFolder = m_fileComboBox->currentText();
+    if (!selectedFolder.isEmpty() && selectedFolder != "No DSSAT folders found") {
+        QSettings s("DSSAT", "GB2");
+        s.setValue("lastCropFolder", selectedFolder);
+    }
     if (selectedFolder.isEmpty() || selectedFolder == "No DSSAT folders found") {
         // Crop unselected - clear plot and metrics
         if (m_plotWidget) {

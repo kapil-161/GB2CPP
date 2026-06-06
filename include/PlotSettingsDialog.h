@@ -97,6 +97,7 @@ struct PlotSettings {
 
     // Layout settings
     bool multiPanelTimeSeries = false;  // tile Y variables in a grid instead of overlaying
+    bool rememberLastCropFolder = false; // restore last selected crop folder on startup
 
     // Treatment filter (empty excludedSeriesKeys = show all)
     QSet<QString> excludedSeriesKeys;  // format: "varName::expId::trtId"
@@ -200,6 +201,7 @@ private:
 
     // Layout controls
     QCheckBox *m_multiPanelTSCheckBox;
+    QCheckBox *m_rememberLastCropFolderCheckBox;
 
     // Scatter metrics checkboxes
     QMap<QString, QCheckBox*> m_scatterMetricCheckBoxes;

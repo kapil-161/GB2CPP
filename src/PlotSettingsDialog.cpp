@@ -44,6 +44,7 @@ PlotSettings PlotSettingsDialog::getSettings() const
     settings.showLegend = m_showLegendCheckBox->isChecked();
     settings.showHoverTooltip = m_showHoverTooltipCheckBox->isChecked();
     settings.multiPanelTimeSeries = m_multiPanelTSCheckBox->isChecked();
+    settings.rememberLastCropFolder = m_rememberLastCropFolderCheckBox->isChecked();
     settings.legendPosition = "outside-right";
     settings.plotMeanReps = m_plotMeanRepsCheckBox->isChecked();
     settings.showErrorBars = m_showErrorBarsCheckBox->isChecked();
@@ -308,6 +309,12 @@ void PlotSettingsDialog::setupUI()
     m_multiPanelTSCheckBox->setChecked(m_settings.multiPanelTimeSeries);
     m_multiPanelTSCheckBox->setToolTip("When enabled and 2+ Y variables are selected, each variable is shown in its own panel");
     layoutGroupLayout->addWidget(m_multiPanelTSCheckBox);
+
+    m_rememberLastCropFolderCheckBox = new QCheckBox("Remember last selected crop folder on startup");
+    m_rememberLastCropFolderCheckBox->setChecked(m_settings.rememberLastCropFolder);
+    m_rememberLastCropFolderCheckBox->setToolTip("Automatically re-select the last used crop folder when the application starts");
+    layoutGroupLayout->addWidget(m_rememberLastCropFolderCheckBox);
+
     appearanceLayout->addWidget(layoutGroup);
 
     // Legend settings group
@@ -600,6 +607,7 @@ void PlotSettingsDialog::onResetDefaults()
     m_showLegendCheckBox->setChecked(defaults.showLegend);
     m_showHoverTooltipCheckBox->setChecked(defaults.showHoverTooltip);
     m_multiPanelTSCheckBox->setChecked(defaults.multiPanelTimeSeries);
+    m_rememberLastCropFolderCheckBox->setChecked(defaults.rememberLastCropFolder);
     m_showErrorBarsCheckBox->setChecked(defaults.showErrorBars);
     int defaultErrorBarIndex = m_errorBarTypeComboBox->findData(defaults.errorBarType);
     if (defaultErrorBarIndex >= 0) {
