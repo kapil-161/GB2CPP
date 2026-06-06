@@ -86,6 +86,12 @@ if not exist "%MINGW_PATH%" (
 echo Step 1: Cleaning previous build...
 cd /d "%PROJECT_DIR%"
 
+REM Clear any previously extracted runtime so the updated exe is used on next launch
+if exist "%TEMP%\GB2_runtime" (
+    echo Clearing cached runtime: %TEMP%\GB2_runtime
+    rmdir /s /q "%TEMP%\GB2_runtime"
+)
+
 REM Force kill any processes using the build directory
 taskkill /f /im cmake.exe 2>nul
 taskkill /f /im mingw32-make.exe 2>nul
@@ -220,9 +226,6 @@ if not defined NSIS_PATH (
     echo Install NSIS from https://nsis.sourceforge.io to enable single-exe packaging
     goto :skip_nsis
 )
-
-REM Remove stale runtime so the new exe is picked up on next launch
-if exist "%TEMP%\GB2_runtime" rmdir /s /q "%TEMP%\GB2_runtime"
 
 REM Extract version from version_generated.h and pass to NSIS
 set GB2_VERSION=unknown

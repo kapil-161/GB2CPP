@@ -1025,7 +1025,8 @@ void PlotWidget::plotTimeSeries(
     const QString &xVar,
     const QStringList &yVars,
     const DataTable &obsData,
-    const QMap<QString, QMap<QString, QString>> &treatmentNames)
+    const QMap<QString, QMap<QString, QString>> &treatmentNames,
+    const QMap<QString, QString> &yVarFileFilter)
 {
     m_isScatterMode = false;
 
@@ -1069,6 +1070,7 @@ void PlotWidget::plotTimeSeries(
         m_currentXVar = xVar;
         m_currentYVars = yVars;
         m_treatmentNames = treatmentNames;
+        m_yVarFileFilter = yVarFileFilter;
 
         // Reset series filter when dataset or variables change
         // (filter persists only for same data + same Y vars, or via DAS/DAP/DATE switches)
@@ -1513,8 +1515,9 @@ QVector<ErrorBarData> PlotWidget::aggregateReplicates(const QVector<QPointF> &po
 }
 
 void PlotWidget::plotDatasets(const DataTable &simData, const DataTable &obsData,
-                             const QString &xVar, const QStringList &yVars, 
-                             const QStringList &treatments, const QString &selectedExperiment)
+                             const QString &xVar, const QStringList &yVars,
+                             const QStringList &treatments, const QString &selectedExperiment,
+                             const QMap<QString, QString> &yVarFileFilter)
 {
     // Clear existing chart and set up appropriate axes
     clearChart();
@@ -1592,9 +1595,19 @@ void PlotWidget::plotDatasets(const DataTable &simData, const DataTable &obsData
             isSequenceOsu = (uniqueTrts.size() == 1) && (uniqueRseq.size() > 1);
         }
 
+        // Pre-fetch source file column for per-var file filtering
+        const DataColumn *srcFileColumn = simData.getColumn("__SRCFILE__");
+        QString requiredSrcFile = yVarFileFilter.value(yVar);
+
         for (int row = 0; row < simData.rowCount; ++row) {
             if (row >= xColumn->data.size() || row >= yColumn->data.size() || row >= trtColumn->data.size()) {
                 continue;
+            }
+
+            // Skip rows from a different source file when a file filter is active for this variable
+            if (!requiredSrcFile.isEmpty() && srcFileColumn && row < srcFileColumn->data.size()) {
+                if (srcFileColumn->data[row].toString() != requiredSrcFile)
+                    continue;
             }
 
             QString trt = trtColumn->data[row].toString();
@@ -4095,7 +4108,7 @@ void PlotWidget::updatePlotWithScaling()
     if (m_isBoxPlotMode) {
         plotOsuBoxPlot(scaledSimData, m_currentYVars, m_currentTreatments, m_selectedExperiment);
     } else {
-        plotDatasets(scaledSimData, scaledObsData, m_currentXVar, m_currentYVars, m_currentTreatments, m_selectedExperiment);
+        plotDatasets(scaledSimData, scaledObsData, m_currentXVar, m_currentYVars, m_currentTreatments, m_selectedExperiment, m_yVarFileFilter);
     }
     qDebug() << "PlotWidget::updatePlotWithScaling() - Datasets plotted";
 

@@ -1651,13 +1651,14 @@ void MainWindow::updateVariableComboBoxes()
     QStringList yVariableExclusions = {"YEAR", "WYEAR", "HYEAR", "RUNNO", "RUN", "CR", "FILEX",
                                        "EXPERIMENT", "DAS", "DAP", "DOY", "DATE", "TRT", "CROP", "TNAME",
                                        "R#", "O#", "P#", "MODEL", "XLAT", "LONG", "ELEV", "WSTA", "FNAM",
-                                       "SOIL_ID", "EXNAME"};
+                                       "SOIL_ID", "EXNAME", "__SRCFILE__"};
 
     QStringList commonVariables;
     QStringList simOnlyVariables;
 
     // Identify common variables and simulated-only variables
     for (const QString &columnName : m_currentData.columnNames) {
+        if (yVariableExclusions.contains(columnName)) continue;
         if (m_currentObsData.columnNames.contains(columnName)) {
             // Check if observed data column actually has valid (non-missing) data
             const DataColumn *obsCol = m_currentObsData.getColumn(columnName);
@@ -1684,9 +1685,18 @@ void MainWindow::updateVariableComboBoxes()
         }
     }
 
-    // Sort the lists alphabetically
-    commonVariables.sort();
-    simOnlyVariables.sort();
+    // Sort by display description (falls back to code if no description)
+    auto sortByDescription = [](QStringList &list) {
+        std::sort(list.begin(), list.end(), [](const QString &a, const QString &b) {
+            auto infoA = DataProcessor::getVariableInfo(a);
+            auto infoB = DataProcessor::getVariableInfo(b);
+            QString labelA = infoA.first.isEmpty() ? a : infoA.first;
+            QString labelB = infoB.first.isEmpty() ? b : infoB.first;
+            return labelA.compare(labelB, Qt::CaseInsensitive) < 0;
+        });
+    };
+    sortByDescription(commonVariables);
+    sortByDescription(simOnlyVariables);
 
     // Add common variables first (with asterisk) to X combo
     for (const QString &columnName : commonVariables) {
@@ -1704,13 +1714,17 @@ void MainWindow::updateVariableComboBoxes()
     // Populate Y variable list — grouped by file if multiple files selected
     bool multiFile = m_fileColumnMap.size() > 1;
 
+    // currentFile: non-empty inside a multi-file group, empty for single-file mode.
+    // UserRole stores "filename::COL" in multi-file mode, plain "COL" in single-file mode.
+    QString addYCurrentFile;
     auto addYItem = [&](const QString &columnName, bool hasObs) {
         if (yVariableExclusions.contains(columnName)) return;
         QPair<QString, QString> varInfo = DataProcessor::getVariableInfo(columnName);
         QString displayLabel = varInfo.first.isEmpty() ? columnName : QString("%1 (%2)").arg(varInfo.first).arg(columnName);
         if (hasObs) displayLabel = "* " + displayLabel;
         QListWidgetItem *item = new QListWidgetItem(displayLabel);
-        item->setData(Qt::UserRole, columnName);
+        QString key = addYCurrentFile.isEmpty() ? columnName : (addYCurrentFile + "::" + columnName);
+        item->setData(Qt::UserRole, key);
         m_yVariableComboBox->addItem(item);
     };
 
@@ -1730,6 +1744,7 @@ void MainWindow::updateVariableComboBoxes()
             m_yVariableComboBox->addItem(header);
 
             // Variables for this file, common first then sim-only
+            addYCurrentFile = it.key();
             QStringList fileCols = it.value();
             QStringList fileCommon, fileSim;
             for (const QString &col : fileCols) {
@@ -1737,10 +1752,11 @@ void MainWindow::updateVariableComboBoxes()
                 if (commonVariables.contains(col)) fileCommon.append(col);
                 else if (simOnlyVariables.contains(col)) fileSim.append(col);
             }
-            fileCommon.sort(); fileSim.sort();
+            sortByDescription(fileCommon); sortByDescription(fileSim);
             for (const QString &col : fileCommon) addYItem(col, true);
             for (const QString &col : fileSim)    addYItem(col, false);
         }
+        addYCurrentFile.clear();
     }
 
     // Set default x-variable.
@@ -1929,11 +1945,22 @@ void MainWindow::updatePlot()
     
     QString xVar = m_xVariableComboBox->currentData(Qt::UserRole).toString();
     
-    // Get selected Y variables from ListWidget
+    // Get selected Y variables from ListWidget.
+    // In multi-file mode UserRole holds "filename::COL"; decode into plain yVars + file filter.
     QStringList yVars;
+    QMap<QString, QString> yVarFileFilter; // col → source filename (empty = no filter)
     QList<QListWidgetItem*> selectedItems = m_yVariableComboBox->selectedItems();
     for (QListWidgetItem* item : selectedItems) {
-        yVars.append(item->data(Qt::UserRole).toString());
+        QString key = item->data(Qt::UserRole).toString();
+        int sep = key.indexOf("::");
+        if (sep != -1) {
+            QString file = key.left(sep);
+            QString col  = key.mid(sep + 2);
+            if (!yVars.contains(col)) yVars.append(col);
+            yVarFileFilter[col] = file;
+        } else {
+            if (!yVars.contains(key)) yVars.append(key);
+        }
     }
     
     qDebug() << "MainWindow::updatePlot() - X variable:" << xVar;
@@ -2005,7 +2032,8 @@ void MainWindow::updatePlot()
             xVar,
             yVars,
             m_currentObsData,
-            m_treatmentNames
+            m_treatmentNames,
+            yVarFileFilter
         );
         
         qDebug() << "MainWindow::updatePlot() - plotTimeSeries call completed";
@@ -2467,6 +2495,11 @@ void MainWindow::onFileSelectionChanged()
                     } else {
                         // Store regular .OUT data for time series plots
                         m_fileColumnMap[selectedFile] = fileData.columnNames;
+                        // Stamp each row with the source filename so plotDatasets can filter by file
+                        DataColumn srcCol("__SRCFILE__");
+                        for (int i = 0; i < fileData.rowCount; ++i)
+                            srcCol.data.append(selectedFile);
+                        fileData.addColumn(srcCol);
                         if (m_currentData.rowCount == 0) {
                             m_currentData = fileData;
                         } else {
@@ -3205,8 +3238,11 @@ int MainWindow::selectYVariables(const QStringList &varNames)
         QListWidgetItem *item = m_yVariableComboBox->item(i);
         if (!item) continue;
         QString itemData = item->data(Qt::UserRole).toString();
+        // In multi-file mode UserRole is "filename::COL"; strip prefix for matching
+        int sep = itemData.indexOf("::");
+        QString colPart = (sep != -1) ? itemData.mid(sep + 2) : itemData;
         for (const QString &varName : varNames) {
-            if (itemData.compare(varName, Qt::CaseInsensitive) == 0) {
+            if (colPart.compare(varName, Qt::CaseInsensitive) == 0) {
                 item->setSelected(true);
                 ++count;
                 break;
