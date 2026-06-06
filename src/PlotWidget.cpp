@@ -4911,6 +4911,9 @@ void PlotWidget::applyAnimFrame(int frame)
             if (!overlayLines.isEmpty()) {
                 m_tsMetricsOverlay->setText(overlayLines.join("\n"));
                 m_tsMetricsOverlay->adjustSize();
+                m_tsMetricsOverlay->show();
+            } else {
+                m_tsMetricsOverlay->hide();
             }
         }
     }

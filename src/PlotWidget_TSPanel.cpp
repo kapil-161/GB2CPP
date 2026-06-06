@@ -422,7 +422,8 @@ void PlotWidget::plotTimeSeriesMultiPanel()
                 overlayLines << parts.join("  ");
             }
 
-            if (!overlayLines.isEmpty() && m_chartView) {
+            // Always create the overlay if metrics are configured so animation can update it
+            if (m_chartView && !m_plotSettings.tsMetrics.isEmpty()) {
                 QLabel *label = new QLabel(overlayLines.join("\n"), m_chartView);
                 int fontPt = qBound(8, m_plotSettings.axisTickFontSize, 13);
                 label->setStyleSheet(QString(
@@ -431,7 +432,7 @@ void PlotWidget::plotTimeSeriesMultiPanel()
                 label->setAlignment(Qt::AlignLeft | Qt::AlignTop);
                 label->adjustSize();
                 label->raise();
-                label->show();
+                label->setVisible(!overlayLines.isEmpty());
                 m_tsMetricsOverlay = label;
 
                 // Draggable overlay: auto-positions top-left, user can drag
