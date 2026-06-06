@@ -90,10 +90,10 @@ struct PlotSettings {
     QSet<QString> scatterMetrics = {"RMSE", "R²"};
 
     // Time series panel overlay metrics (shown in multi-panel mode, per variable)
-    QSet<QString> tsMetrics = {};
+    QSet<QString> tsMetrics = {"RMSE", "NRMSE"};
 
     // Interaction settings
-    bool showHoverTooltip = false;
+    bool showHoverTooltip = true;
 
     // Layout settings
     bool multiPanelTimeSeries = false;  // tile Y variables in a grid instead of overlaying
