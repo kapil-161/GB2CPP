@@ -4804,6 +4804,53 @@ void PlotWidget::initAnimFrames()
     updateAnimLabel(last);
 }
 
+// Compute metrics text lines for a variable using only points up to cutoff x
+static QStringList computeAnimMetrics(
+    const QVector<QSharedPointer<PlotData>> &varData,
+    double cutoff,
+    const QSet<QString> &selectedMetrics)
+{
+    QMap<QString, QVector<QPointF>> obsByTrt, simByTrt;
+    for (const auto &pd : varData) {
+        QString key = pd->treatment + "__" + pd->experiment;
+        QVector<QPointF> pts;
+        for (const QPointF &pt : pd->points)
+            if (pt.x() <= cutoff) pts.append(pt);
+        if (pd->isObserved) obsByTrt[key].append(pts);
+        else                simByTrt[key].append(pts);
+    }
+
+    QVector<double> allObs, allSim;
+    for (const QString &key : obsByTrt.keys()) {
+        if (!simByTrt.contains(key)) continue;
+        QMap<double, double> simByX;
+        for (const QPointF &pt : simByTrt[key]) simByX[pt.x()] = pt.y();
+        for (const QPointF &pt : obsByTrt[key])
+            if (simByX.contains(pt.x())) { allObs << pt.y(); allSim << simByX[pt.x()]; }
+    }
+
+    QVector<double> obs, sim;
+    for (int i = 0; i < allObs.size() && i < allSim.size(); ++i)
+        if (std::isfinite(allObs[i]) && std::isfinite(allSim[i]))
+            { obs << allObs[i]; sim << allSim[i]; }
+
+    if (obs.isEmpty()) return {};
+
+    int    n       = obs.size();
+    double obsSum  = 0; for (double v : obs) obsSum += v;
+    double obsMean = obsSum / n;
+    double rmse    = MetricsCalculator::rmse(obs, sim);
+    double nrmse   = (obsMean > 0) ? (rmse / obsMean) * 100.0 : 0.0;
+    double dStat   = MetricsCalculator::dStat(obs, sim);
+
+    QStringList parts;
+    if (selectedMetrics.contains("N"))     parts << QString("N=%1").arg(n);
+    if (selectedMetrics.contains("RMSE"))  parts << QString("RMSE=%1").arg(rmse, 0, 'f', rmse < 1 ? 3 : (rmse < 100 ? 2 : 1));
+    if (selectedMetrics.contains("NRMSE")) parts << QString("NRMSE=%1%").arg(nrmse, 0, 'f', 1);
+    if (selectedMetrics.contains("d-stat"))parts << QString("d=%1").arg(dStat, 0, 'f', 3);
+    return parts;
+}
+
 void PlotWidget::applyAnimFrame(int frame)
 {
     if (m_animXValues.isEmpty() || frame < 0 || frame >= m_animXValues.size()) return;
@@ -4823,6 +4870,49 @@ void PlotWidget::applyAnimFrame(int frame)
             ls->replace(filtered);
         else if (QScatterSeries *ss = qobject_cast<QScatterSeries*>(pd->series.data()))
             ss->replace(filtered);
+    }
+
+    // Update metrics overlays if any are configured
+    if (!m_plotSettings.tsMetrics.isEmpty()) {
+        // Group plotData by variable
+        QStringList varOrder;
+        QMap<QString, QVector<QSharedPointer<PlotData>>> byVar;
+        for (const auto &pd : m_plotDataList) {
+            if (!byVar.contains(pd->variable)) varOrder.append(pd->variable);
+            byVar[pd->variable].append(pd);
+        }
+        QSet<QString> metricSet(m_plotSettings.tsMetrics.begin(), m_plotSettings.tsMetrics.end());
+
+        // Update multi-panel overlays (one label per variable)
+        for (const QString &varCode : varOrder) {
+            if (!m_tsPanelOverlays.contains(varCode)) continue;
+            QLabel *lbl = m_tsPanelOverlays[varCode];
+            if (!lbl) continue;
+            QStringList parts = computeAnimMetrics(byVar[varCode], cutoff, metricSet);
+            if (!parts.isEmpty()) {
+                lbl->setText(parts.join("\n"));
+                lbl->adjustSize();
+                lbl->show();
+            } else {
+                lbl->hide();
+            }
+        }
+
+        // Update single-chart overlay
+        if (m_tsMetricsOverlay) {
+            QStringList overlayLines;
+            for (const QString &varCode : varOrder) {
+                QStringList parts = computeAnimMetrics(byVar[varCode], cutoff, metricSet);
+                if (parts.isEmpty()) continue;
+                QPair<QString,QString> vi = DataProcessor::getVariableInfo(varCode);
+                QString varLabel = vi.first.isEmpty() ? varCode : vi.first;
+                overlayLines << varLabel + ":  " + parts.join("  ");
+            }
+            if (!overlayLines.isEmpty()) {
+                m_tsMetricsOverlay->setText(overlayLines.join("\n"));
+                m_tsMetricsOverlay->adjustSize();
+            }
+        }
     }
 
     updateAnimLabel(frame);

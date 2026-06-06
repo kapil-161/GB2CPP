@@ -443,6 +443,7 @@ void PlotWidget::plotTimeSeriesMultiPanel()
 
     // Remove single-panel overlay when switching to multi-panel
     if (m_tsMetricsOverlay) { delete m_tsMetricsOverlay; m_tsMetricsOverlay = nullptr; }
+    m_tsPanelOverlays.clear();
 
     // --- Hide single chart, show TS panel area ---
     if (m_chartView)       m_chartView->setVisible(false);
@@ -842,6 +843,8 @@ void PlotWidget::plotTimeSeriesMultiPanel()
 
                 // Draggable overlay: auto-positions top-left, user can drag
                 new DraggableOverlay(cv, statsLabel, statsLabel);
+                // Store reference so animation can update it per-frame
+                m_tsPanelOverlays[varCode] = statsLabel;
             }
         }
 

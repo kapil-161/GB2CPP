@@ -458,6 +458,9 @@ private:
     // Time series metrics overlay for single-panel mode
     QPointer<QLabel> m_tsMetricsOverlay;
 
+    // Per-variable metrics overlay labels for multi-panel mode (variable -> label)
+    QMap<QString, QPointer<QLabel>> m_tsPanelOverlays;
+
     // Draggable / resizable legend
     QWidget* m_legendPanel        = nullptr;
     QWidget* m_legendHandle       = nullptr;
