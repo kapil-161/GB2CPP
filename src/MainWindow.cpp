@@ -1657,8 +1657,9 @@ void MainWindow::updateVariableComboBoxes()
     QStringList simOnlyVariables;
 
     // Identify common variables and simulated-only variables
+    // Only skip internal/synthetic columns here; yVariableExclusions is applied later when adding to Y list
     for (const QString &columnName : m_currentData.columnNames) {
-        if (yVariableExclusions.contains(columnName)) continue;
+        if (columnName.startsWith("__")) continue;
         if (m_currentObsData.columnNames.contains(columnName)) {
             // Check if observed data column actually has valid (non-missing) data
             const DataColumn *obsCol = m_currentObsData.getColumn(columnName);

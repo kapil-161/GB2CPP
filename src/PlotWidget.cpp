@@ -4402,6 +4402,9 @@ bool PlotWidget::eventFilter(QObject* obj, QEvent* event)
                 setSimSeriesVisible(!m_simVisible);
                 updateObsSimHeaders();
                 return true;
+            } else if (headerType == "treatment") {
+                showTreatmentSelection();
+                return true;
             }
             if (widget->property("seriesToHighlight").isValid()) {
                 createToggleHandler(widget);

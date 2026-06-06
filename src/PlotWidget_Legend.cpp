@@ -66,8 +66,12 @@ void PlotWidget::updateLegendAdvanced(const QMap<QString, QMap<QString, QVector<
 
         updateObsSimHeaders();  // apply current toggle appearance
 
-        QLabel* trtHeader = new QLabel("<b>Treatment</b>");
+        QLabel* trtHeader = new QLabel("<b>Treatments</b>");
         trtHeader->setAlignment(Qt::AlignLeft);
+        trtHeader->setCursor(Qt::PointingHandCursor);
+        trtHeader->setToolTip("Click to select treatments");
+        trtHeader->setProperty("legendHeaderType", "treatment");
+        trtHeader->installEventFilter(this);
 
         headerLayout->addWidget(obsHeader);
         headerLayout->addWidget(simHeader);
@@ -574,8 +578,12 @@ void PlotWidget::createLegendHeader()
     simHeader->setAlignment(Qt::AlignCenter);
     simHeader->setFixedWidth(30);
 
-    QLabel* trtHeader = new QLabel("<b>Treatment</b>");
+    QLabel* trtHeader = new QLabel("<b>Treatments</b>");
     trtHeader->setAlignment(Qt::AlignLeft);
+    trtHeader->setCursor(Qt::PointingHandCursor);
+    trtHeader->setToolTip("Click to select treatments");
+    trtHeader->setProperty("legendHeaderType", "treatment");
+    trtHeader->installEventFilter(this);
 
     headerLayout->addWidget(obsHeader);
     headerLayout->addWidget(simHeader);
