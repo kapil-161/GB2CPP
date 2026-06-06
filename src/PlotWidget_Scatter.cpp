@@ -6,6 +6,8 @@
 #include <QtCharts/QScatterSeries>
 #include <QtCharts/QLineSeries>
 #include <QLabel>
+#include <QLineEdit>
+#include <QStackedWidget>
 #include <QFrame>
 #include <QHBoxLayout>
 #include <QVBoxLayout>
@@ -139,6 +141,16 @@ void PlotWidget::plotScatter(
     for (int ei = 0; ei < expOrder.size(); ++ei)
         expColor[expOrder[ei]] = kPalette[ei % kPalette.size()];
 
+    static const QVector<QScatterSeries::MarkerShape> kShapes = {
+        QScatterSeries::MarkerShapeCircle,
+        QScatterSeries::MarkerShapeRectangle,
+        QScatterSeries::MarkerShapeRotatedRectangle,
+        QScatterSeries::MarkerShapeTriangle,
+    };
+    QMap<QString, QScatterSeries::MarkerShape> expShape;
+    for (int ei = 0; ei < expOrder.size(); ++ei)
+        expShape[expOrder[ei]] = kShapes[ei % kShapes.size()];
+
     // --- Nice-axis helper (reused per panel) ---
     auto niceAxis = [](double dataMin, double dataMax,
                        double &outMin, double &outMax, int &outTicks, QString &outFmt) {
@@ -238,6 +250,7 @@ void PlotWidget::plotScatter(
 
     // --- Build one panel per variable ---
     QVector<QMap<QString, QVariant>> allMetrics;
+    QMap<QString, QVector<QAbstractSeries*>> expSeriesMap; // expLabel -> series across all panels
 
     for (int vi = 0; vi < vars.size(); ++vi) {
         QString baseVar = vars[vi].toUpper();
@@ -335,10 +348,11 @@ void PlotWidget::plotScatter(
             ss->setColor(c);
             ss->setBorderColor(c.darker(120));
             ss->setMarkerSize(m_plotSettings.markerSize);
-            ss->setMarkerShape(QScatterSeries::MarkerShapeCircle);
+            ss->setMarkerShape(expShape.value(expLabel, QScatterSeries::MarkerShapeCircle));
             ss->setUseOpenGL(false);
             for (const QPointF &p : expPoints[expLabel]) ss->append(p);
             chart->addSeries(ss);
+            expSeriesMap[expLabel].append(ss);
         }
 
         // Axes — use settings for fonts, grid, tick count
@@ -382,14 +396,47 @@ void PlotWidget::plotScatter(
 
         QPair<QString, QString> stripVarInfo = DataProcessor::getVariableInfo(baseVar);
         QString stripDisplayName = stripVarInfo.first.isEmpty() ? baseVar : stripVarInfo.first;
+        QString stripStyle = QString(
+            "background-color: #e8e8e8; border-bottom: 1px solid #cccccc; "
+            "font-weight: bold; font-size: %1px; padding: 2px 0px;")
+            .arg(m_plotSettings.titleFontSize > 0 ? m_plotSettings.titleFontSize : 10);
+
+        // Editable strip title: QStackedWidget with label (page 0) and line edit (page 1)
+        QStackedWidget *titleStack = new QStackedWidget();
+        titleStack->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+
         QLabel *stripLabel = new QLabel(stripDisplayName);
         stripLabel->setAlignment(Qt::AlignCenter);
-        stripLabel->setStyleSheet(QString(
-            "QLabel { background-color: #e8e8e8; border-bottom: 1px solid #cccccc; "
-            "font-weight: bold; font-size: %1px; padding: 2px 0px; }")
-            .arg(m_plotSettings.titleFontSize > 0 ? m_plotSettings.titleFontSize : 10));
+        stripLabel->setStyleSheet(QString("QLabel { %1 }").arg(stripStyle));
         stripLabel->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
-        panelLayout->addWidget(stripLabel);
+        stripLabel->setToolTip("Double-click to edit title");
+        stripLabel->setCursor(Qt::IBeamCursor);
+
+        QLineEdit *stripEdit = new QLineEdit(stripDisplayName);
+        stripEdit->setAlignment(Qt::AlignCenter);
+        stripEdit->setStyleSheet(QString("QLineEdit { %1 border: 1px solid #99ccff; }").arg(stripStyle));
+        stripEdit->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+
+        titleStack->addWidget(stripLabel);  // page 0 — display
+        titleStack->addWidget(stripEdit);   // page 1 — edit
+
+        // Double-click label → switch to edit mode
+        stripLabel->installEventFilter(this);
+        stripLabel->setProperty("titleStack", QVariant::fromValue(titleStack));
+        stripLabel->setProperty("titleEdit",  QVariant::fromValue(stripEdit));
+        stripLabel->setProperty("isScatterTitleLabel", true);
+
+        // Commit on Enter or focus loss
+        auto commit = [titleStack, stripLabel, stripEdit]() {
+            QString t = stripEdit->text().trimmed();
+            if (t.isEmpty()) t = stripLabel->text();
+            stripLabel->setText(t);
+            titleStack->setCurrentIndex(0);
+        };
+        connect(stripEdit, &QLineEdit::returnPressed, this, commit);
+        connect(stripEdit, &QLineEdit::editingFinished, this, commit);
+
+        panelLayout->addWidget(titleStack);
 
         QChartView *cv = new QChartView(chart);
         cv->setRenderHint(QPainter::Antialiasing);
@@ -533,17 +580,35 @@ void PlotWidget::plotScatter(
         QHBoxLayout *hl = new QHBoxLayout(row);
         hl->setContentsMargins(0, 2, 0, 2);
         hl->setSpacing(6);
+        row->setCursor(Qt::PointingHandCursor);
 
-        QLabel *swatch = new QLabel();
-        swatch->setFixedSize(12, 12);
         QColor c = expColor.value(expLabel, Qt::gray);
-        swatch->setStyleSheet(QString("background-color: %1; border-radius: 6px;").arg(c.name()));
+        QScatterSeries::MarkerShape shape = expShape.value(expLabel, QScatterSeries::MarkerShapeCircle);
+        QString symbol;
+        switch (shape) {
+            case QScatterSeries::MarkerShapeCircle:           symbol = "o"; break;
+            case QScatterSeries::MarkerShapeRectangle:        symbol = "s"; break;
+            case QScatterSeries::MarkerShapeRotatedRectangle: symbol = "d"; break;
+            case QScatterSeries::MarkerShapeTriangle:         symbol = "t"; break;
+            default:                                          symbol = "o"; break;
+        }
+        QPen pen(c.darker(120)); pen.setWidth(1);
+        LegendSampleWidget *swatch = new LegendSampleWidget(true, pen, symbol, QBrush(c), QString());
+
         QLabel *txt = new QLabel(expLabel);
         txt->setStyleSheet("font-size: 12px;");
 
         hl->addWidget(swatch);
         hl->addWidget(txt);
         hl->addStretch();
+
+        // Wire up single-click highlight and double-click show/hide
+        QVector<QAbstractSeries*> seriesList = expSeriesMap.value(expLabel);
+        row->setProperty("seriesToHighlight", QVariant::fromValue(seriesList));
+        row->setProperty("varName", expLabel);
+        row->setProperty("trtId", "");
+        row->installEventFilter(this);
+
         m_legendLayout->addWidget(row);
     }
 }

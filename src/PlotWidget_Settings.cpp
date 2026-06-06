@@ -87,8 +87,12 @@ void PlotWidget::onSettingsButtonClicked()
         }
         if (!vAxesSeed.isEmpty()) {
             if (auto yAx = qobject_cast<QValueAxis*>(vAxesSeed.first())) {
-                m_plotSettings.yAxisMin = yAx->min();
-                m_plotSettings.yAxisMax = yAx->max();
+                // Only seed from live axis if the user has NOT set a custom override —
+                // otherwise we'd overwrite their saved value with the auto-fit result.
+                if (!m_plotSettings.useCustomYMin)
+                    m_plotSettings.yAxisMin = yAx->min();
+                if (!m_plotSettings.useCustomYMax)
+                    m_plotSettings.yAxisMax = yAx->max();
             }
         }
     }
@@ -124,10 +128,8 @@ void PlotWidget::onSettingsButtonClicked()
             // Box plot: tick spacing or decimals change requires a full replot; range change goes via autoFitAxes
             bool boxReplot = (m_plotSettings.yAxisTickSpacing != newSettings.yAxisTickSpacing) ||
                              (m_plotSettings.yAxisDecimals    != newSettings.yAxisDecimals);
-            if (boxReplot || filterChanged) {
+            if (boxReplot || filterChanged || axisRangeChanged) {
                 updatePlotWithScaling();
-            } else if (axisRangeChanged) {
-                autoFitAxes();
             }
         } else if (!m_isScatterMode && m_simData.rowCount > 0) {
             if (filterChanged || errorBarChanged) {
@@ -135,7 +137,11 @@ void PlotWidget::onSettingsButtonClicked()
                 if (m_obsData.rowCount > 0)
                     calculateMetrics();
             } else if (axisRangeChanged) {
-                autoFitAxes();
+                // Multi-panel rebuilds axes from scratch — must replot to pick up new range.
+                // Single-panel: applyPlotSettings already patched the live axis (lines above);
+                // autoFitAxes would override it, so call it only to handle tick/label updates,
+                // but let the custom range win by calling updatePlotWithScaling instead.
+                updatePlotWithScaling();
             }
         }
     }
@@ -490,15 +496,7 @@ void PlotWidget::saveSettings() const
     s.setValue("yAxisMinorTickCount", m_plotSettings.yAxisMinorTickCount);
     s.setValue("yAxisDecimals",       m_plotSettings.yAxisDecimals);
 
-    // Axis range overrides
-    s.setValue("useCustomXMin", m_plotSettings.useCustomXMin);
-    s.setValue("xAxisMin",      m_plotSettings.xAxisMin);
-    s.setValue("useCustomXMax", m_plotSettings.useCustomXMax);
-    s.setValue("xAxisMax",      m_plotSettings.xAxisMax);
-    s.setValue("useCustomYMin", m_plotSettings.useCustomYMin);
-    s.setValue("yAxisMin",      m_plotSettings.yAxisMin);
-    s.setValue("useCustomYMax", m_plotSettings.useCustomYMax);
-    s.setValue("yAxisMax",      m_plotSettings.yAxisMax);
+    // Axis range overrides are intentionally not persisted — they are per-dataset.
 
     // Appearance
     s.setValue("plotTitle",        m_plotSettings.plotTitle);
@@ -562,14 +560,7 @@ void PlotWidget::loadSettings()
     m_plotSettings.yAxisMinorTickCount = s.value("yAxisMinorTickCount", m_plotSettings.yAxisMinorTickCount).toInt();
     m_plotSettings.yAxisDecimals       = s.value("yAxisDecimals",       m_plotSettings.yAxisDecimals).toInt();
 
-    m_plotSettings.useCustomXMin = s.value("useCustomXMin", m_plotSettings.useCustomXMin).toBool();
-    m_plotSettings.xAxisMin      = s.value("xAxisMin",      m_plotSettings.xAxisMin).toDouble();
-    m_plotSettings.useCustomXMax = s.value("useCustomXMax", m_plotSettings.useCustomXMax).toBool();
-    m_plotSettings.xAxisMax      = s.value("xAxisMax",      m_plotSettings.xAxisMax).toDouble();
-    m_plotSettings.useCustomYMin = s.value("useCustomYMin", m_plotSettings.useCustomYMin).toBool();
-    m_plotSettings.yAxisMin      = s.value("yAxisMin",      m_plotSettings.yAxisMin).toDouble();
-    m_plotSettings.useCustomYMax = s.value("useCustomYMax", m_plotSettings.useCustomYMax).toBool();
-    m_plotSettings.yAxisMax      = s.value("yAxisMax",      m_plotSettings.yAxisMax).toDouble();
+    // Axis range overrides are not loaded — always reset to auto on startup.
 
     m_plotSettings.plotTitle     = s.value("plotTitle",     m_plotSettings.plotTitle).toString();
     m_plotSettings.backgroundColor = QColor(s.value("backgroundColor", m_plotSettings.backgroundColor.name()).toString());

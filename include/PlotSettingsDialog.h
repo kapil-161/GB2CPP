@@ -169,16 +169,17 @@ private:
     QDoubleSpinBox *m_yAxisTickSpacingSpinBox;
     QSpinBox *m_yAxisMinorTickCountSpinBox;
     QSpinBox *m_yAxisDecimalsSpinBox;
-    QCheckBox *m_useCustomXMinCheckBox;
     QDoubleSpinBox *m_xAxisMinSpinBox;      // numeric X axis
     QDateTimeEdit *m_xAxisMinDateEdit;      // date X axis
-    QCheckBox *m_useCustomXMaxCheckBox;
     QDoubleSpinBox *m_xAxisMaxSpinBox;      // numeric X axis
     QDateTimeEdit *m_xAxisMaxDateEdit;      // date X axis
-    QCheckBox *m_useCustomYMinCheckBox;
     QDoubleSpinBox *m_yAxisMinSpinBox;
-    QCheckBox *m_useCustomYMaxCheckBox;
     QDoubleSpinBox *m_yAxisMaxSpinBox;
+    // Seeded values — used to detect whether user changed the spinbox
+    double m_seededXMin = 0.0;
+    double m_seededXMax = 0.0;
+    double m_seededYMin = 0.0;
+    double m_seededYMax = 0.0;
     bool m_xAxisIsDate = false;
     
     // Plot appearance controls

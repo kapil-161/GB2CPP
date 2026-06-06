@@ -31,6 +31,7 @@
 #include <QTimer>
 #include <QDateTime>
 #include <QLineEdit>
+#include <QStackedWidget>
 #include <QMenu>
 #include <QAction>
 #include <QClipboard>
@@ -643,8 +644,8 @@ void PlotWidget::autoFitAxes()
     // No edge case handling needed for xLeftPadding since it's always 0
     if (yPadding == 0) yPadding = maxY * 0.1 + 1;
 
-    // Force Y-axis to start from 0
-    minY = 0;
+    // Force Y-axis to start from 0 unless user has set a custom Y min
+    minY = m_plotSettings.useCustomYMin ? m_plotSettings.yAxisMin : 0.0;
     
     // Apply ranges to axes
     auto axes = m_chart->axes();
@@ -752,12 +753,14 @@ void PlotWidget::autoFitAxes()
                 if (numIntervals < 2) numIntervals = 2;
                 int tickCount = numIntervals + 1;
 
-                valueAxis->setRange(0, alignedMax);
+                double yMin = m_plotSettings.useCustomYMin ? m_plotSettings.yAxisMin : 0.0;
+                if (m_plotSettings.useCustomYMax) alignedMax = m_plotSettings.yAxisMax;
+                valueAxis->setRange(yMin, alignedMax);
                 valueAxis->setTickCount(tickCount);
                 valueAxis->setMinorTickCount(m_plotSettings.yAxisMinorTickCount);
                 valueAxis->setMinorGridLineVisible(m_plotSettings.showMinorGrid);
                 if (m_chartView && !m_chartView->boxPlotStats().isEmpty())
-                    m_chartView->setBoxPlotYBounds(0, alignedMax);
+                    m_chartView->setBoxPlotYBounds(yMin, alignedMax);
 
                 // Label format: user decimals or auto-detect from tick interval
                 if (m_plotSettings.yAxisDecimals >= 0) {
@@ -4244,6 +4247,30 @@ bool PlotWidget::eventFilter(QObject* obj, QEvent* event)
             if (widget->property("seriesToHighlight").isValid()) {
                 createToggleHandler(widget);
                 return true;
+            }
+        }
+    }
+
+    if (event->type() == QEvent::MouseButtonDblClick) {
+        QWidget* widget = qobject_cast<QWidget*>(obj);
+        if (widget) {
+            QMouseEvent* me = static_cast<QMouseEvent*>(event);
+            if (me->button() == Qt::LeftButton) {
+                if (widget->property("isScatterTitleLabel").toBool()) {
+                    auto *stack = widget->property("titleStack").value<QStackedWidget*>();
+                    auto *edit  = widget->property("titleEdit").value<QLineEdit*>();
+                    if (stack && edit) {
+                        edit->setText(qobject_cast<QLabel*>(widget)->text());
+                        stack->setCurrentIndex(1);
+                        edit->selectAll();
+                        edit->setFocus();
+                    }
+                    return true;
+                }
+                if (widget->property("seriesToHighlight").isValid()) {
+                    toggleLegendRowVisibility(widget);
+                    return true;
+                }
             }
         }
     }

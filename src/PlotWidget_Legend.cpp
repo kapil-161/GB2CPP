@@ -331,6 +331,25 @@ void PlotWidget::updateLegendAdvanced(const QMap<QString, QMap<QString, QVector<
     if (!m_simVisible) setSimSeriesVisible(false);
 }
 
+void PlotWidget::toggleLegendRowVisibility(QWidget* rowWidget)
+{
+    // The preceding single-click (MouseButtonPress) fired createToggleHandler which
+    // dims other series — undo that before toggling visibility.
+    resetAllHighlightedItems();
+
+    bool hidden = rowWidget->property("seriesHidden").toBool();
+    bool nowHidden = !hidden;
+    rowWidget->setProperty("seriesHidden", nowHidden);
+
+    const auto seriesList = rowWidget->property("seriesToHighlight").value<QVector<QAbstractSeries*>>();
+    for (QAbstractSeries* s : seriesList) {
+        if (s) s->setVisible(!nowHidden);
+    }
+
+    // Dim the legend row text when hidden
+    rowWidget->setStyleSheet(nowHidden ? "color: #aaaaaa;" : "");
+}
+
 void PlotWidget::createLegendRowFromData(const QMap<QString, QVariant>& treatmentData, const QString& varName, const QString& displayName)
 {
     // Create a single legend row for a treatment (matching Python _create_legend_row)
@@ -832,6 +851,23 @@ void PlotWidget::resetAllHighlightedItems()
         }
     }
 
+    if (m_isScatterMode) {
+        // Scatter series live in panel charts, not m_plotDataList — restore full opacity directly.
+        for (QChartView *cv : m_scatterPanelViews) {
+            for (QAbstractSeries *s : cv->chart()->series()) {
+                if (QScatterSeries *ss = qobject_cast<QScatterSeries*>(s)) {
+                    QPen pen = ss->pen();
+                    QColor pc = pen.color(); pc.setAlphaF(1.0); pen.setColor(pc);
+                    ss->setPen(pen);
+                    QBrush brush = ss->brush();
+                    QColor bc = brush.color(); bc.setAlphaF(1.0); brush.setColor(bc);
+                    ss->setBrush(brush);
+                }
+            }
+        }
+        return;
+    }
+
     // Restore original pen/brush from PlotData — works for both single and multi-panel.
     // pd->pen/brush are stored at series creation time and never mutated, so they are
     // always the correct "unhighlighted" baseline regardless of m_tsPanelViews state.
@@ -856,6 +892,23 @@ void PlotWidget::highlightPlotItems(const QVector<QAbstractSeries*>& seriesToHig
 {
     // Build a fast lookup set
     QSet<QAbstractSeries*> highlightSet(seriesToHighlight.begin(), seriesToHighlight.end());
+
+    if (m_isScatterMode) {
+        for (QChartView *cv : m_scatterPanelViews) {
+            for (QAbstractSeries *s : cv->chart()->series()) {
+                QScatterSeries *ss = qobject_cast<QScatterSeries*>(s);
+                if (!ss) continue;
+                bool isHighlighted = highlightSet.contains(s);
+                QPen pen = ss->pen();
+                QColor pc = pen.color(); pc.setAlphaF(isHighlighted ? 1.0 : 0.15); pen.setColor(pc);
+                ss->setPen(pen);
+                QBrush brush = ss->brush();
+                QColor bc = brush.color(); bc.setAlphaF(isHighlighted ? 1.0 : 0.15); brush.setColor(bc);
+                ss->setBrush(brush);
+            }
+        }
+        return;
+    }
 
     // Use m_plotDataList (covers both single and multi-panel) and baseline pens/brushes
     // stored at series creation time — no m_tsPanelViews branch needed.

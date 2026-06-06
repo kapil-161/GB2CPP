@@ -710,8 +710,13 @@ void PlotWidget::plotTimeSeriesMultiPanel()
                 else if (tickInterval < 10.0)  autoDecimals = 1;
             }
 
+            double alignedMin = m_plotSettings.useCustomYMin
+                                ? m_plotSettings.yAxisMin
+                                : 0.0;
+            if (m_plotSettings.useCustomYMax) alignedMax = m_plotSettings.yAxisMax;
+
             QValueAxis *yAx = new QValueAxis();
-            yAx->setRange(0, alignedMax);
+            yAx->setRange(alignedMin, alignedMax);
             yAx->setTickCount(yTickCount);
             yAx->setMinorTickCount(m_plotSettings.yAxisMinorTickCount);
             yAx->setMinorGridLineVisible(m_plotSettings.showMinorGrid);

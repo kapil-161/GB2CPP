@@ -62,18 +62,19 @@ PlotSettings PlotSettingsDialog::getSettings() const
     settings.yAxisTickSpacing = m_yAxisTickSpacingSpinBox->value();
     settings.yAxisMinorTickCount = m_yAxisMinorTickCountSpinBox->value();
     settings.yAxisDecimals = m_yAxisDecimalsSpinBox->value();
-    settings.useCustomXMin = m_useCustomXMinCheckBox->isChecked();
     settings.xAxisMin = m_xAxisIsDate
         ? static_cast<double>(m_xAxisMinDateEdit->dateTime().toMSecsSinceEpoch())
         : m_xAxisMinSpinBox->value();
-    settings.useCustomXMax = m_useCustomXMaxCheckBox->isChecked();
     settings.xAxisMax = m_xAxisIsDate
         ? static_cast<double>(m_xAxisMaxDateEdit->dateTime().toMSecsSinceEpoch())
         : m_xAxisMaxSpinBox->value();
-    settings.useCustomYMin = m_useCustomYMinCheckBox->isChecked();
     settings.yAxisMin = m_yAxisMinSpinBox->value();
-    settings.useCustomYMax = m_useCustomYMaxCheckBox->isChecked();
     settings.yAxisMax = m_yAxisMaxSpinBox->value();
+    // useCustom* is true if the user changed the value from what was seeded
+    settings.useCustomXMin = (settings.xAxisMin != m_seededXMin);
+    settings.useCustomXMax = (settings.xAxisMax != m_seededXMax);
+    settings.useCustomYMin = (settings.yAxisMin != m_seededYMin);
+    settings.useCustomYMax = (settings.yAxisMax != m_seededYMax);
     settings.plotTitle = m_plotTitleEdit->text();
     settings.fontFamily = m_fontFamilyComboBox->currentText();
     settings.titleFontSize = m_titleFontSizeSpinBox->value();
@@ -227,14 +228,13 @@ void PlotSettingsDialog::setupUI()
     QGridLayout *rangeLayout = new QGridLayout(rangeGroup);
 
     // X Min
-    m_useCustomXMinCheckBox = new QCheckBox("X Min:");
-    m_useCustomXMinCheckBox->setChecked(m_settings.useCustomXMin);
-    rangeLayout->addWidget(m_useCustomXMinCheckBox, 0, 0);
+    rangeLayout->addWidget(new QLabel("X Min:"), 0, 0);
 
     m_xAxisMinSpinBox = new QDoubleSpinBox();
     m_xAxisMinSpinBox->setRange(-1e9, 1e9);
     m_xAxisMinSpinBox->setDecimals(4);
     m_xAxisMinSpinBox->setValue(m_settings.xAxisMin);
+    m_seededXMin = m_settings.xAxisMin;
     m_xAxisMinDateEdit = new QDateTimeEdit();
     m_xAxisMinDateEdit->setDisplayFormat("yyyy-MM-dd");
     m_xAxisMinDateEdit->setCalendarPopup(true);
@@ -249,14 +249,13 @@ void PlotSettingsDialog::setupUI()
     }
 
     // X Max
-    m_useCustomXMaxCheckBox = new QCheckBox("X Max:");
-    m_useCustomXMaxCheckBox->setChecked(m_settings.useCustomXMax);
-    rangeLayout->addWidget(m_useCustomXMaxCheckBox, 1, 0);
+    rangeLayout->addWidget(new QLabel("X Max:"), 1, 0);
 
     m_xAxisMaxSpinBox = new QDoubleSpinBox();
     m_xAxisMaxSpinBox->setRange(-1e9, 1e9);
     m_xAxisMaxSpinBox->setDecimals(4);
     m_xAxisMaxSpinBox->setValue(m_settings.xAxisMax);
+    m_seededXMax = m_settings.xAxisMax;
     m_xAxisMaxDateEdit = new QDateTimeEdit();
     m_xAxisMaxDateEdit->setDisplayFormat("yyyy-MM-dd");
     m_xAxisMaxDateEdit->setCalendarPopup(true);
@@ -271,23 +270,21 @@ void PlotSettingsDialog::setupUI()
     }
 
     // Y Min
-    m_useCustomYMinCheckBox = new QCheckBox("Y Min:");
-    m_useCustomYMinCheckBox->setChecked(m_settings.useCustomYMin);
     m_yAxisMinSpinBox = new QDoubleSpinBox();
     m_yAxisMinSpinBox->setRange(-1e9, 1e9);
     m_yAxisMinSpinBox->setDecimals(4);
     m_yAxisMinSpinBox->setValue(m_settings.yAxisMin);
-    rangeLayout->addWidget(m_useCustomYMinCheckBox, 2, 0);
+    m_seededYMin = m_settings.yAxisMin;
+    rangeLayout->addWidget(new QLabel("Y Min:"), 2, 0);
     rangeLayout->addWidget(m_yAxisMinSpinBox, 2, 1);
 
     // Y Max
-    m_useCustomYMaxCheckBox = new QCheckBox("Y Max:");
-    m_useCustomYMaxCheckBox->setChecked(m_settings.useCustomYMax);
     m_yAxisMaxSpinBox = new QDoubleSpinBox();
     m_yAxisMaxSpinBox->setRange(-1e9, 1e9);
     m_yAxisMaxSpinBox->setDecimals(4);
     m_yAxisMaxSpinBox->setValue(m_settings.yAxisMax);
-    rangeLayout->addWidget(m_useCustomYMaxCheckBox, 3, 0);
+    m_seededYMax = m_settings.yAxisMax;
+    rangeLayout->addWidget(new QLabel("Y Max:"), 3, 0);
     rangeLayout->addWidget(m_yAxisMaxSpinBox, 3, 1);
 
     gridAxesLayout->addWidget(axisGroup);
@@ -622,14 +619,14 @@ void PlotSettingsDialog::onResetDefaults()
     m_yAxisTickSpacingSpinBox->setValue(defaults.yAxisTickSpacing);
     m_yAxisMinorTickCountSpinBox->setValue(defaults.yAxisMinorTickCount);
     m_yAxisDecimalsSpinBox->setValue(defaults.yAxisDecimals);
-    m_useCustomXMinCheckBox->setChecked(defaults.useCustomXMin);
     m_xAxisMinSpinBox->setValue(defaults.xAxisMin);
-    m_useCustomXMaxCheckBox->setChecked(defaults.useCustomXMax);
+    m_seededXMin = defaults.xAxisMin;
     m_xAxisMaxSpinBox->setValue(defaults.xAxisMax);
-    m_useCustomYMinCheckBox->setChecked(defaults.useCustomYMin);
+    m_seededXMax = defaults.xAxisMax;
     m_yAxisMinSpinBox->setValue(defaults.yAxisMin);
-    m_useCustomYMaxCheckBox->setChecked(defaults.useCustomYMax);
+    m_seededYMin = defaults.yAxisMin;
     m_yAxisMaxSpinBox->setValue(defaults.yAxisMax);
+    m_seededYMax = defaults.yAxisMax;
     m_plotTitleEdit->setText(defaults.plotTitle);
     updateColorButton(m_backgroundColorButton, defaults.backgroundColor);
     updateColorButton(m_plotAreaColorButton, defaults.plotAreaColor);

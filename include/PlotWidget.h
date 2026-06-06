@@ -321,6 +321,7 @@ private:
     void createLegendRowFromData(const QMap<QString, QVariant>& treatmentData, const QString& varName, const QString& displayName);
     void createSimpleLegendRow(const LegendTreatmentData& treatmentData, const QString& varName, const QString& displayName);
     void createToggleHandler(QWidget* rowWidget);
+    void toggleLegendRowVisibility(QWidget* rowWidget);
     bool shouldCropLegend(int totalTreatments) const;
     QStringList cropTreatmentList(const QStringList& treatments, int maxEntries) const;
     QString getCropNameFromCode(const QString& cropCode) const;
