@@ -1360,6 +1360,7 @@ QStringList DataProcessor::prepareOutFiles(const QString &folderName)
             << "*.OG2" << "*.og2"
             << "*.OGF" << "*.ogf"
             << "*.OLN" << "*.oln"
+            << "*.OLC" << "*.olc"
             << "*.OME" << "*.ome"
             << "*.OMO" << "*.omo"
             << "*.ONO" << "*.ono"
