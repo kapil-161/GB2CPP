@@ -64,8 +64,15 @@ void releaseMessageHandler(QtMsgType type, const QMessageLogContext &context, co
 // Verbose message handler that shows all debug output
 void verboseMessageHandler(QtMsgType type, const QMessageLogContext &context, const QString &msg)
 {
-    Q_UNUSED(context);
-    
+    // Drop Qt's own internal DEBUG spam (e.g. qt.text.layout emits thousands of
+    // "layoutBlock/layoutFrame" lines that bury our [TRACE] output and stall the
+    // console). Keep everything from the default category and all warnings/criticals.
+    if (type == QtDebugMsg && context.category
+        && qstrcmp(context.category, "default") != 0
+        && qstrncmp(context.category, "qt.", 3) == 0) {
+        return;
+    }
+
     const char *typeStr = "";
     switch (type) {
         case QtDebugMsg: typeStr = "DEBUG"; break;

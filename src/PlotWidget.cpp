@@ -497,6 +497,7 @@ void PlotWidget::setupAxes(const QString &xVar)
         QValueAxis *valueAxis = new QValueAxis();
         valueAxis->setTitleText("Date");
         valueAxis->setLabelsVisible(false); // custom labels drawn in paintEvent
+        valueAxis->setTickType(QValueAxis::TicksFixed); // never dynamic-by-interval
         valueAxis->setTickCount(2);         // just endpoints; we paint our own ticks
         valueAxis->setMinorTickCount(0);
         valueAxis->setMinorGridLineVisible(false);
@@ -537,7 +538,12 @@ void PlotWidget::setupAxes(const QString &xVar)
     // Configure axis appearance
     xAxis->setGridLineVisible(m_showGrid);
     yAxis->setGridLineVisible(m_showGrid);
-    xAxis->setLabelsVisible(true);
+    // Re-enable X labels EXCEPT in axis-break mode, where the QValueAxis labels are
+    // raw virtual coordinates (e.g. -898488001) that we deliberately hide and draw
+    // our own date labels for in paintEvent. Unconditionally showing them here was
+    // overwriting the setLabelsVisible(false) set above for the break-mode axis.
+    bool breakModeXAxis = (xVar == "DATE" && !m_axisBreaks.isEmpty());
+    xAxis->setLabelsVisible(!breakModeXAxis);
     yAxis->setLabelsVisible(true);
 
     // Add axes to chart first — Qt theme is applied on addAxis and would override pens set before
@@ -620,7 +626,20 @@ void PlotWidget::autoFitAxes()
     if (!hasData) {
         return;
     }
-    
+
+    // Safety clamp: in axis-break (virtual-coordinate) mode, every plotted x must
+    // lie within [0, m_virtualAxisMax]. A single out-of-range x (e.g. a mis-mapped
+    // error-bar mean) would otherwise stretch the axis to billions, and Qt Charts'
+    // CartesianChartAxis::createItems would try to lay out a near-infinite number
+    // of tick items and hang the app. Bound the computed range defensively.
+    if (!m_axisBreaks.isEmpty() && m_currentXVar == "DATE" && m_virtualAxisMax > 0.0) {
+        if (minX < 0.0 || maxX > m_virtualAxisMax || maxX - minX > m_virtualAxisMax * 1.5) {
+            minX = qMax(0.0, minX);
+            maxX = qMin(m_virtualAxisMax, maxX);
+            if (maxX <= minX) { minX = 0.0; maxX = m_virtualAxisMax; }
+        }
+    }
+
     // Include error bar extent in Y bounds when error bars are enabled
     if (m_plotSettings.showErrorBars) {
         for (const QSharedPointer<PlotData> &plotData : m_plotDataList) {
@@ -652,11 +671,18 @@ void PlotWidget::autoFitAxes()
     for (auto axis : axes) {
         if (axis->orientation() == Qt::Horizontal) {
             if (auto valueAxis = qobject_cast<QValueAxis*>(axis)) {
+                // CRITICAL: Force fixed 2-tick mode BEFORE any setRange call. If the axis is
+                // still in TicksDynamic mode (small interval left from a prior DAS/DAP
+                // plot), setRange over a huge span (e.g. milliseconds since epoch for PDATE)
+                // makes Qt create millions of tick items and hang the UI.
+                valueAxis->setTickType(QValueAxis::TicksFixed);
+                valueAxis->setTickCount(2);
+                valueAxis->setMinorTickCount(0);
+
                 // In axis-break mode the x coords are virtual; just use tight range with no padding
                 if (!m_axisBreaks.isEmpty() && m_currentXVar == "DATE") {
                     double vPad = m_virtualAxisMax * 0.02;
                     valueAxis->setRange(minX - vPad, maxX + vPad);
-                    valueAxis->setTickCount(2);
                     valueAxis->setLabelsVisible(false);
                     // Pass break positions to chart view for painting
                     if (m_chartView) {
@@ -730,6 +756,11 @@ void PlotWidget::autoFitAxes()
             }
         } else if (axis->orientation() == Qt::Vertical) {
             if (auto valueAxis = qobject_cast<QValueAxis*>(axis)) {
+                // CRITICAL: Force fixed 2-tick mode BEFORE any setRange call to avoid explosion.
+                valueAxis->setTickType(QValueAxis::TicksFixed);
+                valueAxis->setTickCount(2);
+                valueAxis->setMinorTickCount(0);
+
                 // Start with data maximum and minimal padding (5%)
                 double dataMax = maxY;
                 double minimalPadding = dataMax * 0.05;
@@ -896,50 +927,43 @@ double PlotWidget::calculateNiceXInterval(double range)
 {
     if (range <= 0) return 1;
     
-    // Define clean interval options (in order of preference)
-    QVector<double> cleanIntervals = {1, 2, 5, 10, 15, 20, 25, 30, 50, 100, 150, 200, 250, 500, 1000};
-    
-    // Target 8-15 ticks for good readability
-    double targetTicks = 12.0;
-    double idealInterval = range / targetTicks;
-    
-    // Find the closest clean interval that gives us reasonable tick count
-    double bestInterval = cleanIntervals.last(); // Default to largest
-    for (double interval : cleanIntervals) {
-        double tickCount = range / interval;
-        // Accept intervals that give us 6-20 ticks (prefer 8-15)
-        if (tickCount >= 6 && tickCount <= 20) {
-            bestInterval = interval;
-            break; // Take the first (smallest) acceptable interval
-        }
-    }
-    
-    return bestInterval;
+    // For very small ranges, just use a small clean interval
+    if (range < 1.0) return 0.1;
+
+    // Use a logarithmic approach to find a clean interval for ANY range scale.
+    // Target ~10 ticks.
+    double targetInterval = range / 10.0;
+    double exponent = std::floor(std::log10(targetInterval));
+    double magnitude = std::pow(10, exponent);
+    double fraction = targetInterval / magnitude;
+
+    double cleanFraction;
+    if (fraction <= 1.0) cleanFraction = 1.0;
+    else if (fraction <= 2.0) cleanFraction = 2.0;
+    else if (fraction <= 5.0) cleanFraction = 5.0;
+    else cleanFraction = 10.0;
+
+    return cleanFraction * magnitude;
 }
 
 double PlotWidget::calculateNiceYInterval(double max)
 {
-    if (max <= 0) return 1;
+    if (max <= 0) return 1.0;
     
-    // Define clean Y-axis interval options
-    QVector<double> cleanIntervals = {0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1, 2, 5, 10, 20, 25, 50, 100, 200, 250, 500, 1000, 2000, 2500, 5000, 10000, 20000, 25000, 50000, 100000};
-    
-    // Target 8-12 ticks for Y-axis
-    double targetTicks = 10.0;
-    double idealInterval = max / targetTicks;
-    
-    // Find the closest clean interval
-    double bestInterval = cleanIntervals.last(); // Default to largest
-    for (double interval : cleanIntervals) {
-        double tickCount = max / interval;
-        // Accept intervals that give us 6-15 ticks
-        if (tickCount >= 6 && tickCount <= 15) {
-            bestInterval = interval;
-            break; // Take the first (smallest) acceptable interval
-        }
-    }
-    
-    return bestInterval;
+    // Use a logarithmic approach to find a clean interval for ANY range scale.
+    // Target ~10 ticks.
+    double targetInterval = max / 10.0;
+    double exponent = std::floor(std::log10(targetInterval));
+    double magnitude = std::pow(10, exponent);
+    double fraction = targetInterval / magnitude;
+
+    double cleanFraction;
+    if (fraction <= 1.0) cleanFraction = 1.0;
+    else if (fraction <= 2.0) cleanFraction = 2.0;
+    else if (fraction <= 5.0) cleanFraction = 5.0;
+    else cleanFraction = 10.0;
+
+    return cleanFraction * magnitude;
 }
 
 int PlotWidget::calculateOptimalDateTickCount() const
@@ -1942,10 +1966,12 @@ void PlotWidget::plotDatasets(const DataTable &simData, const DataTable &obsData
                         meanPoints.append(errorBar.meanPoint());
                     }
                     plotData.points = meanPoints;
+                    plotData.rawPoints = it.value(); // keep originals for animation filtering
                     plotData.errorBars = errorBars;
                 } else {
                     plotData.points = it.value();
-                    plotData.errorBars.clear();  // No error bars if disabled or no replicates
+                    plotData.rawPoints = it.value();
+                    plotData.errorBars.clear();
                 }
                 
                 plotData.color = getColorForTreatment(treatmentId, colorIndex); // Use same treatmentId as simulated data for consistent colors
@@ -1976,10 +2002,16 @@ void PlotWidget::plotDatasets(const DataTable &simData, const DataTable &obsData
             m_chart->removeAxis(axis);
         setupAxes(xVar);
 
-        // Remap all x-coordinates to virtual space
+        // Remap all x-coordinates to virtual space. rawPoints and error-bar
+        // meanX must be remapped too so downstream obs/sim pairing (TS panel
+        // metrics, animation metrics) compares like-for-like coordinates.
         for (PlotData &pd : plotDataList) {
             for (QPointF &pt : pd.points)
                 pt.setX(remapX(pt.x()));
+            for (QPointF &pt : pd.rawPoints)
+                pt.setX(remapX(pt.x()));
+            for (ErrorBarData &eb : pd.errorBars)
+                eb.meanX = remapX(eb.meanX);
         }
     }
 
@@ -2634,9 +2666,18 @@ void PlotWidget::updatePlot(const QString &xVariable, const QString &yVariable,
 
 void PlotWidget::clearChart()
 {
+    // Drop error-bar maps BEFORE deleting the series they key on. The maps hold
+    // raw QAbstractSeries* keys; once removeAllSeries() frees those objects, any
+    // paint event would qobject_cast a dangling pointer and crash. This must
+    // cover the multi-panel views too, not just m_chartView.
+    if (m_chartView)
+        m_chartView->setErrorBarData(QMap<QAbstractSeries*, QVector<ErrorBarData>>());
+    for (ErrorBarChartView *v : m_tsPanelViews)
+        if (v) v->setErrorBarData(QMap<QAbstractSeries*, QVector<ErrorBarData>>());
+
     if (m_chart) {
         m_chart->removeAllSeries();
-        
+
         // Remove all existing axes to prevent accumulation
         auto existingAxes = m_chart->axes();
         for (auto axis : existingAxes) {
@@ -2647,10 +2688,9 @@ void PlotWidget::clearChart()
     m_scalingLabel->clear();
     m_plotDataList.clear();
     if (m_tsMetricsOverlay) { delete m_tsMetricsOverlay; m_tsMetricsOverlay = nullptr; }
-    
-    // Clear error bars and axis breaks when chart is cleared
+
+    // Clear remaining single-view decorations when chart is cleared
     if (m_chartView) {
-        m_chartView->setErrorBarData(QMap<QAbstractSeries*, QVector<ErrorBarData>>());
         m_chartView->clearBoxPlotMedians();
         m_chartView->clearAxisBreaks();
     }
@@ -2746,10 +2786,17 @@ void PlotWidget::computeAxisBreaks(const QVector<PlotData> &plotDataList)
 
     if (m_currentXVar != "DATE") return;
 
-    // Gather all unique real x-values across all series
+    // Gather all unique real x-values across all series. Must include rawPoints:
+    // for error-bar series pd.points holds day-rounded means while rawPoints holds
+    // the un-rounded originals, and BOTH get remapped later. If a rawPoint falls
+    // outside every segment computed from points alone, remapX can't place it and
+    // the axis range breaks. Building segments from the same set we remap keeps
+    // every value inside a segment window.
     QVector<double> allX;
     for (const PlotData &pd : plotDataList) {
         for (const QPointF &pt : pd.points)
+            allX.append(pt.x());
+        for (const QPointF &pt : pd.rawPoints)
             allX.append(pt.x());
     }
     if (allX.isEmpty()) return;
@@ -2817,9 +2864,24 @@ double PlotWidget::remapX(double realMsec) const
                 return seg.virtualStart + (realMsec - seg.start);
         }
     }
-    // Fallback: clamp to last segment
+
+    // Out of every segment window (e.g. a point that fell inside a gap, or an
+    // aggregated mean rounded just past a segment edge). DO NOT extrapolate from
+    // a single segment — for multi-segment axes that produces values millions of
+    // units away and blows out the whole axis range. Instead snap to the nearest
+    // segment's virtual span.
+    if (realMsec <= m_axisSegments.first().start)
+        return m_axisSegments.first().virtualStart;
     const AxisSegment &last = m_axisSegments.last();
-    return last.virtualStart + (realMsec - last.start);
+    if (realMsec >= last.end)
+        return last.virtualStart + (last.end - last.start);
+    // Falls in a gap between two segments: clamp to the end of the segment before it.
+    for (int i = 0; i < m_axisSegments.size() - 1; ++i) {
+        const AxisSegment &seg = m_axisSegments[i];
+        if (realMsec > seg.end)
+            return seg.virtualStart + (seg.end - seg.start);
+    }
+    return m_axisSegments.first().virtualStart;
 }
 
 double PlotWidget::unremapX(double virtualX) const
@@ -4840,8 +4902,11 @@ static QStringList computeAnimMetrics(
     QMap<QString, QVector<QPointF>> obsByTrt, simByTrt;
     for (const auto &pd : varData) {
         QString key = pd->treatment + "__" + pd->experiment;
+        // Use rawPoints for observed so individual obs pair against sim, even when error bars aggregate them
+        const QVector<QPointF> &src = (pd->isObserved && !pd->rawPoints.isEmpty())
+                                      ? pd->rawPoints : pd->points;
         QVector<QPointF> pts;
-        for (const QPointF &pt : pd->points)
+        for (const QPointF &pt : src)
             if (pt.x() <= cutoff) pts.append(pt);
         if (pd->isObserved) obsByTrt[key].append(pts);
         else                simByTrt[key].append(pts);
@@ -4852,8 +4917,16 @@ static QStringList computeAnimMetrics(
         if (!simByTrt.contains(key)) continue;
         QMap<double, double> simByX;
         for (const QPointF &pt : simByTrt[key]) simByX[pt.x()] = pt.y();
-        for (const QPointF &pt : obsByTrt[key])
-            if (simByX.contains(pt.x())) { allObs << pt.y(); allSim << simByX[pt.x()]; }
+        for (const QPointF &pt : obsByTrt[key]) {
+            if (simByX.contains(pt.x())) {
+                allObs << pt.y(); allSim << simByX[pt.x()];
+            } else {
+                // Fuzzy match — obs dates may be remapped slightly off sim dates
+                auto it = simByX.lowerBound(pt.x() - 0.5);
+                if (it != simByX.end() && std::abs(it.key() - pt.x()) < 0.5)
+                    { allObs << pt.y(); allSim << it.value(); }
+            }
+        }
     }
 
     QVector<double> obs, sim;
@@ -4884,19 +4957,55 @@ void PlotWidget::applyAnimFrame(int frame)
 
     double cutoff = m_animXValues[frame];
 
+    // Collect filtered error bars per view so we can update them in one pass
+    QMap<ErrorBarChartView*, QMap<QAbstractSeries*, QVector<ErrorBarData>>> viewErrorBars;
+    if (m_plotSettings.showErrorBars) {
+        if (m_chartView && m_chartView->isVisible())
+            viewErrorBars[m_chartView] = {};
+        for (ErrorBarChartView *v : m_tsPanelViews)
+            if (v && v->isVisible())
+                viewErrorBars[v] = {};
+    }
+
     for (const auto &pd : m_plotDataList) {
         if (!pd || !pd->series) continue;
 
+        // For the series itself always filter pd->points (mean points for error bar series,
+        // raw points for non-aggregated observed). rawPoints is only used for error bar metrics.
         QVector<QPointF> filtered;
-        for (const QPointF &pt : pd->points) {
-            if (pt.x() <= cutoff)
-                filtered.append(pt);
-        }
+        for (const QPointF &pt : pd->points)
+            if (pt.x() <= cutoff) filtered.append(pt);
 
         if (QLineSeries *ls = qobject_cast<QLineSeries*>(pd->series.data()))
             ls->replace(filtered);
         else if (QScatterSeries *ss = qobject_cast<QScatterSeries*>(pd->series.data()))
             ss->replace(filtered);
+
+        // Filter error bars for this observed series
+        if (m_plotSettings.showErrorBars && pd->isObserved && !pd->errorBars.isEmpty()) {
+            QChart *chart = pd->series->chart();
+            if (chart) {
+                ErrorBarChartView *target = nullptr;
+                if (m_chartView && m_chartView->chart() == chart)
+                    target = m_chartView;
+                else {
+                    for (ErrorBarChartView *v : m_tsPanelViews)
+                        if (v && v->chart() == chart) { target = v; break; }
+                }
+                if (target && viewErrorBars.contains(target)) {
+                    QVector<ErrorBarData> filteredEB;
+                    for (const auto &eb : pd->errorBars)
+                        if (eb.meanX <= cutoff) filteredEB.append(eb);
+                    viewErrorBars[target][pd->series.data()] = filteredEB;
+                }
+            }
+        }
+    }
+
+    // Push filtered error bars to their views
+    if (m_plotSettings.showErrorBars) {
+        for (auto it = viewErrorBars.begin(); it != viewErrorBars.end(); ++it)
+            it.key()->setErrorBarData(it.value());
     }
 
     // Update metrics overlays if any are configured
@@ -4963,7 +5072,9 @@ void PlotWidget::animTick()
 
 void PlotWidget::updateAnimLabel(int frame)
 {
-    if (m_animXValues.isEmpty()) { m_animLabel->setText("--"); return; }
+    if (m_animXValues.isEmpty() || frame < 0 || frame >= m_animXValues.size()) {
+        m_animLabel->setText("--"); return;
+    }
 
     double x = m_animXValues[frame];
     QString text;
@@ -4974,7 +5085,11 @@ void PlotWidget::updateAnimLabel(int frame)
                 || m_currentXVar.toUpper() == "HDAT");
 
     if (isDate) {
-        QDateTime dt = QDateTime::fromMSecsSinceEpoch(static_cast<qint64>(x), QTimeZone::utc());
+        // m_animXValues come from pd->points, which are remapped into virtual
+        // coordinates when axis breaks are active. Convert back to real epoch
+        // ms before decoding, otherwise virtual x≈0 displays as 1970.
+        double realMsec = m_axisBreaks.isEmpty() ? x : unremapX(x);
+        QDateTime dt = QDateTime::fromMSecsSinceEpoch(static_cast<qint64>(realMsec));
         text = dt.toString("MMM d, yyyy");
     } else {
         text = QString("%1 / %2")

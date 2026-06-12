@@ -14,6 +14,9 @@
 
 Name "GB2"
 OutFile "C:\DSSAT48\Tools\gb2\GB2.exe"
+; Give the packaged launcher exe the GB2 application icon (otherwise NSIS uses
+; its generic default icon). Path is relative to this .nsi file.
+Icon "manual_deployment\resources\final.ico"
 RequestExecutionLevel user
 SilentInstall silent
 SetCompressor /SOLID lzma

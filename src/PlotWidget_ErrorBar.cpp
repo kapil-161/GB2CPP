@@ -167,11 +167,15 @@ void ErrorBarChartView::paintErrorBars(QPainter *painter, const QPoint &viewport
         return;
     }
 
+    const QList<QAbstractSeries*> liveSeries = chart()->series();
     for (auto it = m_errorBars.begin(); it != m_errorBars.end(); ++it) {
         QAbstractSeries *series = it.key();
         const QVector<ErrorBarData> &errorBars = it.value();
 
         if (errorBars.isEmpty()) continue;
+        // Guard against stale keys: the series may have been removed/deleted by a
+        // rebuild before the map was refreshed. Casting a dangling pointer crashes.
+        if (!liveSeries.contains(series)) continue;
 
         QColor color = Qt::black;
         if (auto lineSeries = qobject_cast<QLineSeries*>(series)) {

@@ -650,6 +650,11 @@ void MainWindow::connectSignals()
     if (m_yVarSearch) {
         connect(m_yVarSearch, &QLineEdit::textChanged, this, &MainWindow::filterYVars);
     }
+
+    // Connect OutFile search
+    if (m_fileSearchWidget) {
+        connect(m_fileSearchWidget, &QLineEdit::textChanged, this, &MainWindow::filterOutFiles);
+    }
 }
 
 void MainWindow::onOpenFile()
@@ -1274,7 +1279,22 @@ void MainWindow::onPlotTypeChanged()
 
 void MainWindow::onUpdatePlot()
 {
-    
+    // Refresh variable list asterisks based on currently selected treatments.
+    // Save and restore Y selection so rebuilding the list doesn't deselect variables.
+    QStringList savedYKeys;
+    if (m_yVariableComboBox) {
+        for (QListWidgetItem *item : m_yVariableComboBox->selectedItems())
+            savedYKeys << item->data(Qt::UserRole).toString();
+    }
+    updateVariableComboBoxes();
+    if (m_yVariableComboBox && !savedYKeys.isEmpty()) {
+        for (int i = 0; i < m_yVariableComboBox->count(); ++i) {
+            QListWidgetItem *item = m_yVariableComboBox->item(i);
+            if (item && savedYKeys.contains(item->data(Qt::UserRole).toString()))
+                item->setSelected(true);
+        }
+    }
+
     // Check which tab we're on and perform appropriate action
     if (m_tabWidget && m_tabWidget->currentIndex() == 0) {
         // Time Series tab - refresh time series plot
@@ -1423,6 +1443,7 @@ void MainWindow::onDataProcessed(const QString &message)
 {
     m_statusWidget->showSuccess(message);
     m_progressBar->hide();
+
     
     // Update UI with new data
     updateVariableComboBoxes();
@@ -1628,24 +1649,50 @@ void MainWindow::updateVariableComboBoxes()
     QStringList commonVariables;
     QStringList simOnlyVariables;
 
+    // Build set of obs row indices matching the currently selected treatments.
+    // Empty selection (all) → no filtering. __NO_SELECTION__ → no rows match → no *.
+    QSet<int> obsRowsForSelectedTrts;
+    bool filterObsByTrt = false;
+    if (m_plotWidget) {
+        QStringList selectedTrts = m_plotWidget->getSelectedTreatments();
+        bool noneSelected = selectedTrts.size() == 1 && selectedTrts.first() == "__NO_SELECTION__";
+        bool allSelected  = selectedTrts.isEmpty();
+        if (!allSelected && !noneSelected) {
+            filterObsByTrt = true;
+            const DataColumn *obsTrtCol = m_currentObsData.getColumn("TRT");
+            const DataColumn *obsExpCol = m_currentObsData.getColumn("EXPERIMENT");
+            int nRows = m_currentObsData.rowCount;
+            for (int i = 0; i < nRows; ++i) {
+                QString trt = obsTrtCol ? obsTrtCol->data.value(i).toString() : QString();
+                QString exp = obsExpCol ? obsExpCol->data.value(i).toString() : QString();
+                if (selectedTrts.contains(trt) || selectedTrts.contains(exp + "::" + trt))
+                    obsRowsForSelectedTrts.insert(i);
+            }
+        } else if (noneSelected) {
+            filterObsByTrt = true; // empty set → no * shown
+        }
+    }
+
     // Identify common variables and simulated-only variables
     // Only skip internal/synthetic columns here; yVariableExclusions is applied later when adding to Y list
     for (const QString &columnName : m_currentData.columnNames) {
         if (columnName.startsWith("__")) continue;
         if (m_currentObsData.columnNames.contains(columnName)) {
-            // Check if observed data column actually has valid (non-missing) data
+            // Check if observed data column has valid (non-missing) data for selected treatments
             const DataColumn *obsCol = m_currentObsData.getColumn(columnName);
             bool hasValidObsData = false;
-            
+
             if (obsCol) {
-                for (const QVariant &value : obsCol->data) {
-                    if (!DataProcessor::isMissingValue(value)) {
+                int nRows = obsCol->data.size();
+                for (int i = 0; i < nRows; ++i) {
+                    if (filterObsByTrt && !obsRowsForSelectedTrts.contains(i)) continue;
+                    if (!DataProcessor::isMissingValue(obsCol->data.value(i))) {
                         hasValidObsData = true;
                         break;
                     }
                 }
             }
-            
+
             if (hasValidObsData) {
                 commonVariables.append(columnName);
             } else {
@@ -2644,6 +2691,7 @@ void MainWindow::onFileSelectionChanged()
                 m_statusWidget->showInfo("No EVALUATE.OUT files selected. Please select EVALUATE.OUT files for scatter plots.");
             }
         }
+
     }
 }
 

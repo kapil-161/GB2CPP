@@ -120,6 +120,19 @@ void PlotWidget::onSettingsButtonClicked()
         m_plotSettings = newSettings;
         saveSettings();
 
+        // Toggling error bars switches the chart between aggregated mean-points and
+        // raw points (and, with DATE-gap axis breaks, swaps the x-axis type). Mutating
+        // the existing chart in place leaves stale axis/series state that has caused
+        // garbage axis labels and hangs. For an error-bar change, tear the chart down
+        // completely and rebuild from scratch so nothing stale survives.
+        if (errorBarChanged && !m_isScatterMode && !m_isBoxPlotMode && m_simData.rowCount > 0) {
+            clearChart();
+            updatePlotWithScaling();
+            if (m_obsData.rowCount > 0)
+                calculateMetrics();
+            return;
+        }
+
         if (m_isScatterMode && m_simData.rowCount > 0 && !m_currentYVars.isEmpty()) {
             // Always replot scatter — metrics selection, appearance, etc. all require rebuild
             DataTable dataCopy = m_simData;
@@ -132,7 +145,7 @@ void PlotWidget::onSettingsButtonClicked()
                 updatePlotWithScaling();
             }
         } else if (!m_isScatterMode && m_simData.rowCount > 0) {
-            if (filterChanged || errorBarChanged) {
+            if (filterChanged) {
                 updatePlotWithScaling();
                 if (m_obsData.rowCount > 0)
                     calculateMetrics();
@@ -198,11 +211,25 @@ void PlotWidget::applyPlotSettings(const PlotSettings &settings)
 
         if (auto valueAxis = qobject_cast<QValueAxis*>(axis)) {
             valueAxis->setMinorGridLineVisible(settings.showMinorGrid);
-            valueAxis->setLabelsVisible(settings.showAxisLabels);
 
             bool isXAxis = !hAxes.isEmpty() && axis == hAxes.first();
 
-            if (!m_isScatterMode && isXAxis) {
+            // In axis-break (DATE-gap) mode the x-axis is a QValueAxis whose labels
+            // are raw virtual coordinates (e.g. -898488001); we hide them and paint
+            // our own date labels. Never force them back on here, or toggling any
+            // setting (e.g. error bars) re-shows the garbage numbers.
+            bool breakModeXAxis = isXAxis && !m_isScatterMode
+                                  && m_currentXVar == "DATE" && !m_axisBreaks.isEmpty();
+            valueAxis->setLabelsVisible(settings.showAxisLabels && !breakModeXAxis);
+
+            if (!m_isScatterMode && isXAxis && breakModeXAxis) {
+                // Break-mode x-axis spans the (large) virtual range and we draw our
+                // own ticks. NEVER apply a user tick interval here: range/interval can
+                // be millions of ticks, and Qt's CartesianChartAxis::createItems then
+                // tries to allocate them all and hangs. Keep the 2-endpoint axis.
+                valueAxis->setTickCount(2);
+                valueAxis->setMinorTickCount(0);
+            } else if (!m_isScatterMode && isXAxis) {
                 // X-axis tick customization
                 valueAxis->setMinorTickCount(settings.xAxisMinorTickCount);
                 if (settings.xAxisTickSpacing > 0.0) {

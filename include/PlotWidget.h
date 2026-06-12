@@ -52,6 +52,7 @@ struct PlotData {
     QString treatment;
     QString treatmentName;
     QVector<QPointF> points;
+    QVector<QPointF> rawPoints; // Original points before error-bar aggregation
     QColor color;
     QString variable;
     bool isObserved;

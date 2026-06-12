@@ -33,13 +33,17 @@ public:
 
     bool eventFilter(QObject *obj, QEvent *e) override {
         if (obj == m_view) {
-            if (!m_userPositioned &&
-                (e->type() == QEvent::Resize || e->type() == QEvent::Paint)) {
+            // Reposition ONLY on resize. Never on Paint: moving/raising the label
+            // schedules another paint, which would re-enter here and loop forever
+            // (app hangs "not responding"), especially while the chart's plotArea
+            // is still zero-width right after a rebuild.
+            if (!m_userPositioned && e->type() == QEvent::Resize) {
                 QRectF pa = m_view->chart()->plotArea();
-                if (pa.isValid() && pa.width() > 10)
+                if (pa.isValid() && pa.width() > 10) {
                     m_label->move(static_cast<int>(pa.left()) + 4,
                                   static_cast<int>(pa.top())  + 4);
-                m_label->raise();
+                    m_label->raise();
+                }
             }
             return false;
         }
@@ -379,18 +383,37 @@ void PlotWidget::plotTimeSeriesMultiPanel()
                 QMap<QString, QVector<QPointF>> obsByTrt, simByTrt;
                 for (const auto &pd : varData) {
                     QString key = pd->treatment + "__" + pd->experiment;
-                    if (pd->isObserved) obsByTrt[key].append(pd->points);
-                    else                simByTrt[key].append(pd->points);
+                    if (pd->isObserved) {
+                        // Use rawPoints (pre-aggregation) so we pair individual obs against sim
+                        const QVector<QPointF> &src = pd->rawPoints.isEmpty() ? pd->points : pd->rawPoints;
+                        obsByTrt[key].append(src);
+                    } else {
+                        simByTrt[key].append(pd->points);
+                    }
                 }
+                // Display name for variable — declared early so it's available in all branches below
+                QPair<QString,QString> vi = DataProcessor::getVariableInfo(varCode);
+                QString varLabel = vi.first.isEmpty() ? varCode : vi.first;
+
                 QVector<double> allObs, allSim;
                 for (const QString &key : obsByTrt.keys()) {
                     if (!simByTrt.contains(key)) continue;
                     QMap<double, double> simByX;
                     for (const QPointF &pt : simByTrt[key]) simByX[pt.x()] = pt.y();
-                    for (const QPointF &pt : obsByTrt[key])
-                        if (simByX.contains(pt.x())) { allObs << pt.y(); allSim << simByX[pt.x()]; }
+                    for (const QPointF &pt : obsByTrt[key]) {
+                        if (simByX.contains(pt.x())) {
+                            allObs << pt.y(); allSim << simByX[pt.x()];
+                        } else {
+                            auto it = simByX.lowerBound(pt.x() - 0.5);
+                            if (it != simByX.end() && std::abs(it.key() - pt.x()) < 0.5)
+                                { allObs << pt.y(); allSim << it.value(); }
+                        }
+                    }
                 }
-                if (allObs.isEmpty()) continue;
+                if (allObs.isEmpty()) {
+                    overlayLines << varLabel + ": No paired data";
+                    continue;
+                }
 
                 // Filter NaN
                 QVector<double> obs, sim;
@@ -405,10 +428,6 @@ void PlotWidget::plotTimeSeriesMultiPanel()
                 double nrmse   = (obsMean > 0) ? (rmse / obsMean) * 100.0 : 0.0;
                 double dStat   = MetricsCalculator::dStat(obs, sim);
 
-                // Display name for variable
-                QPair<QString,QString> vi = DataProcessor::getVariableInfo(varCode);
-                QString varLabel = vi.first.isEmpty() ? varCode : vi.first;
-
                 QStringList parts;
                 parts << varLabel + ":";
                 if (m_plotSettings.tsMetrics.contains("N"))
@@ -422,20 +441,29 @@ void PlotWidget::plotTimeSeriesMultiPanel()
                 overlayLines << parts.join("  ");
             }
 
-            // Always create the overlay if metrics are configured so animation can update it
-            if (m_chartView && !m_plotSettings.tsMetrics.isEmpty()) {
+            // Create overlay whenever metrics are configured so animation can update it
+            if (m_chartView && !m_plotSettings.tsMetrics.isEmpty() && !overlayLines.isEmpty()) {
                 QLabel *label = new QLabel(overlayLines.join("\n"), m_chartView);
+                // Plain text + no wrapping: a zero/negative-width parent must never
+                // push the rich-text layout engine into an infinite re-layout loop.
+                label->setTextFormat(Qt::PlainText);
+                label->setWordWrap(false);
                 int fontPt = qBound(8, m_plotSettings.axisTickFontSize, 13);
                 label->setStyleSheet(QString(
                     "QLabel { background: rgba(255,255,255,210); font-size: %1pt; "
                     "padding: 2px 4px; border: none; }").arg(fontPt));
                 label->setAlignment(Qt::AlignLeft | Qt::AlignTop);
                 label->adjustSize();
+                // Position inside plot area once chart is laid out
+                QRectF pa = m_chartView->chart()->plotArea();
+                if (pa.isValid() && pa.width() > 10)
+                    label->move(static_cast<int>(pa.left()) + 4, static_cast<int>(pa.top()) + 4);
+                else
+                    label->move(4, 4); // chart not laid out yet — park at top-left
                 label->raise();
-                label->setVisible(!overlayLines.isEmpty());
+                label->show();
                 m_tsMetricsOverlay = label;
-
-                // Draggable overlay: auto-positions top-left, user can drag
+                // Draggable overlay: auto-positions at plot-area top-left, user can drag
                 new DraggableOverlay(m_chartView, label, label);
             }
         }
@@ -790,8 +818,12 @@ void PlotWidget::plotTimeSeriesMultiPanel()
             QMap<QString, QVector<QPointF>> obsByTrt, simByTrt;
             for (const auto &pd : varData) {
                 QString key = pd->treatment + "__" + pd->experiment;
-                if (pd->isObserved) obsByTrt[key].append(pd->points);
-                else                simByTrt[key].append(pd->points);
+                if (pd->isObserved) {
+                    const QVector<QPointF> &src = pd->rawPoints.isEmpty() ? pd->points : pd->rawPoints;
+                    obsByTrt[key].append(src);
+                } else {
+                    simByTrt[key].append(pd->points);
+                }
             }
             for (const QString &key : obsByTrt.keys()) {
                 if (!simByTrt.contains(key)) continue;
@@ -834,7 +866,7 @@ void PlotWidget::plotTimeSeriesMultiPanel()
                 }
             }
 
-            if (!statsLines.isEmpty()) {
+            if (!m_plotSettings.tsMetrics.isEmpty()) {
                 QLabel *statsLabel = new QLabel(statsLines.join("\n"), cv);
                 int statsFontPt = qBound(8, m_plotSettings.axisTickFontSize, 13);
                 if (m_plotSettings.axisTickFontSize != 9)
