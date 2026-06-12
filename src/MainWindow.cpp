@@ -1279,6 +1279,14 @@ void MainWindow::onPlotTypeChanged()
 
 void MainWindow::onUpdatePlot()
 {
+    // If a watched output file was overwritten on disk, re-read the selected files
+    // from disk before plotting so the user sees the latest data (not the cache).
+    if (m_fileChangedOnDisk && m_fileListWidget
+        && !m_fileListWidget->selectedItems().isEmpty()) {
+        m_fileChangedOnDisk = false;
+        onFileSelectionChanged();   // re-reads all selected files into m_currentData
+    }
+
     // Refresh variable list asterisks based on currently selected treatments.
     // Save and restore Y selection so rebuilding the list doesn't deselect variables.
     QStringList savedYKeys;
@@ -2375,6 +2383,9 @@ void MainWindow::onFileSelectionChanged()
     if (selectedItems.isEmpty()) {
         m_updatePlotButton->setEnabled(false);
 
+        // Nothing selected: stop watching files
+        rearmFileWatcher(QStringList());
+
         // Clear data when no files are selected
         m_currentData.clear();
         m_currentObsData.clear();
@@ -2426,7 +2437,8 @@ void MainWindow::onFileSelectionChanged()
         QString firstValidRegularFile;  // For observed data lookup
         bool hasEvaluateFile = false;
         bool hasRegularFile = false;
-        
+        QStringList loadedPaths;  // absolute paths actually read, for the file watcher
+
         for (QListWidgetItem* selectedItem : selectedItems) {
             QString selectedFile = selectedItem->text();
         
@@ -2468,7 +2480,9 @@ void MainWindow::onFileSelectionChanged()
                 }
                 
                 if (readSuccess) {
-                    
+
+                    loadedPaths << filePath;  // watch this file for on-disk changes
+
                     // Keep track of first valid file for later processing
                     if (firstValidFile.isEmpty()) {
                         firstValidFile = filePath;
@@ -2692,7 +2706,41 @@ void MainWindow::onFileSelectionChanged()
             }
         }
 
+        // Watch the freshly loaded files so we can warn if DSSAT overwrites them.
+        rearmFileWatcher(loadedPaths);
     }
+}
+
+void MainWindow::rearmFileWatcher(const QStringList &absolutePaths)
+{
+    if (!m_fileWatcher) {
+        m_fileWatcher = new QFileSystemWatcher(this);
+        connect(m_fileWatcher, &QFileSystemWatcher::fileChanged,
+                this, &MainWindow::onWatchedFileChanged);
+    }
+    // Drop previous watches
+    if (!m_fileWatcher->files().isEmpty())
+        m_fileWatcher->removePaths(m_fileWatcher->files());
+    m_watchedFilePaths = absolutePaths;
+    if (!absolutePaths.isEmpty())
+        m_fileWatcher->addPaths(absolutePaths);
+}
+
+void MainWindow::onWatchedFileChanged(const QString &path)
+{
+    QFileInfo fi(path);
+    // DSSAT typically deletes + recreates the file. A rename/replace drops the
+    // watch, so re-add the path once it exists again, then notify the user.
+    if (fi.exists() && m_fileWatcher && !m_fileWatcher->files().contains(path))
+        m_fileWatcher->addPath(path);
+
+    m_statusWidget->showWarning(
+        QString("%1 changed on disk — click 'Plot' to reload the latest data.")
+            .arg(fi.fileName()),
+        0 /* no timeout: keep visible until the user acts */);
+
+    // Flag so the next Plot click re-reads from disk rather than the cache.
+    m_fileChangedOnDisk = true;
 }
 
 // Additional methods from Python version

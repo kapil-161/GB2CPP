@@ -22,6 +22,7 @@
 #include <QListWidget>
 #include <QLineEdit>
 #include <QScrollArea>
+#include <QFileSystemWatcher>
 #include <memory>
 
 #include "StatusWidget.h"
@@ -203,6 +204,15 @@ private:
     QString m_currentFilePath;
     QStringList m_availableFiles;
     QString m_selectedFolder;
+
+    // Detect when loaded output files are overwritten on disk (e.g. DSSAT re-runs
+    // and rewrites PlantGro.OUT). Watch the loaded paths and prompt the user to
+    // click Plot to reload — we do NOT auto-reload.
+    QFileSystemWatcher *m_fileWatcher = nullptr;
+    QStringList m_watchedFilePaths;          // absolute paths currently loaded/watched
+    bool m_fileChangedOnDisk = false;        // a watched file was overwritten; re-read on next Plot
+    void onWatchedFileChanged(const QString &path);
+    void rearmFileWatcher(const QStringList &absolutePaths);
     
     // UI component references for file handling
     QListWidget *m_fileListWidget;
