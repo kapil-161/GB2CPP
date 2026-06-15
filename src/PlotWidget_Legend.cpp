@@ -325,6 +325,54 @@ void PlotWidget::updateLegendAdvanced(const QMap<QString, QMap<QString, QVector<
         }
     }
 
+    // --- Snapshot section ---
+    if (m_snapshotActive && !m_snapshotDataList.isEmpty()) {
+        QFrame *snapSep = new QFrame();
+        snapSep->setFrameShape(QFrame::HLine);
+        snapSep->setFrameShadow(QFrame::Plain);
+        m_legendLayout->addWidget(snapSep);
+
+        QLabel *snapHeader = new QLabel("📷  <b>Snapshot</b>");
+        snapHeader->setStyleSheet(
+            "background-color: #fff8e1; color: #5d4037; padding: 2px 6px; font-size: 9px;");
+        m_legendLayout->addWidget(snapHeader);
+
+        QSet<QString> seenSnap;
+        for (const QSharedPointer<PlotData> &pd : m_snapshotDataList) {
+            if (!pd || pd->points.isEmpty()) continue;
+            // De-duplicate by variable + treatment + experiment + obs/sim
+            QString rowKey = pd->variable + "__" + pd->treatment + "__"
+                             + pd->experiment + "__" + (pd->isObserved ? "o" : "s");
+            if (seenSnap.contains(rowKey)) continue;
+            seenSnap.insert(rowKey);
+
+            QWidget *row = new QWidget();
+            QHBoxLayout *rowL = new QHBoxLayout(row);
+            rowL->setContentsMargins(2, 0, 2, 0);
+            rowL->setSpacing(4);
+
+            // Dashed swatch using the same LegendSampleWidget the live legend uses
+            QColor swatchColor = pd->color;
+            swatchColor.setAlphaF(0.5);
+            QPen swatchPen(swatchColor, 1.5,
+                           pd->isObserved ? Qt::SolidLine : Qt::DashLine);
+            LegendSampleWidget *swatch = new LegendSampleWidget(
+                pd->isObserved, swatchPen,
+                pd->symbol, QBrush(Qt::transparent), QString(), row);
+            swatch->setFixedWidth(30);
+            rowL->addWidget(swatch);
+
+            QPair<QString, QString> vi = DataProcessor::getVariableInfo(pd->variable);
+            QString varLabel = vi.first.isEmpty() ? pd->variable : vi.first;
+            QLabel *lbl = new QLabel(pd->treatmentName + "  " + varLabel);
+            lbl->setStyleSheet("font-size: 9px; color: #666;");
+            lbl->setWordWrap(true);
+            rowL->addWidget(lbl, 1);
+
+            m_legendLayout->addWidget(row);
+        }
+    }
+
     // Re-apply toggle visibility in case this is a legend rebuild (e.g. axis change)
     // after the user had already toggled obs or sim off.
     if (!m_obsVisible) setObsSeriesVisible(false);

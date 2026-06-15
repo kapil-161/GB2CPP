@@ -550,6 +550,15 @@ void PlotWidget::plotTimeSeriesMultiPanel()
             globalXMax = qMax(globalXMax, pt.x());
         }
     }
+    // Extend X range to include snapshot data so panels aren't clipped
+    if (m_snapshotActive) {
+        for (const auto &pd : m_snapshotDataList) {
+            for (const QPointF &pt : pd->points) {
+                globalXMin = qMin(globalXMin, pt.x());
+                globalXMax = qMax(globalXMax, pt.x());
+            }
+        }
+    }
     if (globalXMin >= globalXMax) { globalXMax = globalXMin + 1.0; }
     double dataXMin = globalXMin; // pre-pad, used to avoid negative axis start
     double xPad = (globalXMax - globalXMin) * 0.02;
@@ -606,6 +615,14 @@ void PlotWidget::plotTimeSeriesMultiPanel()
                     yDataMax = qMax(yDataMax, eb.meanY + eb.errorValue);
             }
         }
+        // Extend Y range to include snapshot data for this variable
+        if (m_snapshotActive) {
+            for (const auto &snapPD : m_snapshotDataList) {
+                if (snapPD->variable != varCode) continue;
+                for (const QPointF &pt : snapPD->points)
+                    yDataMax = qMax(yDataMax, pt.y());
+            }
+        }
         if (yDataMax <= 0.0) yDataMax = 1.0;
 
         // --- Build QChart ---
@@ -649,6 +666,33 @@ void PlotWidget::plotTimeSeriesMultiPanel()
                 pd->pen = solidPen;
                 pd->series = ls;
                 panelSeriesMap[ls] = pd;
+            }
+        }
+
+        // Inject snapshot series for this variable (attached to axes in the batch loop below)
+        if (m_snapshotActive) {
+            for (const auto &snapPD : m_snapshotDataList) {
+                if (snapPD->variable != varCode || snapPD->points.isEmpty()) continue;
+                QColor c = snapPD->color;
+                c.setAlphaF(0.5);
+                if (snapPD->isObserved) {
+                    QScatterSeries *ss = new QScatterSeries();
+                    ss->setUseOpenGL(false);
+                    ss->setColor(c);
+                    ss->setBorderColor(c);
+                    ss->setMarkerSize(qMax(4.0, m_plotSettings.markerSize * 0.85));
+                    ss->setMarkerShape(getMarkerShape(snapPD->symbol));
+                    for (const QPointF &pt : snapPD->points) ss->append(pt);
+                    chart->addSeries(ss);
+                } else {
+                    QLineSeries *ls = new QLineSeries();
+                    ls->setUseOpenGL(false);
+                    QPen p(c, m_plotSettings.lineWidth);
+                    p.setStyle(Qt::DashLine);
+                    ls->setPen(p);
+                    for (const QPointF &pt : snapPD->points) ls->append(pt);
+                    chart->addSeries(ls);
+                }
             }
         }
 

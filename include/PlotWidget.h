@@ -263,6 +263,8 @@ signals:
 
 public slots:
     void onSettingsButtonClicked();
+    void takeSnapshot();
+    void clearSnapshot();
 
 private slots:
     void onPlotSettingsChanged();
@@ -327,6 +329,8 @@ private:
     QStringList cropTreatmentList(const QStringList& treatments, int maxEntries) const;
     QString getCropNameFromCode(const QString& cropCode) const;
     void highlightSeries(QAbstractSeries* series, bool highlight);
+    void injectSnapshotSeries(QChart *chart);
+    void updateSnapshotButton(bool active);
 
     // Obs/Sim global visibility toggles
     void setObsSeriesVisible(bool visible);
@@ -459,6 +463,12 @@ private:
 
     // Time series metrics overlay for single-panel mode
     QPointer<QLabel> m_tsMetricsOverlay;
+
+    // Snapshot / comparison mode
+    QVector<QSharedPointer<PlotData>> m_snapshotDataList;
+    bool         m_snapshotActive = false;
+    QLabel      *m_snapshotBanner = nullptr;
+    QPushButton *m_snapshotBtn    = nullptr;
 
     // Per-variable metrics overlay labels for multi-panel mode (variable -> label)
     QMap<QString, QPointer<QLabel>> m_tsPanelOverlays;

@@ -622,6 +622,8 @@ void PlotWidget::loadSettings()
 
 void PlotWidget::setXAxisVariable(const QString &xVar)
 {
+    // Snapshot points are stored in the old axis coordinate system; clear before re-plotting
+    if (m_snapshotActive) clearSnapshot();
 
     // Update button states
     m_dasButton->setChecked(xVar == "DAS");

@@ -246,6 +246,18 @@ void PlotWidget::setupUI()
     m_treatmentsButton->setToolTip("Show treatment selection panel");
     m_bottomLayout->addWidget(m_treatmentsButton);
 
+    // Snapshot / comparison-mode button
+    m_snapshotBtn = new QPushButton("📷 Snapshot");
+    m_snapshotBtn->setStyleSheet(buttonStyle);
+    m_snapshotBtn->setFixedWidth(100);
+    m_snapshotBtn->setToolTip("Freeze the current plot as a ghost overlay for before/after comparison");
+    m_snapshotBtn->setEnabled(false);
+    m_bottomLayout->addWidget(m_snapshotBtn);
+    connect(m_snapshotBtn, &QPushButton::clicked, this, [this]() {
+        if (m_snapshotActive) clearSnapshot();
+        else takeSnapshot();
+    });
+
     // Animation controls — separator, reset, play/pause, slider, label
     m_bottomLayout->addSpacing(4);
     setupAnimControls();
@@ -274,7 +286,23 @@ void PlotWidget::setupUI()
     QWidget* chartPlaceholder = new QWidget();
     chartPlaceholder->setStyleSheet("background-color: #f0f0f0; border: 1px dashed #ccc;");
     chartPlaceholder->setMinimumHeight(200);
+    // Snapshot active banner (sits between chart area and bottom toolbar)
+    m_snapshotBanner = new QLabel(
+        "📷  <b>Comparison Mode</b> — snapshot overlaid as dashed lines.  "
+        "<a href='clear' style='color:#5d4037;text-decoration:underline;'>Clear Snapshot</a>");
+    m_snapshotBanner->setTextFormat(Qt::RichText);
+    m_snapshotBanner->setTextInteractionFlags(Qt::LinksAccessibleByMouse);
+    m_snapshotBanner->setOpenExternalLinks(false);
+    m_snapshotBanner->setStyleSheet(
+        "QLabel { background-color: #fff8e1; border-top: 1px solid #ffc107; "
+        "color: #5d4037; padding: 3px 10px; font-size: 10px; }");
+    m_snapshotBanner->setVisible(false);
+    connect(m_snapshotBanner, &QLabel::linkActivated, this, [this](const QString &) {
+        clearSnapshot();
+    });
+
     m_leftLayout->addWidget(chartPlaceholder, 1);
+    m_leftLayout->addWidget(m_snapshotBanner, 0);
     m_leftLayout->addWidget(m_bottomContainer, 0);
 
     m_mainLayout->addWidget(m_leftContainer, 80);
@@ -2299,7 +2327,13 @@ void PlotWidget::addSeriesToPlot(const QVector<PlotData> &plotDataList)
         }
     }
     
-    
+    // Re-inject snapshot series if comparison mode is active
+    if (m_snapshotActive && !m_snapshotDataList.isEmpty())
+        injectSnapshotSeries(m_chart);
+
+    // Enable snapshot button now that there is data to snapshot
+    if (m_snapshotBtn) m_snapshotBtn->setEnabled(true);
+
     // Run auto-fit synchronously so axes are correct on first render (no visible jump)
     autoFitAxes();
 
@@ -2705,6 +2739,7 @@ void PlotWidget::clearChart()
 void PlotWidget::clear()
 {
     clearChart();
+    if (m_snapshotBtn) m_snapshotBtn->setEnabled(false);
     m_simData.clear();
     m_obsData.clear();
     m_scaleFactors.clear();
@@ -5167,4 +5202,98 @@ void PlotWidget::dockLegend()
     m_legendFloating = false;
     m_legendDragging = false;
     m_legendResizingH = false;
+}
+
+// ============================================================================
+// SNAPSHOT / COMPARISON MODE
+// ============================================================================
+
+void PlotWidget::injectSnapshotSeries(QChart *chart)
+{
+    if (!m_snapshotActive || m_snapshotDataList.isEmpty() || !chart) return;
+
+    for (const QSharedPointer<PlotData> &snapPD : m_snapshotDataList) {
+        if (!snapPD || snapPD->points.isEmpty()) continue;
+
+        QColor c = snapPD->color;
+        c.setAlphaF(0.5);
+
+        QAbstractSeries *s = nullptr;
+        if (snapPD->isObserved) {
+            QScatterSeries *ss = new QScatterSeries();
+            ss->setUseOpenGL(false);
+            ss->setColor(c);
+            ss->setBorderColor(c);
+            ss->setMarkerSize(qMax(4.0, m_plotSettings.markerSize * 0.85));
+            ss->setMarkerShape(getMarkerShape(snapPD->symbol));
+            for (const QPointF &pt : snapPD->points) ss->append(pt);
+            s = ss;
+        } else {
+            QLineSeries *ls = new QLineSeries();
+            ls->setUseOpenGL(false);
+            QPen p(c, m_plotSettings.lineWidth);
+            p.setStyle(Qt::DashLine);
+            ls->setPen(p);
+            for (const QPointF &pt : snapPD->points) ls->append(pt);
+            s = ls;
+        }
+
+        chart->addSeries(s);
+        for (auto *ax : chart->axes(Qt::Horizontal)) s->attachAxis(ax);
+        for (auto *ax : chart->axes(Qt::Vertical))   s->attachAxis(ax);
+    }
+}
+
+void PlotWidget::updateSnapshotButton(bool active)
+{
+    if (!m_snapshotBtn) return;
+    static const QString kBase =
+        "QPushButton { padding: 3px 8px; background-color: #f8f9fa; "
+        "border: 1px solid #cccccc; border-radius: 4px; color: #333333; font-size: 11px; } "
+        "QPushButton:hover { background-color: #e9ecef; } "
+        "QPushButton:pressed { background-color: #dee2e6; }";
+    static const QString kActive =
+        "QPushButton { padding: 3px 8px; background-color: #fff3cd; "
+        "border: 1px solid #ffc107; border-radius: 4px; color: #856404; font-size: 11px; } "
+        "QPushButton:hover { background-color: #ffe69c; }";
+    m_snapshotBtn->setText(active ? "📷 Active  ✕" : "📷 Snapshot");
+    m_snapshotBtn->setToolTip(active
+        ? "Comparison mode active — click to clear snapshot"
+        : "Freeze the current plot as a ghost overlay for before/after comparison");
+    m_snapshotBtn->setStyleSheet(active ? kActive : kBase);
+}
+
+void PlotWidget::takeSnapshot()
+{
+    if (m_plotDataList.isEmpty() || m_isScatterMode || m_isBoxPlotMode) return;
+
+    m_snapshotDataList = m_plotDataList;  // QSharedPointer copy — lightweight
+    m_snapshotActive   = true;
+
+    injectSnapshotSeries(m_chart);
+
+    if (m_snapshotBanner) m_snapshotBanner->setVisible(true);
+    updateSnapshotButton(true);
+    updateLegend({});
+}
+
+void PlotWidget::clearSnapshot()
+{
+    if (!m_snapshotActive) return;
+
+    m_snapshotDataList.clear();
+    m_snapshotActive = false;
+
+    // Remove snapshot series — they are any series NOT tracked in m_seriesToPlotData
+    if (m_chart) {
+        QList<QAbstractSeries *> toRemove;
+        for (auto *s : m_chart->series())
+            if (!m_seriesToPlotData.contains(s)) toRemove.append(s);
+        for (auto *s : toRemove) { m_chart->removeSeries(s); delete s; }
+    }
+
+    if (m_snapshotBanner) m_snapshotBanner->setVisible(false);
+    updateSnapshotButton(false);
+    updateLegend({});
+    autoFitAxes();
 }
