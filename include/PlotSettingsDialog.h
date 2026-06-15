@@ -37,6 +37,9 @@ struct PlotSettings {
     // Error bar settings
     bool showErrorBars = false;
     QString errorBarType = "SD";  // "SD" or "SE"
+
+    // Show the Snapshot / comparison-mode button in the plot toolbar (default off)
+    bool showSnapshot = false;
     bool plotMeanReps = false;    // average replicates into one line (sequence OSU)
     
     // Line settings
@@ -119,6 +122,10 @@ public:
     
     PlotSettings getSettings() const;
 
+    // True only when the user clicked "Save Settings" (persist to disk). False for
+    // plain OK, which applies to the current session/plot but is not written out.
+    bool shouldPersist() const { return m_persist; }
+
 private slots:
     void onBackgroundColorClicked();
     void onPlotAreaColorClicked();
@@ -133,7 +140,8 @@ private:
     
     PlotSettings m_settings;
     PlotWidget *m_plotWidget;
-    
+    bool m_persist = false;  // set by "Save Settings" (persist), cleared for plain OK
+
     // Grid controls
     QCheckBox *m_showGridCheckBox;
     QCheckBox *m_showMinorGridCheckBox;
@@ -148,6 +156,9 @@ private:
     // Error bar controls
     QCheckBox *m_showErrorBarsCheckBox;
     QComboBox *m_errorBarTypeComboBox;
+
+    // Snapshot / comparison-mode toggle
+    QCheckBox *m_showSnapshotCheckBox;
     QCheckBox *m_plotMeanRepsCheckBox;
     
     // Line controls

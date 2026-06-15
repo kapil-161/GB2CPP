@@ -49,6 +49,7 @@ PlotSettings PlotSettingsDialog::getSettings() const
     settings.plotMeanReps = m_plotMeanRepsCheckBox->isChecked();
     settings.showErrorBars = m_showErrorBarsCheckBox->isChecked();
     settings.errorBarType = m_errorBarTypeComboBox->currentData().toString();
+    settings.showSnapshot = m_showSnapshotCheckBox->isChecked();
     settings.lineWidth = m_lineWidthSpinBox->value();
     settings.markerSize = m_markerSizeSpinBox->value();
     settings.showAxisLabels = m_showAxisLabelsCheckBox->isChecked();
@@ -342,6 +343,12 @@ void PlotSettingsDialog::setupUI()
     m_showErrorBarsCheckBox->setChecked(m_settings.showErrorBars);
     m_showErrorBarsCheckBox->setToolTip("Aggregate replicates and show mean with error bars");
     legendLayout->addWidget(m_showErrorBarsCheckBox);
+
+    // Snapshot / comparison-mode toggle (off by default)
+    m_showSnapshotCheckBox = new QCheckBox("Enable Snapshot (comparison mode)");
+    m_showSnapshotCheckBox->setChecked(m_settings.showSnapshot);
+    m_showSnapshotCheckBox->setToolTip("Show the Snapshot button to freeze the current plot as a ghost overlay for before/after comparison");
+    legendLayout->addWidget(m_showSnapshotCheckBox);
     
     QHBoxLayout *errorBarTypeLayout = new QHBoxLayout();
     errorBarTypeLayout->addWidget(new QLabel("Error Bar Type:"));
@@ -537,13 +544,16 @@ void PlotSettingsDialog::setupUI()
     buttonLayout->addWidget(m_resetButton);
     
     m_saveSettingsButton = new QPushButton("Save Settings");
+    m_saveSettingsButton->setToolTip("Apply and save these settings — they persist across restarts");
     connect(m_saveSettingsButton, &QPushButton::clicked, this, &PlotSettingsDialog::onSaveSettings);
     buttonLayout->addWidget(m_saveSettingsButton);
-    
-    
+
+
     buttonLayout->addStretch();
-    
+
     QDialogButtonBox *buttonBox = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel);
+    if (QPushButton *okBtn = buttonBox->button(QDialogButtonBox::Ok))
+        okBtn->setToolTip("Apply these settings to the current plot for this session only (not saved)");
     connect(buttonBox, &QDialogButtonBox::accepted, this, &QDialog::accept);
     connect(buttonBox, &QDialogButtonBox::rejected, this, &QDialog::reject);
     buttonLayout->addWidget(buttonBox);
@@ -609,6 +619,7 @@ void PlotSettingsDialog::onResetDefaults()
     m_multiPanelTSCheckBox->setChecked(defaults.multiPanelTimeSeries);
     m_rememberLastCropFolderCheckBox->setChecked(defaults.rememberLastCropFolder);
     m_showErrorBarsCheckBox->setChecked(defaults.showErrorBars);
+    m_showSnapshotCheckBox->setChecked(defaults.showSnapshot);
     int defaultErrorBarIndex = m_errorBarTypeComboBox->findData(defaults.errorBarType);
     if (defaultErrorBarIndex >= 0) {
         m_errorBarTypeComboBox->setCurrentIndex(defaultErrorBarIndex);
@@ -654,7 +665,8 @@ void PlotSettingsDialog::onResetDefaults()
 
 void PlotSettingsDialog::onSaveSettings()
 {
-    accept();   // collects settings via getSettings() path, then PlotWidget::saveSettings() persists them
+    m_persist = true;  // caller will persist to disk; plain OK applies for this session only
+    accept();
 }
 
 

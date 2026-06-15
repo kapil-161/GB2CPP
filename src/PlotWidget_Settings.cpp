@@ -118,7 +118,10 @@ void PlotWidget::onSettingsButtonClicked()
 
         applyPlotSettings(newSettings);
         m_plotSettings = newSettings;
-        saveSettings();
+        // OK applies to the current session/plot only; "Save Settings" also persists
+        // the settings to disk so they survive a restart.
+        if (dialog.shouldPersist())
+            saveSettings();
 
         // Toggling error bars switches the chart between aggregated mean-points and
         // raw points (and, with DATE-gap axis breaks, swaps the x-axis type). Mutating
@@ -162,6 +165,14 @@ void PlotWidget::onSettingsButtonClicked()
 
 void PlotWidget::applyPlotSettings(const PlotSettings &settings)
 {
+    // Show/hide the Snapshot button per the Plot Settings toggle. If it's being
+    // turned off while a snapshot is active, clear the snapshot so no orphan
+    // ghost overlay is left behind.
+    if (m_snapshotBtn) {
+        if (!settings.showSnapshot && m_snapshotActive)
+            clearSnapshot();
+        m_snapshotBtn->setVisible(settings.showSnapshot);
+    }
 
     // Apply grid settings
     setShowGrid(settings.showGrid);
@@ -503,6 +514,7 @@ void PlotWidget::saveSettings() const
 
     // Error bars
     s.setValue("showErrorBars", m_plotSettings.showErrorBars);
+    s.setValue("showSnapshot", m_plotSettings.showSnapshot);
     s.setValue("errorBarType",  m_plotSettings.errorBarType);
     s.setValue("plotMeanReps",  m_plotSettings.plotMeanReps);
 
@@ -570,6 +582,7 @@ void PlotWidget::loadSettings()
     m_plotSettings.legendY        = s.value("legendY",        m_plotSettings.legendY).toDouble();
 
     m_plotSettings.showErrorBars = s.value("showErrorBars", m_plotSettings.showErrorBars).toBool();
+    m_plotSettings.showSnapshot = s.value("showSnapshot", m_plotSettings.showSnapshot).toBool();
     m_plotSettings.errorBarType  = s.value("errorBarType",  m_plotSettings.errorBarType).toString();
     m_plotSettings.plotMeanReps  = s.value("plotMeanReps",  m_plotSettings.plotMeanReps).toBool();
 

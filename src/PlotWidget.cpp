@@ -252,6 +252,7 @@ void PlotWidget::setupUI()
     m_snapshotBtn->setFixedWidth(100);
     m_snapshotBtn->setToolTip("Freeze the current plot as a ghost overlay for before/after comparison");
     m_snapshotBtn->setEnabled(false);
+    m_snapshotBtn->setVisible(m_plotSettings.showSnapshot); // off unless enabled in Plot Settings
     m_bottomLayout->addWidget(m_snapshotBtn);
     connect(m_snapshotBtn, &QPushButton::clicked, this, [this]() {
         if (m_snapshotActive) clearSnapshot();
@@ -5212,11 +5213,24 @@ void PlotWidget::injectSnapshotSeries(QChart *chart)
 {
     if (!m_snapshotActive || m_snapshotDataList.isEmpty() || !chart) return;
 
-    for (const QSharedPointer<PlotData> &snapPD : m_snapshotDataList) {
+    // Re-derive ghost points in the CURRENT x-variable from the frozen source
+    // data. This is what makes the overlay work across DATE/DAS/DAP switches:
+    // the x-coordinates are rebuilt for the active axis rather than reused from
+    // the snapshot-time unit (which would land off-screen after a switch).
+    QVector<QSharedPointer<PlotData>> ghosts = buildSnapshotSeriesForCurrentX();
+
+    for (const QSharedPointer<PlotData> &snapPD : ghosts) {
         if (!snapPD || snapPD->points.isEmpty()) continue;
 
         QColor c = snapPD->color;
         c.setAlphaF(0.5);
+
+        // On a DATE axis with breaks, live points are in virtual coordinates;
+        // remap the ghost's real-ms x the same way so it aligns.
+        const bool remap = (!m_axisBreaks.isEmpty() && m_currentXVar == "DATE");
+        QVector<QPointF> gpts = snapPD->points;
+        if (remap)
+            for (QPointF &pt : gpts) pt.setX(remapX(pt.x()));
 
         QAbstractSeries *s = nullptr;
         if (snapPD->isObserved) {
@@ -5226,7 +5240,7 @@ void PlotWidget::injectSnapshotSeries(QChart *chart)
             ss->setBorderColor(c);
             ss->setMarkerSize(qMax(4.0, m_plotSettings.markerSize * 0.85));
             ss->setMarkerShape(getMarkerShape(snapPD->symbol));
-            for (const QPointF &pt : snapPD->points) ss->append(pt);
+            for (const QPointF &pt : gpts) ss->append(pt);
             s = ss;
         } else {
             QLineSeries *ls = new QLineSeries();
@@ -5234,7 +5248,7 @@ void PlotWidget::injectSnapshotSeries(QChart *chart)
             QPen p(c, m_plotSettings.lineWidth);
             p.setStyle(Qt::DashLine);
             ls->setPen(p);
-            for (const QPointF &pt : snapPD->points) ls->append(pt);
+            for (const QPointF &pt : gpts) ls->append(pt);
             s = ls;
         }
 
@@ -5263,12 +5277,95 @@ void PlotWidget::updateSnapshotButton(bool active)
     m_snapshotBtn->setStyleSheet(active ? kActive : kBase);
 }
 
+// Derive an x-coordinate from a raw cell value for the given x-variable, matching
+// the logic in plotDatasets (DATE → epoch ms, DSSAT YYYYDOY dates, else numeric).
+bool PlotWidget::snapshotXValue(const QString &xVar, const QVariant &xVal, double &outX)
+{
+    if (DataProcessor::isMissingValue(xVal)) return false;
+    if (xVar == "DATE") {
+        return parseDateCached(xVal.toString(), outX, false);
+    } else if (xVar == "SDAT" || xVar == "PDAT" || xVar == "HDAT" ||
+               xVar == "MDAT" || xVar == "EDAT" || xVar == "ADAT") {
+        QString dateStr = xVal.toString();
+        if (dateStr.length() == 7 && dateStr != "-99") {
+            int year = dateStr.left(4).toInt();
+            int doy  = dateStr.mid(4).toInt();
+            if (year > 0 && doy > 0 && doy <= 366) {
+                QDateTime dt = DataProcessor::unifiedDateConvert(year, doy);
+                if (dt.isValid()) { outX = dt.toMSecsSinceEpoch(); return true; }
+            }
+        }
+        return false;
+    }
+    bool ok = false;
+    outX = xVal.toDouble(&ok);
+    return ok;
+}
+
+// Rebuild the snapshot ghost series from the frozen source data, deriving x in
+// the CURRENT x-variable. Each live snapshot PlotData identifies a treatment×
+// experiment×variable group; we re-read that group's (x,y) from the frozen sim/
+// obs tables so the ghost overlays correctly on whatever axis is now active.
+QVector<QSharedPointer<PlotData>> PlotWidget::buildSnapshotSeriesForCurrentX()
+{
+    QVector<QSharedPointer<PlotData>> out;
+    if (m_snapshotDataList.isEmpty()) return out;
+
+    const QString xVar = m_currentXVar;
+
+    auto buildPoints = [&](const DataTable &tbl, const QString &experiment,
+                           const QString &treatment, const QString &variable) {
+        QVector<QPointF> pts;
+        const DataColumn *xCol   = tbl.getColumn(xVar);
+        const DataColumn *yCol   = tbl.getColumn(variable);
+        const DataColumn *trtCol = tbl.getColumn("TRT");
+        const DataColumn *expCol = tbl.getColumn("EXPERIMENT");
+        if (!xCol || !yCol || !trtCol) return pts;
+        for (int row = 0; row < tbl.rowCount; ++row) {
+            if (row >= xCol->data.size() || row >= yCol->data.size() ||
+                row >= trtCol->data.size()) continue;
+            if (trtCol->data[row].toString() != treatment) continue;
+            if (expCol && row < expCol->data.size() && !experiment.isEmpty()
+                && expCol->data[row].toString() != experiment) continue;
+            double x, y; bool yOk = false;
+            if (!snapshotXValue(xVar, xCol->data[row], x)) continue;
+            y = yCol->data[row].toDouble(&yOk);
+            if (!yOk || DataProcessor::isMissingValue(yCol->data[row])) continue;
+            pts.append(QPointF(x, y));
+        }
+        std::sort(pts.begin(), pts.end(),
+                  [](const QPointF &a, const QPointF &b){ return a.x() < b.x(); });
+        return pts;
+    };
+
+    for (const QSharedPointer<PlotData> &snap : m_snapshotDataList) {
+        if (!snap) continue;
+        const DataTable &tbl = snap->isObserved ? m_snapshotObsData : m_snapshotSimData;
+        QVector<QPointF> pts = buildPoints(tbl, snap->experiment, snap->treatment, snap->variable);
+        if (pts.isEmpty()) continue;
+        auto ghost = QSharedPointer<PlotData>::create(*snap); // copy identity + color
+        ghost->points    = pts;
+        ghost->rawPoints = pts;
+        ghost->errorBars.clear();
+        ghost->series    = nullptr;
+        out.append(ghost);
+    }
+    return out;
+}
+
 void PlotWidget::takeSnapshot()
 {
     if (m_plotDataList.isEmpty() || m_isScatterMode || m_isBoxPlotMode) return;
 
-    m_snapshotDataList = m_plotDataList;  // QSharedPointer copy — lightweight
-    m_snapshotActive   = true;
+    // Freeze series identity/color AND the source data so the ghost can be
+    // re-derived in whatever x-unit is active later.
+    m_snapshotDataList   = m_plotDataList;     // QSharedPointer copy — lightweight
+    m_snapshotSimData    = m_simData;
+    m_snapshotObsData    = m_obsData;
+    m_snapshotYVars      = m_currentYVars;
+    m_snapshotTreatments = m_currentTreatments;
+    m_snapshotExperiment = m_selectedExperiment;
+    m_snapshotActive     = true;
 
     injectSnapshotSeries(m_chart);
 
@@ -5282,6 +5379,11 @@ void PlotWidget::clearSnapshot()
     if (!m_snapshotActive) return;
 
     m_snapshotDataList.clear();
+    m_snapshotSimData.clear();
+    m_snapshotObsData.clear();
+    m_snapshotYVars.clear();
+    m_snapshotTreatments.clear();
+    m_snapshotExperiment.clear();
     m_snapshotActive = false;
 
     // Remove snapshot series — they are any series NOT tracked in m_seriesToPlotData

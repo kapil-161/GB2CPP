@@ -1200,6 +1200,15 @@ void MainWindow::onXVariableChanged()
 
     // Check if X variable is unselected (empty or invalid)
     QString xVar = m_xVariableComboBox ? m_xVariableComboBox->currentData(Qt::UserRole).toString() : QString();
+
+    // Keep PlotWidget's x-var (DAS/DAP/DATE button state) in sync with a combo
+    // choice so the two controls never disagree. Only for the day/date axes the
+    // buttons represent; other X columns are combo-only and left as-is.
+    if (!xVar.isEmpty() && m_plotWidget && (xVar == "DAS" || xVar == "DAP" || xVar == "DATE")
+        && m_plotWidget->currentXVariable() != xVar) {
+        m_plotWidget->setXAxisVariable(xVar);
+    }
+
     if (!m_suppressPlotClear && xVar.isEmpty()) {
         // Clear plots and metrics when X variable is unselected
         if (m_plotWidget) {
@@ -1962,8 +1971,29 @@ void MainWindow::updatePlot()
     if (m_currentData.rowCount == 0) {
         return;
     }
-    
+
     QString xVar = m_xVariableComboBox->currentData(Qt::UserRole).toString();
+
+    // The DAS/DAP/DATE buttons are the primary x-axis control for time series and
+    // can get out of sync with this combo (the combo resets to DATE on data load).
+    // Prefer the button's selection when it names a real column, so clicking Plot
+    // respects the axis the user picked via the buttons.
+    if (m_plotWidget) {
+        QString btnXVar = m_plotWidget->currentXVariable();
+        if (!btnXVar.isEmpty() && m_currentData.columnNames.contains(btnXVar)
+            && btnXVar != xVar) {
+            xVar = btnXVar;
+            // Sync the combo so the UI reflects what is actually plotted.
+            if (m_xVariableComboBox) {
+                int idx = m_xVariableComboBox->findData(btnXVar);
+                if (idx >= 0) {
+                    m_xVariableComboBox->blockSignals(true);
+                    m_xVariableComboBox->setCurrentIndex(idx);
+                    m_xVariableComboBox->blockSignals(false);
+                }
+            }
+        }
+    }
     
     // Get selected Y variables from ListWidget.
     // In multi-file mode UserRole holds "filename::COL"; decode into plain yVars + file filter.

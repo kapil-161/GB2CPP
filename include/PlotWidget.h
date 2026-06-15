@@ -265,6 +265,8 @@ public slots:
     void onSettingsButtonClicked();
     void takeSnapshot();
     void clearSnapshot();
+    void setXAxisVariable(const QString &xVar);          // DAS/DAP/DATE selection
+    QString currentXVariable() const { return m_currentXVar; }
 
 private slots:
     void onPlotSettingsChanged();
@@ -370,8 +372,7 @@ private slots:
 
 private:
     
-    // X-axis management
-    void setXAxisVariable(const QString &xVar);
+    // X-axis management (setXAxisVariable / currentXVariable are public slots above)
     
     // Utility functions
     void styleChart();
@@ -469,6 +470,18 @@ private:
     bool         m_snapshotActive = false;
     QLabel      *m_snapshotBanner = nullptr;
     QPushButton *m_snapshotBtn    = nullptr;
+    // Frozen source data captured at snapshot time so the ghost overlay can be
+    // re-derived in the CURRENT x-unit (DATE/DAS/DAP). Storing rendered points
+    // alone would freeze them in the snapshot-time x-unit and they'd land
+    // off-screen after an axis switch.
+    DataTable    m_snapshotSimData;
+    DataTable    m_snapshotObsData;
+    QStringList  m_snapshotYVars;
+    QStringList  m_snapshotTreatments;
+    QString      m_snapshotExperiment;
+    // Rebuild ghost points from the frozen data using the current x-variable.
+    QVector<QSharedPointer<PlotData>> buildSnapshotSeriesForCurrentX();
+    bool snapshotXValue(const QString &xVar, const QVariant &xVal, double &outX);
 
     // Per-variable metrics overlay labels for multi-panel mode (variable -> label)
     QMap<QString, QPointer<QLabel>> m_tsPanelOverlays;
