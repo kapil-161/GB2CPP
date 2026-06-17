@@ -1288,14 +1288,6 @@ void MainWindow::onPlotTypeChanged()
 
 void MainWindow::onUpdatePlot()
 {
-    // If a watched output file was overwritten on disk, re-read the selected files
-    // from disk before plotting so the user sees the latest data (not the cache).
-    if (m_fileChangedOnDisk && m_fileListWidget
-        && !m_fileListWidget->selectedItems().isEmpty()) {
-        m_fileChangedOnDisk = false;
-        onFileSelectionChanged();   // re-reads all selected files into m_currentData
-    }
-
     // Refresh variable list asterisks based on currently selected treatments.
     // Save and restore Y selection so rebuilding the list doesn't deselect variables.
     QStringList savedYKeys;
@@ -1796,7 +1788,8 @@ void MainWindow::updateVariableComboBoxes()
 
     // Set default x-variable.
     // OSU/summary files have WYEAR but no DAS/DAP — prefer WYEAR for seasonal/sequence data.
-    // Regular time-series files have DAS/DAP/DATE — prefer DATE then DAP.
+    // For regular time-series: honour the user's button choice (DAS/DAP/DATE) if the column
+    // exists in the new data; only fall back to DATE→DAP when no button selection is active.
     bool isSummaryFile = m_currentData.columnNames.contains("WYEAR") &&
                          !m_currentData.columnNames.contains("DAS") &&
                          !m_currentData.columnNames.contains("DAP");
@@ -1805,15 +1798,18 @@ void MainWindow::updateVariableComboBoxes()
         if (index != -1) {
             m_xVariableComboBox->setCurrentIndex(index);
         }
-    } else if (m_currentData.columnNames.contains("DATE")) {
-        int index = m_xVariableComboBox->findData("DATE");
-        if (index != -1) {
-            m_xVariableComboBox->setCurrentIndex(index);
-        }
-    } else if (m_currentData.columnNames.contains("DAP")) {
-        int index = m_xVariableComboBox->findData("DAP");
-        if (index != -1) {
-            m_xVariableComboBox->setCurrentIndex(index);
+    } else {
+        // Give priority to whatever the user picked via the DAS/DAP/DATE buttons.
+        QString btnXVar = m_plotWidget ? m_plotWidget->currentXVariable() : QString();
+        int btnIdx = (!btnXVar.isEmpty()) ? m_xVariableComboBox->findData(btnXVar) : -1;
+        if (btnIdx != -1) {
+            m_xVariableComboBox->setCurrentIndex(btnIdx);
+        } else if (m_currentData.columnNames.contains("DATE")) {
+            int index = m_xVariableComboBox->findData("DATE");
+            if (index != -1) m_xVariableComboBox->setCurrentIndex(index);
+        } else if (m_currentData.columnNames.contains("DAP")) {
+            int index = m_xVariableComboBox->findData("DAP");
+            if (index != -1) m_xVariableComboBox->setCurrentIndex(index);
         }
     }
 
@@ -2378,6 +2374,7 @@ void MainWindow::onFolderSelectionChanged()
 void MainWindow::onRefreshFiles()
 {
     if (!m_selectedFolder.isEmpty()) {
+        m_fileChangedOnDisk = false;
         m_statusWidget->showInfo("Refreshing file list...");
 
         // Save current selection so we can restore it after repopulating
@@ -2765,7 +2762,7 @@ void MainWindow::onWatchedFileChanged(const QString &path)
         m_fileWatcher->addPath(path);
 
     m_statusWidget->showWarning(
-        QString("%1 changed on disk — click 'Plot' to reload the latest data.")
+        QString("%1 changed on disk — click 'Refresh Data' to reload the latest data.")
             .arg(fi.fileName()),
         0 /* no timeout: keep visible until the user acts */);
 

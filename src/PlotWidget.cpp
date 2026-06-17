@@ -74,7 +74,7 @@ PlotWidget::PlotWidget(QWidget *parent)
     , m_preplotPanelEnabled(true)
     , m_currentPlotType("Line")
     , m_dataProcessor(new DataProcessor(this))
-    , m_currentXVar("DAP")
+    , m_currentXVar("DATE")
     , m_isScatterMode(false)
     , m_isBoxPlotMode(false)
 {
@@ -176,7 +176,7 @@ void PlotWidget::setupUI()
     
     // X-axis selection buttons (like Python version)
     
-    m_refreshButton = new QPushButton("Refresh");
+    m_refreshButton = new QPushButton("Refresh Data");
     m_dasButton = new QPushButton("DAS");
     m_dapButton = new QPushButton("DAP");
     m_dateButton = new QPushButton("DATE");
