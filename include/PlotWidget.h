@@ -41,8 +41,9 @@
 struct ErrorBarData {
     double meanX;
     double meanY;
-    double errorValue;  // SD or SE
-    int n;              // Number of replicates
+    double errorValue;       // SD or SE
+    int n;                   // Number of replicates
+    bool preComputedIsSE = false;  // true if errorValue came from an SE_VAR column (already SE)
     QPointF meanPoint() const { return QPointF(meanX, meanY); }
 };
 

@@ -610,7 +610,7 @@ void PlotWidget::plotTimeSeriesMultiPanel()
             for (const QPointF &pt : pd->points)
                 yDataMax = qMax(yDataMax, pt.y());
             // Include error bar tops so they don't get clipped
-            if (m_plotSettings.showErrorBars && pd->isObserved) {
+            if (pd->isObserved && !pd->errorBars.isEmpty()) {
                 for (const ErrorBarData &eb : pd->errorBars)
                     yDataMax = qMax(yDataMax, eb.meanY + eb.errorValue);
             }
@@ -652,7 +652,7 @@ void PlotWidget::plotTimeSeriesMultiPanel()
                 pd->brush = ss->brush();
                 pd->series = ss;
                 panelSeriesMap[ss] = pd;
-                if (m_plotSettings.showErrorBars && !pd->errorBars.isEmpty())
+                if (!pd->errorBars.isEmpty())
                     panelErrorBars[ss] = pd->errorBars;
             } else {
                 QLineSeries *ls = new QLineSeries();
@@ -847,8 +847,7 @@ void PlotWidget::plotTimeSeriesMultiPanel()
             m_plotSettings.showHoverTooltip, cv); // parented to cv — auto-deleted
         cv->installEventFilter(panelFilter);
         cv->viewport()->installEventFilter(panelFilter);
-        if (m_plotSettings.showErrorBars)
-            cv->setErrorBarData(panelErrorBars);
+        cv->setErrorBarData(panelErrorBars);
         cv->setAxisLineColor(m_plotSettings.axisLineColor);
         if (hasBreaks) cv->setAxisBreaks(globalBreakInfos, globalSegInfos);
         else           cv->clearAxisBreaks();

@@ -669,8 +669,8 @@ void PlotWidget::autoFitAxes()
         }
     }
 
-    // Include error bar extent in Y bounds when error bars are enabled
-    if (m_plotSettings.showErrorBars) {
+    // Include error bar extent in Y bounds whenever error bars are present
+    {
         for (const QSharedPointer<PlotData> &plotData : m_plotDataList) {
             if (!plotData || plotData->errorBars.isEmpty()) continue;
             for (const ErrorBarData &errorBar : plotData->errorBars) {
@@ -1862,10 +1862,15 @@ void PlotWidget::plotDatasets(const DataTable &simData, const DataTable &obsData
             const DataColumn *yColumn = obsData.getColumn(yVar);
             const DataColumn *trtColumn = trtColumnObs;
             const DataColumn *expColumn = expColumnObs;
-            
-            
+            const DataColumn *sdColumn = obsData.getColumn("SD_" + yVar);
+            const DataColumn *seColumn = obsData.getColumn("SE_" + yVar);
+
             // Group observed data by experiment and treatment combination
             QMap<QString, QVector<QPointF>> experimentTreatmentData;
+            // Parallel maps: pre-computed error values from SD_VAR / SE_VAR columns (NaN if absent)
+            // isPreSE[key][i] == true means the value in experimentTreatmentSD is already SE
+            QMap<QString, QVector<double>> experimentTreatmentSD;
+            QMap<QString, QVector<bool>>   experimentTreatmentIsPreSE;
             
             for (int row = 0; row < obsData.rowCount; ++row) {
                 if (row >= xColumn->data.size() || row >= yColumn->data.size() || row >= trtColumn->data.size()) {
@@ -1955,8 +1960,26 @@ void PlotWidget::plotDatasets(const DataTable &simData, const DataTable &obsData
                 }
                 
                 experimentTreatmentData[expTrtKey].append(QPointF(x, y));
+
+                // Collect pre-computed error value: prefer SE_VAR, fall back to SD_VAR
+                double preVal = std::numeric_limits<double>::quiet_NaN();
+                bool   isSE   = false;
+                auto readErrCol = [&](const DataColumn *col) -> double {
+                    if (!col || row >= col->data.size()) return std::numeric_limits<double>::quiet_NaN();
+                    QVariant v = col->data[row];
+                    if (DataProcessor::isMissingValue(v)) return std::numeric_limits<double>::quiet_NaN();
+                    bool ok = false;
+                    double d = v.toDouble(&ok);
+                    return (ok && d >= 0.0) ? d : std::numeric_limits<double>::quiet_NaN();
+                };
+                double seVal = readErrCol(seColumn);
+                double sdVal = readErrCol(sdColumn);
+                if (!std::isnan(seVal)) { preVal = seVal; isSE = true; }
+                else if (!std::isnan(sdVal)) { preVal = sdVal; isSE = false; }
+                experimentTreatmentSD[expTrtKey].append(preVal);
+                experimentTreatmentIsPreSE[expTrtKey].append(isSE);
             }
-            
+
             // Create plot data for observed data (each experiment-treatment combination)
             // Observed data has no run; keys are always crop__experiment__treatment
             for (auto it = experimentTreatmentData.begin(); it != experimentTreatmentData.end(); ++it) {
@@ -1976,19 +1999,52 @@ void PlotWidget::plotDatasets(const DataTable &simData, const DataTable &obsData
                 // Observed has no run; always use base treatment ID
                 QString treatmentId = QString("%1__%2__%3").arg(crop).arg(experiment).arg(treatment);
                 
-                // Aggregate replicates if error bars are enabled (ONLY for observed data, not simulated)
-                if (m_plotSettings.showErrorBars && it.value().size() > 0) {
+                // Aggregate replicates if error bars are enabled, OR if pre-computed SD/SE columns exist
+                bool hasPreComputedErr = (sdColumn != nullptr || seColumn != nullptr);
+                if ((m_plotSettings.showErrorBars || hasPreComputedErr) && it.value().size() > 0) {
+                    const QVector<double> &preValues  = experimentTreatmentSD.value(it.key());
+                    const QVector<bool>   &preIsSE    = experimentTreatmentIsPreSE.value(it.key());
                     QVector<ErrorBarData> errorBars = aggregateReplicates(it.value(), xVar);
-                    
-                    // Convert SD to SE if needed
-                    if (m_plotSettings.errorBarType == "SE") {
-                        for (ErrorBarData &errorBar : errorBars) {
-                            if (errorBar.n > 1) {
-                                errorBar.errorValue = errorBar.errorValue / qSqrt(errorBar.n);  // SE = SD / sqrt(n)
+
+                    // For groups with n==1 and no computed SD, fill from SD_VAR or SE_VAR column.
+                    // Build a map from rounded X → pre-computed value so we can match regardless
+                    // of x-axis units (epoch ms for DATE, plain numeric for DAS/DAP etc.)
+                    double tol = (xVar == "DATE") ? 86400000.0 : 0.01;
+                    QMap<double, double> xToPreVal;
+                    QMap<double, bool>   xToIsSE;
+                    for (int pi = 0; pi < it.value().size() && pi < preValues.size(); ++pi) {
+                        if (!std::isnan(preValues[pi])) {
+                            double rx = qRound(it.value()[pi].x() / tol) * tol;
+                            xToPreVal[rx] = preValues[pi];
+                            xToIsSE[rx]   = (pi < preIsSE.size()) ? preIsSE[pi] : false;
+                        }
+                    }
+                    for (ErrorBarData &errorBar : errorBars) {
+                        if (errorBar.n == 1 && qFuzzyIsNull(errorBar.errorValue)) {
+                            double rx = qRound(errorBar.meanX / tol) * tol;
+                            if (xToPreVal.contains(rx)) {
+                                errorBar.errorValue      = xToPreVal[rx];
+                                errorBar.preComputedIsSE = xToIsSE[rx];
                             }
                         }
                     }
+
+                    // Convert SD to SE if needed — skip bars whose value is already SE
+                    if (m_plotSettings.errorBarType == "SE") {
+                        for (ErrorBarData &errorBar : errorBars) {
+                            if (!errorBar.preComputedIsSE && errorBar.n > 1) {
+                                errorBar.errorValue = errorBar.errorValue / qSqrt(errorBar.n);
+                            }
+                            // preComputedIsSE==true: value is already SE, use as-is
+                            // n==1 with SD column: can't derive SE without knowing n, keep as SD
+                        }
+                    }
                     
+                    // Remove bars with zero errorValue (no SD data for that point — e.g. -99 in T file)
+                    QVector<ErrorBarData> validBars;
+                    for (const ErrorBarData &eb : errorBars)
+                        if (eb.errorValue > 0.0) validBars.append(eb);
+
                     // Create points from aggregated data (mean points)
                     QVector<QPointF> meanPoints;
                     for (const ErrorBarData &errorBar : errorBars) {
@@ -1996,7 +2052,7 @@ void PlotWidget::plotDatasets(const DataTable &simData, const DataTable &obsData
                     }
                     plotData.points = meanPoints;
                     plotData.rawPoints = it.value(); // keep originals for animation filtering
-                    plotData.errorBars = errorBars;
+                    plotData.errorBars = validBars;
                 } else {
                     plotData.points = it.value();
                     plotData.rawPoints = it.value();
@@ -2051,17 +2107,15 @@ void PlotWidget::plotDatasets(const DataTable &simData, const DataTable &obsData
     if (!m_isScatterMode) initAnimFrames();
     
     // Update error bar data in chart view (ONLY for observed data series, never for simulated data)
-    if (m_plotSettings.showErrorBars && m_chartView) {
+    // Always render if pre-computed SD/SE columns were found, regardless of showErrorBars setting
+    if (m_chartView) {
         QMap<QAbstractSeries*, QVector<ErrorBarData>> errorBarMap;
         for (const QSharedPointer<PlotData> &plotData : m_plotDataList) {
-            // Only add error bars for observed data, never for simulated data
             if (plotData && plotData->isObserved && plotData->series && !plotData->errorBars.isEmpty()) {
                 errorBarMap[plotData->series] = plotData->errorBars;
             }
         }
         m_chartView->setErrorBarData(errorBarMap);
-    } else if (m_chartView) {
-        m_chartView->setErrorBarData(QMap<QAbstractSeries*, QVector<ErrorBarData>>());
     }
     
     // Update legend
@@ -4995,13 +5049,11 @@ void PlotWidget::applyAnimFrame(int frame)
 
     // Collect filtered error bars per view so we can update them in one pass
     QMap<ErrorBarChartView*, QMap<QAbstractSeries*, QVector<ErrorBarData>>> viewErrorBars;
-    if (m_plotSettings.showErrorBars) {
-        if (m_chartView && m_chartView->isVisible())
-            viewErrorBars[m_chartView] = {};
-        for (ErrorBarChartView *v : m_tsPanelViews)
-            if (v && v->isVisible())
-                viewErrorBars[v] = {};
-    }
+    if (m_chartView && m_chartView->isVisible())
+        viewErrorBars[m_chartView] = {};
+    for (ErrorBarChartView *v : m_tsPanelViews)
+        if (v && v->isVisible())
+            viewErrorBars[v] = {};
 
     for (const auto &pd : m_plotDataList) {
         if (!pd || !pd->series) continue;
@@ -5018,7 +5070,7 @@ void PlotWidget::applyAnimFrame(int frame)
             ss->replace(filtered);
 
         // Filter error bars for this observed series
-        if (m_plotSettings.showErrorBars && pd->isObserved && !pd->errorBars.isEmpty()) {
+        if (pd->isObserved && !pd->errorBars.isEmpty()) {
             QChart *chart = pd->series->chart();
             if (chart) {
                 ErrorBarChartView *target = nullptr;
@@ -5039,10 +5091,8 @@ void PlotWidget::applyAnimFrame(int frame)
     }
 
     // Push filtered error bars to their views
-    if (m_plotSettings.showErrorBars) {
-        for (auto it = viewErrorBars.begin(); it != viewErrorBars.end(); ++it)
-            it.key()->setErrorBarData(it.value());
-    }
+    for (auto it = viewErrorBars.begin(); it != viewErrorBars.end(); ++it)
+        it.key()->setErrorBarData(it.value());
 
     // Update metrics overlays if any are configured
     if (!m_plotSettings.tsMetrics.isEmpty()) {
