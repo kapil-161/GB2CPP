@@ -93,7 +93,7 @@ struct PlotSettings {
     QSet<QString> scatterMetrics = {"RMSE", "R²"};
 
     // Time series panel overlay metrics (shown in multi-panel mode, per variable)
-    QSet<QString> tsMetrics = {"RMSE", "NRMSE"};
+    QSet<QString> tsMetrics = {"RMSE", "d-stat"};
 
     // Interaction settings
     bool showHoverTooltip = true;

@@ -388,6 +388,9 @@ private:
     QString getTreatmentDisplayName(const QString &trtId, const QString &experimentId, const QString &cropId = QString());
     QString getTreatmentNameFromData(const QString &treatment, const QString &experiment, const QString &crop);
     void testScalingFunctionality(); // TEMPORARY: Test scaling logic
+    QString buildTSOverlayHtml(const QVector<QMap<QString, QVariant>> &metrics,
+                                const QSet<QString> &selectedMetrics) const;
+    void refreshTSMetricsOverlay();
     
     // Optimization: Cached date parsing helper
     bool parseDateCached(const QString &dateStr, double &timestamp, bool isObserved = false);
@@ -465,6 +468,7 @@ private:
 
     // Time series metrics overlay for single-panel mode
     QPointer<QLabel> m_tsMetricsOverlay;
+    QVector<QMap<QString, QVariant>> m_lastTSMetrics; // cache from metricsCalculated signal
 
     // Snapshot / comparison mode
     QVector<QSharedPointer<PlotData>> m_snapshotDataList;

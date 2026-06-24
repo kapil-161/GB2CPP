@@ -40,8 +40,8 @@ public:
             if (!m_userPositioned && e->type() == QEvent::Resize) {
                 QRectF pa = m_view->chart()->plotArea();
                 if (pa.isValid() && pa.width() > 10) {
-                    m_label->move(static_cast<int>(pa.left()) + 4,
-                                  static_cast<int>(pa.top())  + 4);
+                    m_label->move(static_cast<int>(pa.left()) + 28,
+                                  static_cast<int>(pa.top())  + 8);
                     m_label->raise();
                 }
             }
@@ -365,101 +365,28 @@ void PlotWidget::plotTimeSeriesMultiPanel()
         // Remove stale overlay
         if (m_tsMetricsOverlay) { delete m_tsMetricsOverlay; m_tsMetricsOverlay = nullptr; }
 
-        // Build metrics overlay on the single chart (one line per variable)
-        if (!m_plotSettings.tsMetrics.isEmpty() && !m_plotDataList.isEmpty()) {
-            // Group by variable (preserving order)
-            QStringList varOrder;
-            QMap<QString, QVector<QSharedPointer<PlotData>>> byVar;
-            for (const auto &pd : m_plotDataList) {
-                if (!byVar.contains(pd->variable)) varOrder.append(pd->variable);
-                byVar[pd->variable].append(pd);
-            }
+        // Build metrics overlay on the single chart — use cached metrics (same source as table)
+        if (!m_plotSettings.tsMetrics.isEmpty() && !m_lastTSMetrics.isEmpty()) {
+            QString html = this->buildTSOverlayHtml(m_lastTSMetrics,
+                               QSet<QString>(m_plotSettings.tsMetrics.begin(), m_plotSettings.tsMetrics.end()));
 
-            QStringList overlayLines;
-            for (const QString &varCode : varOrder) {
-                const auto &varData = byVar[varCode];
-
-                // Pool matched obs/sim pairs across treatments for this variable
-                QMap<QString, QVector<QPointF>> obsByTrt, simByTrt;
-                for (const auto &pd : varData) {
-                    QString key = pd->treatment + "__" + pd->experiment;
-                    if (pd->isObserved) {
-                        // Use rawPoints (pre-aggregation) so we pair individual obs against sim
-                        const QVector<QPointF> &src = pd->rawPoints.isEmpty() ? pd->points : pd->rawPoints;
-                        obsByTrt[key].append(src);
-                    } else {
-                        simByTrt[key].append(pd->points);
-                    }
-                }
-                // Display name for variable — declared early so it's available in all branches below
-                QPair<QString,QString> vi = DataProcessor::getVariableInfo(varCode);
-                QString varLabel = vi.first.isEmpty() ? varCode : vi.first;
-
-                QVector<double> allObs, allSim;
-                for (const QString &key : obsByTrt.keys()) {
-                    if (!simByTrt.contains(key)) continue;
-                    QMap<double, double> simByX;
-                    for (const QPointF &pt : simByTrt[key]) simByX[pt.x()] = pt.y();
-                    for (const QPointF &pt : obsByTrt[key]) {
-                        if (simByX.contains(pt.x())) {
-                            allObs << pt.y(); allSim << simByX[pt.x()];
-                        } else {
-                            auto it = simByX.lowerBound(pt.x() - 0.5);
-                            if (it != simByX.end() && std::abs(it.key() - pt.x()) < 0.5)
-                                { allObs << pt.y(); allSim << it.value(); }
-                        }
-                    }
-                }
-                if (allObs.isEmpty()) {
-                    overlayLines << varLabel + ": No paired data";
-                    continue;
-                }
-
-                // Filter NaN
-                QVector<double> obs, sim;
-                for (int i = 0; i < allObs.size(); ++i)
-                    if (std::isfinite(allObs[i]) && std::isfinite(allSim[i]))
-                        { obs << allObs[i]; sim << allSim[i]; }
-                if (obs.isEmpty()) continue;
-
-                double obsSum = 0; for (double v : obs) obsSum += v;
-                double obsMean = obsSum / obs.size();
-                double rmse    = MetricsCalculator::rmse(obs, sim);
-                double nrmse   = (obsMean > 0) ? (rmse / obsMean) * 100.0 : 0.0;
-                double dStat   = MetricsCalculator::dStat(obs, sim);
-
-                QStringList parts;
-                parts << varLabel + ":";
-                if (m_plotSettings.tsMetrics.contains("N"))
-                    parts << QString("N=%1").arg(obs.size());
-                if (m_plotSettings.tsMetrics.contains("RMSE"))
-                    parts << QString("RMSE=%1").arg(rmse, 0, 'f', rmse < 1 ? 3 : (rmse < 100 ? 2 : 1));
-                if (m_plotSettings.tsMetrics.contains("NRMSE"))
-                    parts << QString("NRMSE=%1%").arg(nrmse, 0, 'f', 1);
-                if (m_plotSettings.tsMetrics.contains("d-stat"))
-                    parts << QString("d=%1").arg(dStat, 0, 'f', 3);
-                overlayLines << parts.join("  ");
-            }
-
-            // Create overlay whenever metrics are configured so animation can update it
-            if (m_chartView && !m_plotSettings.tsMetrics.isEmpty() && !overlayLines.isEmpty()) {
-                QLabel *label = new QLabel(overlayLines.join("\n"), m_chartView);
-                // Plain text + no wrapping: a zero/negative-width parent must never
-                // push the rich-text layout engine into an infinite re-layout loop.
-                label->setTextFormat(Qt::PlainText);
+            if (m_chartView && !html.isEmpty()) {
+                QLabel *label = new QLabel(m_chartView);
+                label->setTextFormat(Qt::RichText);
+                label->setText(html);
                 label->setWordWrap(false);
                 int fontPt = qBound(8, m_plotSettings.axisTickFontSize, 13);
                 label->setStyleSheet(QString(
-                    "QLabel { background: rgba(255,255,255,210); font-size: %1pt; "
-                    "padding: 2px 4px; border: none; }").arg(fontPt));
+                    "QLabel { background: rgba(255,255,255,220); font-size: %1pt; "
+                    "padding: 4px 7px; border: 1px solid rgba(0,0,0,40); border-radius: 3px; }").arg(fontPt));
                 label->setAlignment(Qt::AlignLeft | Qt::AlignTop);
                 label->adjustSize();
                 // Position inside plot area once chart is laid out
                 QRectF pa = m_chartView->chart()->plotArea();
                 if (pa.isValid() && pa.width() > 10)
-                    label->move(static_cast<int>(pa.left()) + 4, static_cast<int>(pa.top()) + 4);
+                    label->move(static_cast<int>(pa.left()) + 28, static_cast<int>(pa.top()) + 8);
                 else
-                    label->move(4, 4); // chart not laid out yet — park at top-left
+                    label->move(28, 8); // chart not laid out yet — park at top-left
                 label->raise();
                 label->show();
                 m_tsMetricsOverlay = label;
@@ -911,12 +838,10 @@ void PlotWidget::plotTimeSeriesMultiPanel()
 
             if (!m_plotSettings.tsMetrics.isEmpty()) {
                 QLabel *statsLabel = new QLabel(statsLines.join("\n"), cv);
-                int statsFontPt = qBound(8, m_plotSettings.axisTickFontSize, 13);
-                if (m_plotSettings.axisTickFontSize != 9)
-                    statsFontPt = qBound(7, m_plotSettings.axisTickFontSize, 14);
+                int statsFontPt = qBound(7, m_plotSettings.axisTickFontSize, 13);
                 statsLabel->setStyleSheet(QString(
-                    "QLabel { background: rgba(255,255,255,210); font-size: %1pt; "
-                    "padding: 2px 4px; border: none; }").arg(statsFontPt));
+                    "QLabel { background: rgba(255,255,255,220); font-size: %1pt; "
+                    "padding: 4px 7px; border: 1px solid rgba(0,0,0,40); border-radius: 3px; }").arg(statsFontPt));
                 statsLabel->setAlignment(Qt::AlignLeft | Qt::AlignTop);
                 statsLabel->adjustSize();
                 statsLabel->raise();
@@ -1103,4 +1028,53 @@ void PlotWidget::buildMultiPanelLegend()
 
     if (!m_obsVisible) setObsSeriesVisible(false);
     if (!m_simVisible) setSimSeriesVisible(false);
+}
+
+void PlotWidget::refreshTSMetricsOverlay()
+{
+    if (m_plotSettings.tsMetrics.isEmpty() || m_lastTSMetrics.isEmpty()) return;
+
+    bool isMultiPanel = m_plotSettings.multiPanelTimeSeries
+                        && m_currentYVars.size() >= 2
+                        && !m_plotDataList.isEmpty();
+    if (isMultiPanel) return;
+    if (!m_chartView) return;
+
+    QString html = buildTSOverlayHtml(m_lastTSMetrics,
+                       QSet<QString>(m_plotSettings.tsMetrics.begin(), m_plotSettings.tsMetrics.end()));
+    if (html.isEmpty()) return;
+
+    if (m_tsMetricsOverlay) {
+        m_tsMetricsOverlay->setText(html);
+        m_tsMetricsOverlay->adjustSize();
+        m_tsMetricsOverlay->show();
+        return;
+    }
+
+    int fontPt = qBound(8, m_plotSettings.axisTickFontSize, 13);
+    QLabel *label = new QLabel(m_chartView);
+    label->setTextFormat(Qt::RichText);
+    label->setText(html);
+    label->setWordWrap(false);
+    label->setStyleSheet(QString(
+        "QLabel { background: rgba(255,255,255,220); font-size: %1pt; "
+        "padding: 4px 7px; border: 1px solid rgba(0,0,0,40); border-radius: 3px; }").arg(fontPt));
+    label->setAlignment(Qt::AlignLeft | Qt::AlignTop);
+    label->adjustSize();
+    label->move(28, 8); // temporary; repositioned after layout below
+    label->raise();
+    label->show();
+    m_tsMetricsOverlay = label;
+    new DraggableOverlay(m_chartView, label, label);
+
+    // Defer final positioning until Qt has finished laying out the chart
+    QTimer::singleShot(0, this, [this]() {
+        if (!m_tsMetricsOverlay || !m_chartView) return;
+        QRectF pa = m_chartView->chart()->plotArea();
+        if (pa.isValid() && pa.width() > 10) {
+            m_tsMetricsOverlay->move(static_cast<int>(pa.left()) + 28,
+                                     static_cast<int>(pa.top())  + 8);
+            m_tsMetricsOverlay->raise();
+        }
+    });
 }

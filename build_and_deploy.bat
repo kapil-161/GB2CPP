@@ -92,6 +92,12 @@ if exist "%TEMP%\GB2_runtime" (
     rmdir /s /q "%TEMP%\GB2_runtime"
 )
 
+REM Clear stale single-instance lock so first launch after build is never blocked
+if exist "%TEMP%\GB2.instance.lock" (
+    echo Clearing stale instance lock: %TEMP%\GB2.instance.lock
+    del /f /q "%TEMP%\GB2.instance.lock"
+)
+
 REM Force kill any processes using the build directory
 taskkill /f /im cmake.exe 2>nul
 taskkill /f /im mingw32-make.exe 2>nul

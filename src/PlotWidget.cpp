@@ -1173,6 +1173,7 @@ void PlotWidget::plotTimeSeries(
 
         if (m_obsData.rowCount > 0) {
             calculateMetrics();
+            refreshTSMetricsOverlay(); // rebuild overlay now that m_lastTSMetrics is populated
         } else {
         }
 
@@ -2698,6 +2699,7 @@ void PlotWidget::calculateMetrics()
             return cropA < cropB;
         });
         
+        m_lastTSMetrics = metrics;
         emit metricsCalculated(metrics);
     } else {
     }
@@ -4983,6 +4985,59 @@ void PlotWidget::initAnimFrames()
     updateAnimLabel(last);
 }
 
+// Build overlay HTML table from cached per-treatment metrics (Overall rows only)
+QString PlotWidget::buildTSOverlayHtml(
+    const QVector<QMap<QString, QVariant>> &metrics,
+    const QSet<QString> &selectedMetrics) const
+{
+    // Group per-treatment rows by variable (preserving order)
+    QStringList varOrder;
+    QMap<QString, QList<QMap<QString, QVariant>>> byVar;
+    for (const auto &m : metrics) {
+        QString var = m.value("Variable").toString();
+        if (var.isEmpty()) continue;
+        if (!byVar.contains(var)) varOrder << var;
+        byVar[var].append(m);
+    }
+    if (varOrder.isEmpty()) return QString();
+
+    QStringList rows;
+    for (const QString &var : varOrder) {
+        // Compute weighted overall stats (same formula as MetricsTableWidget::computeOverallRow)
+        double totalN = 0, sumSS = 0, sumObsMean = 0, sumDStat = 0;
+        for (const auto &m : byVar[var]) {
+            double n = m.value("n").toDouble();
+            if (n <= 0) continue;
+            double rmse = m.value("RMSE").toDouble();
+            totalN    += n;
+            sumSS     += n * rmse * rmse;
+            sumObsMean += n * m.value("ObsMean").toDouble();
+            sumDStat  += n * m.value("Willmott's d-stat").toDouble();
+        }
+        if (totalN <= 0) continue;
+        double rmse    = std::sqrt(sumSS / totalN);
+        double obsMean = sumObsMean / totalN;
+        double nrmse   = (obsMean > 0) ? (rmse / obsMean) * 100.0 : 0.0;
+        double dStat   = sumDStat / totalN;
+
+        QPair<QString,QString> vi = DataProcessor::getVariableInfo(var);
+        QString label = vi.first.isEmpty() ? var : vi.first;
+        QString row = "<tr><td style='padding-right:8px'><b>" + label.toHtmlEscaped() + ":</b></td>";
+        if (selectedMetrics.contains("N"))
+            row += "<td style='padding-right:12px'>N = " + QString::number((int)totalN) + "</td>";
+        if (selectedMetrics.contains("RMSE"))
+            row += "<td style='padding-right:12px'>RMSE = " + QString::number(rmse, 'f', rmse < 1 ? 3 : (rmse < 100 ? 2 : 1)) + "</td>";
+        if (selectedMetrics.contains("NRMSE"))
+            row += "<td style='padding-right:12px'>NRMSE = " + QString::number(nrmse, 'f', 1) + "%</td>";
+        if (selectedMetrics.contains("d-stat"))
+            row += "<td>d = " + QString::number(dStat, 'f', 3) + "</td>";
+        row += "</tr>";
+        rows << row;
+    }
+    return "<html><body style='margin:0;padding:0;'><table style='border-spacing:0;'>"
+           + rows.join("") + "</table></body></html>";
+}
+
 // Compute metrics text lines for a variable using only points up to cutoff x
 static QStringList computeAnimMetrics(
     const QVector<QSharedPointer<PlotData>> &varData,
@@ -5034,10 +5089,10 @@ static QStringList computeAnimMetrics(
     double dStat   = MetricsCalculator::dStat(obs, sim);
 
     QStringList parts;
-    if (selectedMetrics.contains("N"))     parts << QString("N=%1").arg(n);
-    if (selectedMetrics.contains("RMSE"))  parts << QString("RMSE=%1").arg(rmse, 0, 'f', rmse < 1 ? 3 : (rmse < 100 ? 2 : 1));
-    if (selectedMetrics.contains("NRMSE")) parts << QString("NRMSE=%1%").arg(nrmse, 0, 'f', 1);
-    if (selectedMetrics.contains("d-stat"))parts << QString("d=%1").arg(dStat, 0, 'f', 3);
+    if (selectedMetrics.contains("N"))     parts << QString("N = %1").arg(n);
+    if (selectedMetrics.contains("RMSE"))  parts << QString("RMSE = %1").arg(rmse, 0, 'f', rmse < 1 ? 3 : (rmse < 100 ? 2 : 1));
+    if (selectedMetrics.contains("NRMSE")) parts << QString("NRMSE = %1%").arg(nrmse, 0, 'f', 1);
+    if (selectedMetrics.contains("d-stat"))parts << QString("d = %1").arg(dStat, 0, 'f', 3);
     return parts;
 }
 
@@ -5122,16 +5177,20 @@ void PlotWidget::applyAnimFrame(int frame)
 
         // Update single-chart overlay
         if (m_tsMetricsOverlay) {
-            QStringList overlayLines;
+            QStringList rows;
             for (const QString &varCode : varOrder) {
                 QStringList parts = computeAnimMetrics(byVar[varCode], cutoff, metricSet);
                 if (parts.isEmpty()) continue;
                 QPair<QString,QString> vi = DataProcessor::getVariableInfo(varCode);
                 QString varLabel = vi.first.isEmpty() ? varCode : vi.first;
-                overlayLines << varLabel + ":  " + parts.join("  ");
+                QString row = "<tr><td style='padding-left:10px'><b>" + varLabel.toHtmlEscaped() + ":</b></td>";
+                for (const QString &p : parts)
+                    row += "<td style='padding-left:12px'>" + p.toHtmlEscaped() + "</td>";
+                row += "</tr>";
+                rows << row;
             }
-            if (!overlayLines.isEmpty()) {
-                m_tsMetricsOverlay->setText(overlayLines.join("\n"));
+            if (!rows.isEmpty()) {
+                m_tsMetricsOverlay->setText("<html><body style='margin:0;padding:0;'><table style='border-spacing:0;'>" + rows.join("") + "</table></body></html>");
                 m_tsMetricsOverlay->adjustSize();
                 m_tsMetricsOverlay->show();
             } else {
