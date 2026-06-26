@@ -65,6 +65,10 @@ struct PlotData {
     QString symbol;
     // Error bar data (for aggregated replicates)
     QVector<ErrorBarData> errorBars;  // Empty if not aggregated or no replicates
+    // Pre-matched obs/sim pairs in raw (unscaled) units, keyed by x (date ms or DAS).
+    // Populated for observed series only; used by animation metrics to avoid re-matching.
+    struct MatchedPair { double x; double obs; double sim; };
+    QVector<MatchedPair> matchedPairs;
 };
 
 class ErrorBarChartView : public QChartView
@@ -247,7 +251,7 @@ public:
     void setAvailableTreatments(const QStringList &treatments,
         const QMap<QString, QMap<QString, QString>> &treatmentNames = QMap<QString, QMap<QString, QString>>());
     QStringList getSelectedTreatments() const;
-    void showTreatmentSelection();  // Switch legend area to treatment panel (e.g. on variable change)
+    void showTreatmentSelection(bool onlyIfNoPlot = false);
 
     // Simple legend functionality (matching Python)
     
@@ -388,6 +392,8 @@ private:
     QString getTreatmentDisplayName(const QString &trtId, const QString &experimentId, const QString &cropId = QString());
     QString getTreatmentNameFromData(const QString &treatment, const QString &experiment, const QString &crop);
     void testScalingFunctionality(); // TEMPORARY: Test scaling logic
+    QStringList computeAnimMetricsForVar(const QString &varCode, double cutoff,
+                                         const QSet<QString> &selectedMetrics) const;
     QString buildTSOverlayHtml(const QVector<QMap<QString, QVariant>> &metrics,
                                 const QSet<QString> &selectedMetrics) const;
     void refreshTSMetricsOverlay();
@@ -469,6 +475,12 @@ private:
     // Time series metrics overlay for single-panel mode
     QPointer<QLabel> m_tsMetricsOverlay;
     QVector<QMap<QString, QVariant>> m_lastTSMetrics; // cache from metricsCalculated signal
+
+    // Pre-matched obs/sim pairs in raw units for animation metrics.
+    // Key: "var::trt::exp::crop::run"  Value: list of {x_msec_or_das, obs, sim}
+    struct AnimPair { double x; double obs; double sim; };
+    QMap<QString, QVector<AnimPair>> m_animMatchedPairs;
+    QSet<QString> m_animValidKeys; // keys that pass treatment/series filters
 
     // Snapshot / comparison mode
     QVector<QSharedPointer<PlotData>> m_snapshotDataList;

@@ -784,9 +784,9 @@ void PlotWidget::plotTimeSeriesMultiPanel()
 
         // --- Metrics overlay — use same cached metrics as single-chart overlay ---
         if (!m_plotSettings.tsMetrics.isEmpty() && !m_lastTSMetrics.isEmpty()) {
-            // Extract per-variable stats from cached metrics (correct, matches table)
             QStringList statsLines;
             double totalN = 0, sumSS = 0, sumObsMean = 0, sumDStat = 0;
+            double pooledDStat = -1.0;
             for (const auto &m : m_lastTSMetrics) {
                 if (m.value("Variable").toString() != varCode) continue;
                 double n = m.value("n").toDouble();
@@ -796,12 +796,14 @@ void PlotWidget::plotTimeSeriesMultiPanel()
                 sumSS      += n * rmse * rmse;
                 sumObsMean += n * m.value("ObsMean").toDouble();
                 sumDStat   += n * m.value("Willmott's d-stat").toDouble();
+                if (pooledDStat < 0 && m.contains("PooledDStat"))
+                    pooledDStat = m.value("PooledDStat").toDouble();
             }
             if (totalN > 0) {
                 double rmse    = std::sqrt(sumSS / totalN);
                 double obsMean = sumObsMean / totalN;
                 double nrmse   = (obsMean > 0) ? (rmse / obsMean) * 100.0 : 0.0;
-                double dStat   = sumDStat / totalN;
+                double dStat   = (pooledDStat >= 0) ? pooledDStat : sumDStat / totalN;
                 if (m_plotSettings.tsMetrics.contains("N"))
                     statsLines << QString("N = %1").arg((int)totalN);
                 if (m_plotSettings.tsMetrics.contains("RMSE"))
@@ -919,6 +921,10 @@ void PlotWidget::buildMultiPanelLegend()
     updateObsSimHeaders();
 
     QLabel *trtH = new QLabel("<b>Treatment</b>"); trtH->setAlignment(Qt::AlignLeft);
+    trtH->setObjectName("legendTrtHeader");
+    trtH->setProperty("legendHeaderType", "treatment");
+    trtH->setCursor(Qt::PointingHandCursor);
+    trtH->installEventFilter(this);
     headerLayout->addWidget(obsH);
     headerLayout->addWidget(simH);
     headerLayout->addWidget(trtH, 1);
@@ -1003,6 +1009,12 @@ void PlotWidget::buildMultiPanelLegend()
         m_legendLayout->addWidget(row);
     }
 
+    // Update header to singular/plural based on entry count
+    if (QLabel *hdr = m_legendScrollArea->findChild<QLabel*>("legendTrtHeader")) {
+        QString txt = entryOrder.size() == 1 ? "<b>Treatment</b>" : "<b>Treatments</b>";
+        hdr->setText(txt);
+    }
+
     m_legendLayout->addStretch();
 
     if (!m_obsVisible) setObsSeriesVisible(false);
@@ -1030,8 +1042,9 @@ void PlotWidget::refreshTSMetricsOverlay()
             QWidget *panelWidget = cv->parentWidget();
             if (!panelWidget) continue;
 
-            // Compute weighted stats for this variable
+            // Compute overall stats — use pooled d-stat if available
             double totalN = 0, sumSS = 0, sumObsMean = 0, sumDStat = 0;
+            double pooledDStat = -1.0;
             for (const auto &m : m_lastTSMetrics) {
                 if (m.value("Variable").toString() != varCode) continue;
                 double n = m.value("n").toDouble();
@@ -1041,12 +1054,14 @@ void PlotWidget::refreshTSMetricsOverlay()
                 sumSS      += n * rmse * rmse;
                 sumObsMean += n * m.value("ObsMean").toDouble();
                 sumDStat   += n * m.value("Willmott's d-stat").toDouble();
+                if (pooledDStat < 0 && m.contains("PooledDStat"))
+                    pooledDStat = m.value("PooledDStat").toDouble();
             }
             if (totalN <= 0) continue;
-            double rmse  = std::sqrt(sumSS / totalN);
+            double rmse    = std::sqrt(sumSS / totalN);
             double obsMean = sumObsMean / totalN;
-            double nrmse = (obsMean > 0) ? (rmse / obsMean) * 100.0 : 0.0;
-            double dStat = sumDStat / totalN;
+            double nrmse   = (obsMean > 0) ? (rmse / obsMean) * 100.0 : 0.0;
+            double dStat   = (pooledDStat >= 0) ? pooledDStat : sumDStat / totalN;
 
             QStringList statsLines;
             if (metricSet.contains("N"))     statsLines << QString("N = %1").arg((int)totalN);
@@ -1088,14 +1103,19 @@ void PlotWidget::refreshTSMetricsOverlay()
                        QSet<QString>(m_plotSettings.tsMetrics.begin(), m_plotSettings.tsMetrics.end()));
     if (html.isEmpty()) return;
 
+    int fontPt = qBound(8, m_plotSettings.axisTickFontSize, 13);
+
     if (m_tsMetricsOverlay) {
         m_tsMetricsOverlay->setText(html);
-        m_tsMetricsOverlay->adjustSize();
+        QTextDocument doc;
+        QFont f = m_tsMetricsOverlay->font(); f.setPointSize(fontPt);
+        doc.setDefaultFont(f);
+        doc.setHtml(html);
+        QSize docSize = doc.size().toSize();
+        m_tsMetricsOverlay->resize(docSize.width() + 32, docSize.height() + 12);
         m_tsMetricsOverlay->show();
         return;
     }
-
-    int fontPt = qBound(8, m_plotSettings.axisTickFontSize, 13);
     QLabel *label = new QLabel(m_chartView);
     label->setTextFormat(Qt::RichText);
     label->setText(html);
@@ -1113,7 +1133,7 @@ void PlotWidget::refreshTSMetricsOverlay()
         doc.setDefaultFont(f);
         doc.setHtml(html);
         QSize docSize = doc.size().toSize();
-        label->resize(docSize.width() + 18, docSize.height() + 10);
+        label->resize(docSize.width() + 32, docSize.height() + 12);
     }
     label->move(28, 8); // temporary; repositioned after layout below
     label->raise();

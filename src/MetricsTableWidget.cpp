@@ -404,7 +404,9 @@ static QVariantMap computeOverallRow(const QVariantList& varRows, bool isScatter
         overall["SimMean"] = sumSimMean / totalN;
         overall["RMSE"]    = rmse;
         overall["NRMSE"]   = (obsMean > 0) ? (rmse / obsMean) * 100.0 : 0.0;
-        overall["d-stat"]  = sumDStat / totalN;
+        // Use pooled d-stat if available (correct), otherwise fall back to weighted average
+        QVariant pooled = varRows.isEmpty() ? QVariant() : varRows.first().toMap().value("PooledDStat");
+        overall["d-stat"]  = pooled.isValid() ? pooled.toDouble() : sumDStat / totalN;
         if (isScatterPlot) overall["BIAS"] = sumBias / totalN;
     }
     return overall;

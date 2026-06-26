@@ -2445,9 +2445,14 @@ void PlotWidget::calculateMetrics()
     if (m_simData.rowCount == 0 || m_obsData.rowCount == 0) {
         return;
     }
-    
+
+    m_animMatchedPairs.clear();
+    m_animValidKeys.clear();
+
     QVector<QMap<QString, QVariant>> metrics;
-    
+    // Pool all obs/sim pairs per variable (across treatments) for correct pooled d-stat
+    QMap<QString, QVector<double>> pooledObs, pooledSim;
+
     // Calculate metrics for each Y variable and treatment combination
     for (const QString &yVar : m_currentYVars) {
 
@@ -2556,11 +2561,19 @@ void PlotWidget::calculateMetrics()
                     QString effectiveTrt = (crop == "SQ" && matchKeyToSimTrt.contains(matchKey)) ? matchKeyToSimTrt[matchKey] : obsTrt;
                     
                     QString baseGroupKey = QString("%1_%2_%3_%4").arg(effectiveTrt, yVar, exp, crop);
+                    // Convert date string to numeric x for animation cutoff comparison
+                    double xVal = 0.0;
+                    {
+                        QDateTime dt = QDateTime::fromString(date, "yyyy-MM-dd");
+                        if (dt.isValid()) xVal = static_cast<double>(dt.toMSecsSinceEpoch());
+                        else              xVal = date.toDouble(); // DAS/DAP
+                    }
+
                     if (runMap.isEmpty()) {
-                        // No run separation
+                        // No run separation (runMap should not be empty — handled below — but kept as fallback)
                         QString groupKey = baseGroupKey;
-                        simByTreatmentVarExpCrop[groupKey].append(0.0); // placeholder; will be overwritten next line
-                        simByTreatmentVarExpCrop[groupKey].back() = 0.0; // ensure vector exists
+                        simByTreatmentVarExpCrop[groupKey].append(0.0);
+                        simByTreatmentVarExpCrop[groupKey].back() = 0.0;
                         obsByTreatmentVarExpCrop[groupKey].append(obsVal.toDouble());
                         treatmentVarExpCropToExp[groupKey] = exp;
                         treatmentVarExpCropToCrop[groupKey] = crop;
@@ -2578,6 +2591,11 @@ void PlotWidget::calculateMetrics()
                             treatmentVarExpCropToTrt[groupKey] = effectiveTrt;
                             treatmentVarExpCropToRun[groupKey] = runId;
                             baseGroupToRuns[baseGroupKey].insert(runId);
+
+                            // Store raw pairs keyed by animKey; treatment filter applied in metrics loop
+                            QString animKey = QString("%1::%2::%3::%4::%5").arg(yVar, effectiveTrt, exp, crop, runId);
+                            m_animMatchedPairs[animKey].append({xVal, obsVal.toDouble(), simVal});
+
                             matchedPairs++;
                         }
                     }
@@ -2616,13 +2634,20 @@ void PlotWidget::calculateMetrics()
                 continue;
             }
 
+            // Mark this anim key as passing filters
+            m_animValidKeys.insert(QString("%1::%2::%3::%4::%5").arg(variable, trt, experimentName, cropName, runId));
+
             QVector<double> simValues = it.value();
             QVector<double> obsValues = obsByTreatmentVarExpCrop[groupKey];
-            
+
             if (simValues.isEmpty() || obsValues.isEmpty()) {
                 continue;
             }
-            
+
+            // Pool for overall pooled d-stat
+            pooledObs[variable].append(obsValues);
+            pooledSim[variable].append(simValues);
+
             // Use MetricsCalculator
             QVariantMap result = MetricsCalculator::calculateMetrics(simValues, obsValues, trt.toInt());
             
@@ -2699,6 +2724,15 @@ void PlotWidget::calculateMetrics()
             return cropA < cropB;
         });
         
+        // Store pooled d-stat per variable so overlay and stats table can use it
+        for (auto &m : metrics) {
+            QString var = m.value("Variable").toString();
+            if (pooledObs.contains(var) && !pooledObs[var].isEmpty()) {
+                double pd = MetricsCalculator::dStat(pooledObs[var], pooledSim[var]);
+                m["PooledDStat"] = pd;
+            }
+        }
+
         m_lastTSMetrics = metrics;
         emit metricsCalculated(metrics);
     } else {
@@ -4719,7 +4753,7 @@ void PlotWidget::setupPreplotPanel()
     layout->setSpacing(4);
 
     // Header — matches legend section header style
-    QLabel *titleLabel = new QLabel("Treatments");
+    QLabel *titleLabel = new QLabel("Treatment");
     titleLabel->setStyleSheet(
         "font-size: 10px; font-weight: bold; color: #555555; "
         "padding: 2px 0px; border-bottom: 1px solid #dddddd;"
@@ -4859,12 +4893,14 @@ QStringList PlotWidget::getSelectedTreatments() const
     return selected;
 }
 
-void PlotWidget::showTreatmentSelection()
+void PlotWidget::showTreatmentSelection(bool onlyIfNoPlot)
 {
-    // Only switch to treatment selection if no plot is currently shown
-    if (m_legendStack && m_preplotPanelEnabled && m_treatmentSelectList
-            && m_treatmentSelectList->count() > 0 && m_plotDataList.isEmpty())
-        m_legendStack->setCurrentIndex(0);
+    if (!m_legendStack || !m_preplotPanelEnabled || !m_treatmentSelectList
+            || m_treatmentSelectList->count() == 0)
+        return;
+    if (onlyIfNoPlot && !m_plotDataList.isEmpty())
+        return;
+    m_legendStack->setCurrentIndex(0);
 }
 
 // ── Animation ─────────────────────────────────────────────────────────────
@@ -5006,22 +5042,25 @@ QString PlotWidget::buildTSOverlayHtml(
 
     QStringList rows;
     for (const QString &var : varOrder) {
-        // Compute weighted overall stats (same formula as MetricsTableWidget::computeOverallRow)
-        double totalN = 0, sumSS = 0, sumObsMean = 0, sumDStat = 0;
+        // Compute overall stats — use pooled d-stat if available
+        double totalN = 0, sumSS = 0, sumObsMean = 0;
+        double pooledDStat = -1.0;
         for (const auto &m : byVar[var]) {
             double n = m.value("n").toDouble();
             if (n <= 0) continue;
             double rmse = m.value("RMSE").toDouble();
-            totalN    += n;
-            sumSS     += n * rmse * rmse;
+            totalN     += n;
+            sumSS      += n * rmse * rmse;
             sumObsMean += n * m.value("ObsMean").toDouble();
-            sumDStat  += n * m.value("Willmott's d-stat").toDouble();
+            if (pooledDStat < 0 && m.contains("PooledDStat"))
+                pooledDStat = m.value("PooledDStat").toDouble();
         }
         if (totalN <= 0) continue;
         double rmse    = std::sqrt(sumSS / totalN);
         double obsMean = sumObsMean / totalN;
         double nrmse   = (obsMean > 0) ? (rmse / obsMean) * 100.0 : 0.0;
-        double dStat   = sumDStat / totalN;
+        double dStat   = (pooledDStat >= 0) ? pooledDStat
+                         : [&]{ double s=0; for (const auto &m : byVar[var]) { double n=m.value("n").toDouble(); if(n>0) s+=n*m.value("Willmott's d-stat").toDouble(); } return s/totalN; }();
 
         QPair<QString,QString> vi = DataProcessor::getVariableInfo(var);
         QString label = vi.first.isEmpty() ? var : vi.first;
@@ -5041,55 +5080,34 @@ QString PlotWidget::buildTSOverlayHtml(
            + rows.join("") + "</table></body></html>";
 }
 
-// Compute metrics text lines for a variable using only points up to cutoff x
-static QStringList computeAnimMetrics(
-    const QVector<QSharedPointer<PlotData>> &varData,
+// Compute metrics text for a variable using pre-matched raw pairs up to cutoff x
+QStringList PlotWidget::computeAnimMetricsForVar(
+    const QString &varCode,
     double cutoff,
-    const QSet<QString> &selectedMetrics)
+    const QSet<QString> &selectedMetrics) const
 {
-    QMap<QString, QVector<QPointF>> obsByTrt, simByTrt;
-    for (const auto &pd : varData) {
-        QString key = pd->treatment + "__" + pd->experiment;
-        // Use rawPoints for observed so individual obs pair against sim, even when error bars aggregate them
-        const QVector<QPointF> &src = (pd->isObserved && !pd->rawPoints.isEmpty())
-                                      ? pd->rawPoints : pd->points;
-        QVector<QPointF> pts;
-        for (const QPointF &pt : src)
-            if (pt.x() <= cutoff) pts.append(pt);
-        if (pd->isObserved) obsByTrt[key].append(pts);
-        else                simByTrt[key].append(pts);
-    }
-
+    // Pool all pairs first, then compute stats once (pooled d-stat matches stats table Overall row)
     QVector<double> allObs, allSim;
-    for (const QString &key : obsByTrt.keys()) {
-        if (!simByTrt.contains(key)) continue;
-        QMap<double, double> simByX;
-        for (const QPointF &pt : simByTrt[key]) simByX[pt.x()] = pt.y();
-        for (const QPointF &pt : obsByTrt[key]) {
-            if (simByX.contains(pt.x())) {
-                allObs << pt.y(); allSim << simByX[pt.x()];
-            } else {
-                // Fuzzy match — obs dates may be remapped slightly off sim dates
-                auto it = simByX.lowerBound(pt.x() - 0.5);
-                if (it != simByX.end() && std::abs(it.key() - pt.x()) < 0.5)
-                    { allObs << pt.y(); allSim << it.value(); }
+    for (auto it = m_animMatchedPairs.constBegin(); it != m_animMatchedPairs.constEnd(); ++it) {
+        if (!it.key().startsWith(varCode + "::")) continue;
+        if (!m_animValidKeys.contains(it.key())) continue;
+        for (const AnimPair &p : it.value()) {
+            if (p.x > cutoff) continue;
+            if (std::isfinite(p.obs) && std::isfinite(p.sim)) {
+                allObs << p.obs;
+                allSim << p.sim;
             }
         }
     }
 
-    QVector<double> obs, sim;
-    for (int i = 0; i < allObs.size() && i < allSim.size(); ++i)
-        if (std::isfinite(allObs[i]) && std::isfinite(allSim[i]))
-            { obs << allObs[i]; sim << allSim[i]; }
+    if (allObs.isEmpty()) return {};
 
-    if (obs.isEmpty()) return {};
-
-    int    n       = obs.size();
-    double obsSum  = 0; for (double v : obs) obsSum += v;
+    int    n       = allObs.size();
+    double obsSum  = 0; for (double v : allObs) obsSum += v;
     double obsMean = obsSum / n;
-    double rmse    = MetricsCalculator::rmse(obs, sim);
+    double rmse    = MetricsCalculator::rmse(allObs, allSim);
     double nrmse   = (obsMean > 0) ? (rmse / obsMean) * 100.0 : 0.0;
-    double dStat   = MetricsCalculator::dStat(obs, sim);
+    double dStat   = MetricsCalculator::dStat(allObs, allSim);
 
     QStringList parts;
     if (selectedMetrics.contains("N"))     parts << QString("N = %1").arg(n);
@@ -5152,23 +5170,19 @@ void PlotWidget::applyAnimFrame(int frame)
     for (auto it = viewErrorBars.begin(); it != viewErrorBars.end(); ++it)
         it.key()->setErrorBarData(it.value());
 
-    // Update metrics overlays if any are configured
-    if (!m_plotSettings.tsMetrics.isEmpty()) {
-        // Group plotData by variable
+    // Update metrics overlays progressively (stats for data up to current cutoff)
+    if (!m_plotSettings.tsMetrics.isEmpty() && !m_animMatchedPairs.isEmpty()) {
         QStringList varOrder;
-        QMap<QString, QVector<QSharedPointer<PlotData>>> byVar;
-        for (const auto &pd : m_plotDataList) {
-            if (!byVar.contains(pd->variable)) varOrder.append(pd->variable);
-            byVar[pd->variable].append(pd);
-        }
+        for (const auto &pd : m_plotDataList)
+            if (!varOrder.contains(pd->variable)) varOrder.append(pd->variable);
         QSet<QString> metricSet(m_plotSettings.tsMetrics.begin(), m_plotSettings.tsMetrics.end());
 
-        // Update multi-panel overlays (one label per variable)
+        // Update multi-panel overlays
         for (const QString &varCode : varOrder) {
             if (!m_tsPanelOverlays.contains(varCode)) continue;
             QLabel *lbl = m_tsPanelOverlays[varCode];
             if (!lbl) continue;
-            QStringList parts = computeAnimMetrics(byVar[varCode], cutoff, metricSet);
+            QStringList parts = computeAnimMetricsForVar(varCode, cutoff, metricSet);
             if (!parts.isEmpty()) {
                 lbl->setText(parts.join("\n"));
                 lbl->adjustSize();
@@ -5182,19 +5196,28 @@ void PlotWidget::applyAnimFrame(int frame)
         if (m_tsMetricsOverlay) {
             QStringList rows;
             for (const QString &varCode : varOrder) {
-                QStringList parts = computeAnimMetrics(byVar[varCode], cutoff, metricSet);
+                QStringList parts = computeAnimMetricsForVar(varCode, cutoff, metricSet);
                 if (parts.isEmpty()) continue;
                 QPair<QString,QString> vi = DataProcessor::getVariableInfo(varCode);
                 QString varLabel = vi.first.isEmpty() ? varCode : vi.first;
-                QString row = "<tr><td style='padding-left:10px'><b>" + varLabel.toHtmlEscaped() + ":</b></td>";
+                QString row = "<tr><td style='padding-right:8px'><b>" + varLabel.toHtmlEscaped() + ":</b></td>";
                 for (const QString &p : parts)
                     row += "<td style='padding-left:12px'>" + p.toHtmlEscaped() + "</td>";
                 row += "</tr>";
                 rows << row;
             }
             if (!rows.isEmpty()) {
-                m_tsMetricsOverlay->setText("<html><body style='margin:0;padding:0;'><table style='border-spacing:0;'>" + rows.join("") + "</table></body></html>");
-                m_tsMetricsOverlay->adjustSize();
+                QString html = "<html><body style='margin:0;padding:0;'><table style='border-spacing:0;'>"
+                               + rows.join("") + "</table></body></html>";
+                m_tsMetricsOverlay->setText(html);
+                QTextDocument doc;
+                QFont f = m_tsMetricsOverlay->font();
+                int fp = qBound(8, m_plotSettings.axisTickFontSize, 13);
+                f.setPointSize(fp);
+                doc.setDefaultFont(f);
+                doc.setHtml(html);
+                QSize docSize = doc.size().toSize();
+                m_tsMetricsOverlay->resize(docSize.width() + 32, docSize.height() + 12);
                 m_tsMetricsOverlay->show();
             } else {
                 m_tsMetricsOverlay->hide();

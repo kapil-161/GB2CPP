@@ -1254,7 +1254,7 @@ void MainWindow::onYVariableChanged()
     }
 
     // Show treatment selection panel so user can review before refreshing
-    if (m_plotWidget) m_plotWidget->showTreatmentSelection();
+    if (m_plotWidget) m_plotWidget->showTreatmentSelection(true);
 
     // Show prompt message based on current tab
     if (m_tabWidget && m_tabWidget->currentIndex() == 0) {
@@ -1405,13 +1405,10 @@ void MainWindow::onTabChanged(int index)
                 m_dataViewFileTypeComboBox->setCurrentIndex(0); // Regular .OUT
         }
 
-        // Refresh data table based on selected file type
+        // Refresh data table only when data has changed, not on every tab switch
         if (m_dataTableWidget && m_dataNeedsRefresh) {
             onDataViewFileTypeChanged();
-            m_dataNeedsRefresh = false; // Reset the flag after refreshing
-        } else if (m_dataTableWidget) {
-            // Data already loaded, just refresh if needed
-            onDataViewFileTypeChanged();
+            m_dataNeedsRefresh = false;
         }
     } else if (index == 2) {
         // Scatter Plot tab
