@@ -15,7 +15,7 @@ class StatusWidget : public QWidget
 
 public:
     explicit StatusWidget(QWidget *parent = nullptr);
-    
+
     void showSuccess(const QString &message, int timeout = 3000, bool center = false, bool flash = false);
     void showError(const QString &message, int timeout = 5000, bool center = false, bool flash = false);
     void showWarning(const QString &message, int timeout = 4000, bool center = false, bool flash = false);
@@ -33,13 +33,13 @@ private:
     void setupUI();
     void showCenterMessage(const QString &message, const QColor &bgColor);
     void startFlash(const QString &message, const QString &style, bool center = false, const QColor &bgColor = QColor());
-    
+
     QHBoxLayout *m_layout;
     QLabel *m_messageLabel;
     QProgressBar *m_progressBar;
     QTimer *m_clearTimer;
     QTimer *m_flashTimer;
-    
+
     // Flash functionality
     int m_flashCount;
     bool m_flashVisible;

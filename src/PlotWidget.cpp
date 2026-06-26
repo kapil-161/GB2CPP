@@ -2778,6 +2778,7 @@ void PlotWidget::clearChart()
     clearLegend();
     m_scalingLabel->clear();
     m_plotDataList.clear();
+    m_lastTSMetrics.clear();
     if (m_tsMetricsOverlay) { delete m_tsMetricsOverlay; m_tsMetricsOverlay = nullptr; }
 
     // Clear remaining single-view decorations when chart is cleared
@@ -4860,8 +4861,9 @@ QStringList PlotWidget::getSelectedTreatments() const
 
 void PlotWidget::showTreatmentSelection()
 {
-    // Only switch if there are treatments to show
-    if (m_legendStack && m_preplotPanelEnabled && m_treatmentSelectList && m_treatmentSelectList->count() > 0)
+    // Only switch to treatment selection if no plot is currently shown
+    if (m_legendStack && m_preplotPanelEnabled && m_treatmentSelectList
+            && m_treatmentSelectList->count() > 0 && m_plotDataList.isEmpty())
         m_legendStack->setCurrentIndex(0);
 }
 
@@ -4990,12 +4992,13 @@ QString PlotWidget::buildTSOverlayHtml(
     const QVector<QMap<QString, QVariant>> &metrics,
     const QSet<QString> &selectedMetrics) const
 {
-    // Group per-treatment rows by variable (preserving order)
+    // Group per-treatment rows by variable, restricted to currently plotted vars
     QStringList varOrder;
     QMap<QString, QList<QMap<QString, QVariant>>> byVar;
     for (const auto &m : metrics) {
         QString var = m.value("Variable").toString();
         if (var.isEmpty()) continue;
+        if (!m_currentYVars.contains(var)) continue; // skip stale variables
         if (!byVar.contains(var)) varOrder << var;
         byVar[var].append(m);
     }

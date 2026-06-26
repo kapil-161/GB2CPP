@@ -14,6 +14,8 @@
 #include <QMouseEvent>
 #include <QWheelEvent>
 #include <QDebug>
+#include <QFontMetrics>
+#include <QTextDocument>
 #include <limits>
 #include "MetricsCalculator.h"
 
@@ -780,76 +782,53 @@ void PlotWidget::plotTimeSeriesMultiPanel()
         else           cv->clearAxisBreaks();
         panelLayout->addWidget(cv, 1);
 
-        // --- Metrics overlay (same pattern as scatter panels) ---
-        if (!m_plotSettings.tsMetrics.isEmpty()) {
-            // Pool matched obs/sim pairs across all treatments for this variable.
-            // Match within each treatment by x-value so paired comparison is valid.
-            QVector<double> allObs, allSim;
-            QMap<QString, QVector<QPointF>> obsByTrt, simByTrt;
-            for (const auto &pd : varData) {
-                QString key = pd->treatment + "__" + pd->experiment;
-                if (pd->isObserved) {
-                    const QVector<QPointF> &src = pd->rawPoints.isEmpty() ? pd->points : pd->rawPoints;
-                    obsByTrt[key].append(src);
-                } else {
-                    simByTrt[key].append(pd->points);
-                }
-            }
-            for (const QString &key : obsByTrt.keys()) {
-                if (!simByTrt.contains(key)) continue;
-                QMap<double, double> simByX;
-                for (const QPointF &pt : simByTrt[key]) simByX[pt.x()] = pt.y();
-                for (const QPointF &pt : obsByTrt[key]) {
-                    if (simByX.contains(pt.x())) {
-                        allObs.append(pt.y());
-                        allSim.append(simByX[pt.x()]);
-                    }
-                }
-            }
-
+        // --- Metrics overlay — use same cached metrics as single-chart overlay ---
+        if (!m_plotSettings.tsMetrics.isEmpty() && !m_lastTSMetrics.isEmpty()) {
+            // Extract per-variable stats from cached metrics (correct, matches table)
             QStringList statsLines;
-            if (!allObs.isEmpty()) {
-                // Filter to finite pairs (inline — filterPairs is private)
-                QVector<double> obs, sim;
-                for (int pi = 0; pi < allObs.size() && pi < allSim.size(); ++pi) {
-                    if (std::isfinite(allObs[pi]) && std::isfinite(allSim[pi])) {
-                        obs.append(allObs[pi]);
-                        sim.append(allSim[pi]);
-                    }
-                }
-                if (!obs.isEmpty()) {
-                    int    n       = obs.size();
-                    double obsSum  = 0; for (double v : obs) obsSum += v;
-                    double obsMean = obsSum / n;
-                    double rmse    = MetricsCalculator::rmse(obs, sim);
-                    double nrmse   = (obsMean > 0) ? (rmse / obsMean) * 100.0 : 0.0;
-                    double dStat   = MetricsCalculator::dStat(obs, sim);
-
-                    if (m_plotSettings.tsMetrics.contains("N"))
-                        statsLines << QString("N = %1").arg(n);
-                    if (m_plotSettings.tsMetrics.contains("RMSE"))
-                        statsLines << QString("RMSE = %1").arg(rmse, 0, 'f', rmse < 1 ? 3 : (rmse < 100 ? 2 : 1));
-                    if (m_plotSettings.tsMetrics.contains("NRMSE"))
-                        statsLines << QString("NRMSE = %1%").arg(nrmse, 0, 'f', 1);
-                    if (m_plotSettings.tsMetrics.contains("d-stat"))
-                        statsLines << QString("d = %1").arg(dStat, 0, 'f', 3);
-                }
+            double totalN = 0, sumSS = 0, sumObsMean = 0, sumDStat = 0;
+            for (const auto &m : m_lastTSMetrics) {
+                if (m.value("Variable").toString() != varCode) continue;
+                double n = m.value("n").toDouble();
+                if (n <= 0) continue;
+                double rmse = m.value("RMSE").toDouble();
+                totalN     += n;
+                sumSS      += n * rmse * rmse;
+                sumObsMean += n * m.value("ObsMean").toDouble();
+                sumDStat   += n * m.value("Willmott's d-stat").toDouble();
+            }
+            if (totalN > 0) {
+                double rmse    = std::sqrt(sumSS / totalN);
+                double obsMean = sumObsMean / totalN;
+                double nrmse   = (obsMean > 0) ? (rmse / obsMean) * 100.0 : 0.0;
+                double dStat   = sumDStat / totalN;
+                if (m_plotSettings.tsMetrics.contains("N"))
+                    statsLines << QString("N = %1").arg((int)totalN);
+                if (m_plotSettings.tsMetrics.contains("RMSE"))
+                    statsLines << QString("RMSE = %1").arg(rmse, 0, 'f', rmse < 1 ? 3 : (rmse < 100 ? 2 : 1));
+                if (m_plotSettings.tsMetrics.contains("NRMSE"))
+                    statsLines << QString("NRMSE = %1%").arg(nrmse, 0, 'f', 1);
+                if (m_plotSettings.tsMetrics.contains("d-stat"))
+                    statsLines << QString("d = %1").arg(dStat, 0, 'f', 3);
             }
 
-            if (!m_plotSettings.tsMetrics.isEmpty()) {
-                QLabel *statsLabel = new QLabel(statsLines.join("\n"), cv);
+            if (!statsLines.isEmpty()) {
+                // Parent to panelWidget (not cv) so label is not clipped by chart view
                 int statsFontPt = qBound(7, m_plotSettings.axisTickFontSize, 13);
+                QLabel *statsLabel = new QLabel(statsLines.join("\n"), panelWidget);
                 statsLabel->setStyleSheet(QString(
                     "QLabel { background: rgba(255,255,255,220); font-size: %1pt; "
                     "padding: 4px 7px; border: 1px solid rgba(0,0,0,40); border-radius: 3px; }").arg(statsFontPt));
                 statsLabel->setAlignment(Qt::AlignLeft | Qt::AlignTop);
-                statsLabel->adjustSize();
-                statsLabel->raise();
+                statsLabel->setMaximumWidth(QWIDGETSIZE_MAX);
+                statsLabel->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Preferred);
                 statsLabel->show();
-
-                // Draggable overlay: auto-positions top-left, user can drag
+                statsLabel->adjustSize();
+                // Position inside cv's plot area (offset by strip label height)
+                int stripH = stripLabel->sizeHint().height();
+                statsLabel->move(28, stripH + 8);
+                statsLabel->raise();
                 new DraggableOverlay(cv, statsLabel, statsLabel);
-                // Store reference so animation can update it per-frame
                 m_tsPanelOverlays[varCode] = statsLabel;
             }
         }
@@ -1037,7 +1016,72 @@ void PlotWidget::refreshTSMetricsOverlay()
     bool isMultiPanel = m_plotSettings.multiPanelTimeSeries
                         && m_currentYVars.size() >= 2
                         && !m_plotDataList.isEmpty();
-    if (isMultiPanel) return;
+
+    if (isMultiPanel) {
+        // Build/update per-panel overlays
+        int statsFontPt = qBound(7, m_plotSettings.axisTickFontSize, 13);
+        QSet<QString> metricSet(m_plotSettings.tsMetrics.begin(), m_plotSettings.tsMetrics.end());
+
+        for (int vi = 0; vi < m_currentYVars.size(); ++vi) {
+            const QString &varCode = m_currentYVars[vi];
+            if (vi >= m_tsPanelViews.size()) continue;
+            ErrorBarChartView *cv = m_tsPanelViews[vi];
+            if (!cv) continue;
+            QWidget *panelWidget = cv->parentWidget();
+            if (!panelWidget) continue;
+
+            // Compute weighted stats for this variable
+            double totalN = 0, sumSS = 0, sumObsMean = 0, sumDStat = 0;
+            for (const auto &m : m_lastTSMetrics) {
+                if (m.value("Variable").toString() != varCode) continue;
+                double n = m.value("n").toDouble();
+                if (n <= 0) continue;
+                double rmse = m.value("RMSE").toDouble();
+                totalN     += n;
+                sumSS      += n * rmse * rmse;
+                sumObsMean += n * m.value("ObsMean").toDouble();
+                sumDStat   += n * m.value("Willmott's d-stat").toDouble();
+            }
+            if (totalN <= 0) continue;
+            double rmse  = std::sqrt(sumSS / totalN);
+            double obsMean = sumObsMean / totalN;
+            double nrmse = (obsMean > 0) ? (rmse / obsMean) * 100.0 : 0.0;
+            double dStat = sumDStat / totalN;
+
+            QStringList statsLines;
+            if (metricSet.contains("N"))     statsLines << QString("N = %1").arg((int)totalN);
+            if (metricSet.contains("RMSE"))  statsLines << QString("RMSE = %1").arg(rmse, 0, 'f', rmse < 1 ? 3 : (rmse < 100 ? 2 : 1));
+            if (metricSet.contains("NRMSE")) statsLines << QString("NRMSE = %1%").arg(nrmse, 0, 'f', 1);
+            if (metricSet.contains("d-stat"))statsLines << QString("d = %1").arg(dStat, 0, 'f', 3);
+            if (statsLines.isEmpty()) continue;
+
+            if (m_tsPanelOverlays.contains(varCode) && m_tsPanelOverlays[varCode]) {
+                // Update existing
+                m_tsPanelOverlays[varCode]->setText(statsLines.join("\n"));
+                m_tsPanelOverlays[varCode]->adjustSize();
+                m_tsPanelOverlays[varCode]->show();
+            } else {
+                // Create new label parented to panelWidget to avoid cv clipping
+                QLabel *statsLabel = new QLabel(statsLines.join("\n"), panelWidget);
+                statsLabel->setStyleSheet(QString(
+                    "QLabel { background: rgba(255,255,255,220); font-size: %1pt; "
+                    "padding: 4px 7px; border: 1px solid rgba(0,0,0,40); border-radius: 3px; }").arg(statsFontPt));
+                statsLabel->setAlignment(Qt::AlignLeft | Qt::AlignTop);
+                statsLabel->setMaximumWidth(QWIDGETSIZE_MAX);
+                statsLabel->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Preferred);
+                statsLabel->show();
+                statsLabel->adjustSize();
+                // Position inside chart area (below strip label)
+                int stripH = panelWidget->layout() ? 20 : 0; // approximate strip height
+                statsLabel->move(28, stripH + 8);
+                statsLabel->raise();
+                new DraggableOverlay(cv, statsLabel, statsLabel);
+                m_tsPanelOverlays[varCode] = statsLabel;
+            }
+        }
+        return;
+    }
+
     if (!m_chartView) return;
 
     QString html = buildTSOverlayHtml(m_lastTSMetrics,
@@ -1060,7 +1104,17 @@ void PlotWidget::refreshTSMetricsOverlay()
         "QLabel { background: rgba(255,255,255,220); font-size: %1pt; "
         "padding: 4px 7px; border: 1px solid rgba(0,0,0,40); border-radius: 3px; }").arg(fontPt));
     label->setAlignment(Qt::AlignLeft | Qt::AlignTop);
-    label->adjustSize();
+    label->setMaximumWidth(QWIDGETSIZE_MAX);
+    label->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Preferred);
+    // Use QTextDocument to measure HTML content (adjustSize unreliable before polish)
+    {
+        QTextDocument doc;
+        QFont f = label->font(); f.setPointSize(fontPt);
+        doc.setDefaultFont(f);
+        doc.setHtml(html);
+        QSize docSize = doc.size().toSize();
+        label->resize(docSize.width() + 18, docSize.height() + 10);
+    }
     label->move(28, 8); // temporary; repositioned after layout below
     label->raise();
     label->show();

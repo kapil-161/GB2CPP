@@ -13,11 +13,11 @@ StatusWidget::StatusWidget(QWidget *parent)
     , m_flashCenter(false)
 {
     setupUI();
-    
+
     // Setup timers
     m_clearTimer->setSingleShot(true);
     connect(m_clearTimer, &QTimer::timeout, this, &StatusWidget::onClearTimer);
-    
+
     connect(m_flashTimer, &QTimer::timeout, this, &StatusWidget::onFlashTimer);
 }
 
@@ -56,7 +56,7 @@ void StatusWidget::showCenterMessage(const QString &message, const QColor &bgCol
     msg->setText(message);
     msg->setStandardButtons(QMessageBox::NoButton);
     msg->setWindowFlags(Qt::FramelessWindowHint);
-    
+
     QString style = QString(
         "QMessageBox {"
         "    background-color: %1;"
@@ -69,14 +69,14 @@ void StatusWidget::showCenterMessage(const QString &message, const QColor &bgCol
         "    min-height: 80px;"
         "}"
     ).arg(bgColor.name());
-    
+
     msg->setStyleSheet(style);
     msg->show();
-    
+
     // Auto-close after 250ms for flash effect
     QTimer::singleShot(250, msg, &QMessageBox::close);
     QTimer::singleShot(300, msg, &QMessageBox::deleteLater);
-    
+
     QApplication::processEvents();
 }
 
@@ -88,7 +88,7 @@ void StatusWidget::startFlash(const QString &message, const QString &style, bool
     m_flashStyle = style;
     m_flashCenter = center;
     m_flashBgColor = bgColor;
-    
+
     // Show initial message
     if (center) {
         showCenterMessage(message, bgColor);
@@ -96,7 +96,7 @@ void StatusWidget::startFlash(const QString &message, const QString &style, bool
         m_messageLabel->setText(message);
         m_messageLabel->setStyleSheet(style);
     }
-    
+
     // Start flashing at 300ms intervals
     m_flashTimer->start(300);
 }
@@ -120,10 +120,10 @@ void StatusWidget::onFlashTimer()
             m_messageLabel->setStyleSheet("padding: 2px 5px; background-color: white; color: black; border-radius: 3px; border: 2px solid gray;");
         }
     }
-    
+
     m_flashVisible = !m_flashVisible;
     m_flashCount++;
-    
+
     // Stop flashing after 6 toggles (3 complete flash cycles)
     if (m_flashCount >= 6) {
         m_flashTimer->stop();
@@ -141,7 +141,7 @@ void StatusWidget::showSuccess(const QString &message, int timeout, bool center,
 {
     QString style = "padding: 2px 5px; background-color: #4CAF50; color: white; border-radius: 3px;";
     QColor bgColor(76, 175, 80, 220);
-    
+
     if (flash) {
         startFlash(message, style, center, bgColor);
     } else {
@@ -161,7 +161,7 @@ void StatusWidget::showError(const QString &message, int timeout, bool center, b
 {
     QString style = "padding: 2px 5px; background-color: #F44336; color: white; border-radius: 3px;";
     QColor bgColor(244, 67, 54, 220);
-    
+
     if (flash) {
         startFlash(message, style, center, bgColor);
     } else {
@@ -181,7 +181,7 @@ void StatusWidget::showWarning(const QString &message, int timeout, bool center,
 {
     QString style = "padding: 2px 5px; background-color: #FF9800; color: white; border-radius: 3px;";
     QColor bgColor(255, 152, 0, 220);
-    
+
     if (flash) {
         startFlash(message, style, center, bgColor);
     } else {
@@ -201,7 +201,7 @@ void StatusWidget::showInfo(const QString &message, int timeout, bool center, bo
 {
     QString style = "padding: 2px 5px; background-color: #2196F3; color: white; border-radius: 3px;";
     QColor bgColor(33, 150, 243, 220);
-    
+
     if (flash) {
         startFlash(message, style, center, bgColor);
     } else {

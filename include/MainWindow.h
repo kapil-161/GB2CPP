@@ -244,6 +244,9 @@ private:
     bool m_selectingExperimentProgrammatically;
     bool m_selectingTreatmentsProgrammatically;
     bool m_warningShown;
+
+    void showToast(const QString &message, int durationMs = 3500);
+    QLabel *m_toastLabel = nullptr;
 };
 
 #endif // MAINWINDOW_H

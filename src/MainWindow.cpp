@@ -29,6 +29,8 @@
 #include <QMimeData>
 #include <QUrl>
 #include <functional>
+#include <QPropertyAnimation>
+#include <QGraphicsOpacityEffect>
 
 // Subclass overrides virtual drag events directly — more reliable than event filter
 // for QAbstractItemView which installs its own internal viewport filter.
@@ -1271,11 +1273,14 @@ void MainWindow::onTreatmentChanged()
     m_variableSelectionChanged = true;
     markDataNeedsRefresh();
 
-    // Show prompt message based on current tab
-    if (m_tabWidget && m_tabWidget->currentIndex() == 0) {
-        m_statusWidget->showInfo("Treatment selection changed. Click 'Plot' to update the time series plot");
-    } else if (m_tabWidget && m_tabWidget->currentIndex() == 1) {
-        m_statusWidget->showInfo("Treatment selection changed. Click 'Data' to update the data table");
+    // Show prompt message based on current tab — skip if only EVALUATE.OUT is loaded
+    bool onlyEvaluate = (m_currentData.rowCount == 0 && m_evaluateData.rowCount > 0);
+    if (!onlyEvaluate) {
+        if (m_tabWidget && m_tabWidget->currentIndex() == 0) {
+            m_statusWidget->showInfo("Treatment selection changed. Click 'Plot' to update the time series plot");
+        } else if (m_tabWidget && m_tabWidget->currentIndex() == 1) {
+            m_statusWidget->showInfo("Treatment selection changed. Click 'Data' to update the data table");
+        }
     }
     // Don't auto-plot, wait for manual refresh
 }
@@ -1823,6 +1828,7 @@ void MainWindow::updateVariableComboBoxes()
 
 void MainWindow::updateTreatmentComboBox()
 {
+    m_treatmentComboBox->blockSignals(true);
     m_treatmentComboBox->clear();
     m_treatmentComboBox->addItem("All");
 
@@ -1928,6 +1934,8 @@ void MainWindow::updateTreatmentComboBox()
     // Populate the pre-plot treatment selection panel
     if (m_plotWidget)
         m_plotWidget->setAvailableTreatments(sortedTreatments, m_treatmentNames);
+
+    m_treatmentComboBox->blockSignals(false);
 }
 
 void MainWindow::updateScatterPlot()
@@ -2114,7 +2122,9 @@ void MainWindow::resetInterface()
         m_yVariableComboBox->clear();
     }
     if (m_treatmentComboBox) {
+        m_treatmentComboBox->blockSignals(true);
         m_treatmentComboBox->clear();
+        m_treatmentComboBox->blockSignals(false);
     }
     
     if (m_dataInfoLabel) {
@@ -2719,7 +2729,7 @@ void MainWindow::onFileSelectionChanged()
                     // In command line mode, we already switched tabs, so this message won't show
                     m_statusWidget->showInfo("EVALUATE.OUT files selected. Switched to Scatter Plot tab.");
                 } else {
-                    m_statusWidget->showInfo("EVALUATE.OUT files selected. Switch to Scatter Plot tab to view scatter plots.");
+                    showToast("EVALUATE.OUT files selected — switch to the Scatter Plot tab to view results.");
                 }
             }
         } else if (m_tabWidget && m_tabWidget->currentIndex() == 1) {
@@ -3366,4 +3376,51 @@ DataTable MainWindow::parseCsvToDataTable(const QString &csv)
         result.rowCount++;
     }
     return result;
+}
+
+void MainWindow::showToast(const QString &message, int durationMs)
+{
+    // Delete any existing toast
+    if (m_toastLabel) { m_toastLabel->deleteLater(); m_toastLabel = nullptr; }
+
+    QLabel *toast = new QLabel(message, this);
+    toast->setWordWrap(true);
+    toast->setAlignment(Qt::AlignCenter);
+    toast->setStyleSheet(
+        "QLabel {"
+        "  background-color: #E65100;"   // deep orange — unmissable
+        "  color: white;"
+        "  font-size: 12pt;"
+        "  font-weight: bold;"
+        "  padding: 12px 20px;"
+        "  border-radius: 8px;"
+        "}");
+    toast->adjustSize();
+    // Centre horizontally, position 80px from bottom
+    int w = qMax(toast->sizeHint().width() + 40, 420);
+    int h = toast->sizeHint().height() + 8;
+    toast->resize(w, h);
+    toast->move((width() - w) / 2, height() - h - 80);
+    toast->raise();
+    toast->show();
+    m_toastLabel = toast;
+
+    // Fade-out animation starting after (durationMs - 600ms)
+    auto *effect = new QGraphicsOpacityEffect(toast);
+    toast->setGraphicsEffect(effect);
+    effect->setOpacity(1.0);
+
+    auto *anim = new QPropertyAnimation(effect, "opacity", toast);
+    anim->setDuration(600);
+    anim->setStartValue(1.0);
+    anim->setEndValue(0.0);
+    anim->setEasingCurve(QEasingCurve::InQuad);
+
+    QTimer::singleShot(durationMs - 600, toast, [anim, toast, this]() {
+        anim->start(QAbstractAnimation::DeleteWhenStopped);
+        connect(anim, &QPropertyAnimation::finished, toast, [toast, this]() {
+            if (m_toastLabel == toast) m_toastLabel = nullptr;
+            toast->deleteLater();
+        });
+    });
 }
