@@ -73,16 +73,15 @@ void PlotWidget::onSettingsButtonClicked()
         auto vAxesSeed = m_chart->axes(Qt::Vertical);
         if (!hAxesSeed.isEmpty()) {
             if (auto xAx = qobject_cast<QValueAxis*>(hAxesSeed.first())) {
-                // Current axis is numeric — clear overrides if stored values look like epoch ms
-                if (m_plotSettings.xAxisMin > 1e10 || m_plotSettings.xAxisMax > 1e10) {
-                    m_plotSettings.useCustomXMin = false;
-                    m_plotSettings.useCustomXMax = false;
-                }
-                m_plotSettings.xAxisMin = xAx->min();
-                m_plotSettings.xAxisMax = xAx->max();
+                // Clear stale epoch-ms overrides on a numeric axis (fix both flag AND value)
+                if (m_plotSettings.xAxisMin > 1e10) { m_plotSettings.useCustomXMin = false; m_plotSettings.xAxisMin = xAx->min(); }
+                if (m_plotSettings.xAxisMax > 1e10) { m_plotSettings.useCustomXMax = false; m_plotSettings.xAxisMax = xAx->max(); }
+                // Only overwrite with live axis value when no custom override is active
+                if (!m_plotSettings.useCustomXMin) m_plotSettings.xAxisMin = xAx->min();
+                if (!m_plotSettings.useCustomXMax) m_plotSettings.xAxisMax = xAx->max();
             } else if (auto xDtAx = qobject_cast<QDateTimeAxis*>(hAxesSeed.first())) {
-                m_plotSettings.xAxisMin = static_cast<double>(xDtAx->min().toMSecsSinceEpoch());
-                m_plotSettings.xAxisMax = static_cast<double>(xDtAx->max().toMSecsSinceEpoch());
+                if (!m_plotSettings.useCustomXMin) m_plotSettings.xAxisMin = static_cast<double>(xDtAx->min().toMSecsSinceEpoch());
+                if (!m_plotSettings.useCustomXMax) m_plotSettings.xAxisMax = static_cast<double>(xDtAx->max().toMSecsSinceEpoch());
             }
         }
         if (!vAxesSeed.isEmpty()) {
@@ -101,20 +100,24 @@ void PlotWidget::onSettingsButtonClicked()
     if (dialog.exec() == QDialog::Accepted) {
         PlotSettings newSettings = dialog.getSettings();
 
-        // Check what changed BEFORE applyPlotSettings overwrites m_plotSettings
-        bool filterChanged = (m_plotSettings.excludedSeriesKeys != newSettings.excludedSeriesKeys);
-        bool errorBarChanged = (m_plotSettings.showErrorBars != newSettings.showErrorBars) ||
-                               (m_plotSettings.errorBarType != newSettings.errorBarType);
+        // Capture all diffs BEFORE applyPlotSettings/m_plotSettings=newSettings overwrites old values
+        bool filterChanged    = (m_plotSettings.excludedSeriesKeys != newSettings.excludedSeriesKeys);
+        bool errorBarChanged  = (m_plotSettings.showErrorBars != newSettings.showErrorBars) ||
+                                (m_plotSettings.errorBarType  != newSettings.errorBarType);
         bool axisRangeChanged = (m_plotSettings.useCustomXMin != newSettings.useCustomXMin) ||
                                 (m_plotSettings.useCustomXMax != newSettings.useCustomXMax) ||
                                 (m_plotSettings.useCustomYMin != newSettings.useCustomYMin) ||
                                 (m_plotSettings.useCustomYMax != newSettings.useCustomYMax) ||
-                                (m_plotSettings.xAxisMin != newSettings.xAxisMin) ||
-                                (m_plotSettings.xAxisMax != newSettings.xAxisMax) ||
-                                (m_plotSettings.yAxisMin != newSettings.yAxisMin) ||
-                                (m_plotSettings.yAxisMax != newSettings.yAxisMax) ||
+                                (m_plotSettings.xAxisMin      != newSettings.xAxisMin) ||
+                                (m_plotSettings.xAxisMax      != newSettings.xAxisMax) ||
+                                (m_plotSettings.yAxisMin      != newSettings.yAxisMin) ||
+                                (m_plotSettings.yAxisMax      != newSettings.yAxisMax) ||
                                 (m_plotSettings.yAxisTickSpacing != newSettings.yAxisTickSpacing) ||
                                 (m_plotSettings.xAxisTickSpacing != newSettings.xAxisTickSpacing);
+        bool boxReplot        = (m_plotSettings.yAxisTickSpacing    != newSettings.yAxisTickSpacing) ||
+                                (m_plotSettings.yAxisDecimals      != newSettings.yAxisDecimals);
+        bool layoutChanged    = (m_plotSettings.multiPanelTimeSeries != newSettings.multiPanelTimeSeries) ||
+                                (m_plotSettings.plotMeanReps        != newSettings.plotMeanReps);
 
         applyPlotSettings(newSettings);
         m_plotSettings = newSettings;
@@ -141,29 +144,28 @@ void PlotWidget::onSettingsButtonClicked()
             DataTable dataCopy = m_simData;
             plotScatter(dataCopy, m_currentYVars);
         } else if (m_isBoxPlotMode && m_simData.rowCount > 0) {
-            // Box plot: tick spacing or decimals change requires a full replot; range change goes via autoFitAxes
-            bool boxReplot = (m_plotSettings.yAxisTickSpacing != newSettings.yAxisTickSpacing) ||
-                             (m_plotSettings.yAxisDecimals    != newSettings.yAxisDecimals);
             if (boxReplot || filterChanged || axisRangeChanged) {
                 updatePlotWithScaling();
             }
         } else if (!m_isScatterMode && m_simData.rowCount > 0) {
-            if (filterChanged) {
+            bool hasCustomRange = newSettings.useCustomXMin || newSettings.useCustomXMax
+                                  || newSettings.useCustomYMin || newSettings.useCustomYMax;
+            if (filterChanged || layoutChanged) {
                 updatePlotWithScaling();
                 if (m_obsData.rowCount > 0)
                     calculateMetrics();
             } else if (axisRangeChanged) {
-                // Multi-panel rebuilds axes from scratch — must replot to pick up new range.
-                // Single-panel: applyPlotSettings already patched the live axis (lines above);
-                // autoFitAxes would override it, so call it only to handle tick/label updates,
-                // but let the custom range win by calling updatePlotWithScaling instead.
                 updatePlotWithScaling();
+            } else if (hasCustomRange) {
+                // Custom range active but nothing changed — just re-apply axis range to live chart
+                // without a full replot (avoids resetting legend, treatment panel, etc.)
+                applyPlotSettings(m_plotSettings);
             }
         }
     }
 }
 
-void PlotWidget::applyPlotSettings(const PlotSettings &settings)
+void PlotWidget::applyPlotSettings(const PlotSettings &settings, bool skipAxisRange)
 {
     // Show/hide the Snapshot button per the Plot Settings toggle. If it's being
     // turned off while a snapshot is active, clear the snapshot so no orphan
@@ -255,6 +257,7 @@ void PlotWidget::applyPlotSettings(const PlotSettings &settings)
             } else if (!m_isScatterMode && !isXAxis) {
                 // Y-axis tick customization
                 valueAxis->setMinorTickCount(settings.yAxisMinorTickCount);
+                valueAxis->setMinorGridLineVisible(settings.showMinorGrid);
                 if (settings.yAxisTickSpacing > 0.0) {
                     valueAxis->setTickInterval(settings.yAxisTickSpacing);
                 }
@@ -281,8 +284,9 @@ void PlotWidget::applyPlotSettings(const PlotSettings &settings)
         }
     }
 
-    // Apply user axis range overrides (after auto-fit has already run)
-    if (!m_isScatterMode) {
+    // Apply user axis range overrides — skip when called after a fresh replot since
+    // updatePlotWithScaling already applied snapped ranges with correct tick counts.
+    if (!m_isScatterMode && !skipAxisRange) {
         auto hAxes2 = m_chart->axes(Qt::Horizontal);
         auto vAxes2 = m_chart->axes(Qt::Vertical);
         if (!hAxes2.isEmpty()) {
@@ -536,7 +540,15 @@ void PlotWidget::saveSettings() const
     s.setValue("yAxisMinorTickCount", m_plotSettings.yAxisMinorTickCount);
     s.setValue("yAxisDecimals",       m_plotSettings.yAxisDecimals);
 
-    // Axis range overrides are intentionally not persisted — they are per-dataset.
+    // Axis range overrides
+    s.setValue("useCustomXMin", m_plotSettings.useCustomXMin);
+    s.setValue("useCustomXMax", m_plotSettings.useCustomXMax);
+    s.setValue("useCustomYMin", m_plotSettings.useCustomYMin);
+    s.setValue("useCustomYMax", m_plotSettings.useCustomYMax);
+    s.setValue("xAxisMin", m_plotSettings.xAxisMin);
+    s.setValue("xAxisMax", m_plotSettings.xAxisMax);
+    s.setValue("yAxisMin", m_plotSettings.yAxisMin);
+    s.setValue("yAxisMax", m_plotSettings.yAxisMax);
 
     // Appearance
     s.setValue("plotTitle",        m_plotSettings.plotTitle);
@@ -602,7 +614,15 @@ void PlotWidget::loadSettings()
     m_plotSettings.yAxisMinorTickCount = s.value("yAxisMinorTickCount", m_plotSettings.yAxisMinorTickCount).toInt();
     m_plotSettings.yAxisDecimals       = s.value("yAxisDecimals",       m_plotSettings.yAxisDecimals).toInt();
 
-    // Axis range overrides are not loaded — always reset to auto on startup.
+    // Axis range overrides
+    m_plotSettings.useCustomXMin = s.value("useCustomXMin", false).toBool();
+    m_plotSettings.useCustomXMax = s.value("useCustomXMax", false).toBool();
+    m_plotSettings.useCustomYMin = s.value("useCustomYMin", false).toBool();
+    m_plotSettings.useCustomYMax = s.value("useCustomYMax", false).toBool();
+    m_plotSettings.xAxisMin = s.value("xAxisMin", m_plotSettings.xAxisMin).toDouble();
+    m_plotSettings.xAxisMax = s.value("xAxisMax", m_plotSettings.xAxisMax).toDouble();
+    m_plotSettings.yAxisMin = s.value("yAxisMin", m_plotSettings.yAxisMin).toDouble();
+    m_plotSettings.yAxisMax = s.value("yAxisMax", m_plotSettings.yAxisMax).toDouble();
 
     m_plotSettings.plotTitle     = s.value("plotTitle",     m_plotSettings.plotTitle).toString();
     m_plotSettings.backgroundColor = QColor(s.value("backgroundColor", m_plotSettings.backgroundColor.name()).toString());

@@ -860,8 +860,11 @@ void PlotWidget::autoFitAxes()
                     double tickInterval = m_plotSettings.xAxisTickSpacing > 0.0
                         ? m_plotSettings.xAxisTickSpacing
                         : calculateNiceXInterval(hi - lo);
+                    // Snap lo down always; snap hi up only if not explicitly set by user
                     double snappedLo = std::floor(lo / tickInterval) * tickInterval;
-                    double snappedHi = std::ceil(hi / tickInterval) * tickInterval;
+                    double snappedHi = m_plotSettings.useCustomXMax
+                        ? hi
+                        : std::ceil(hi / tickInterval) * tickInterval;
                     int tickCount = qRound((snappedHi - snappedLo) / tickInterval) + 1;
                     if (tickCount < 3) tickCount = 3;
                     xAx->setRange(snappedLo, snappedHi);
@@ -960,8 +963,8 @@ double PlotWidget::calculateNiceXInterval(double range)
     if (range < 1.0) return 0.1;
 
     // Use a logarithmic approach to find a clean interval for ANY range scale.
-    // Target ~10 ticks.
-    double targetInterval = range / 10.0;
+    // Target ~18 ticks so ranges like 100-200 snap to interval=10 instead of 20.
+    double targetInterval = range / 18.0;
     double exponent = std::floor(std::log10(targetInterval));
     double magnitude = std::pow(10, exponent);
     double fraction = targetInterval / magnitude;
@@ -1171,10 +1174,13 @@ void PlotWidget::plotTimeSeries(
         // Initial plot generation with scaling
         updatePlotWithScaling();
 
+        // Re-apply saved settings (fonts, line width, marker size) to newly created series/axes.
+        // Skip axis range — updatePlotWithScaling already applied snapped ranges with correct ticks.
+        applyPlotSettings(m_plotSettings, true);
+
         if (m_obsData.rowCount > 0) {
             calculateMetrics();
-            refreshTSMetricsOverlay(); // rebuild overlay now that m_lastTSMetrics is populated
-        } else {
+            refreshTSMetricsOverlay();
         }
 
         emit plotUpdated();

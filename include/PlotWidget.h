@@ -276,7 +276,7 @@ public slots:
 private slots:
     void onPlotSettingsChanged();
     void onXAxisButtonClicked();
-    void applyPlotSettings(const PlotSettings &settings);
+    void applyPlotSettings(const PlotSettings &settings, bool skipAxisRange = false);
     void saveSettings() const;
     void loadSettings();
     void onBoxPlotButtonClicked();

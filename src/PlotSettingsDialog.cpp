@@ -28,6 +28,7 @@ PlotSettingsDialog::PlotSettingsDialog(const PlotSettings &currentSettings, Plot
         if (!hAxes.isEmpty())
             m_xAxisIsDate = qobject_cast<QDateTimeAxis*>(hAxes.first()) != nullptr;
     }
+    // Note: axis range seeding is done in onSettingsButtonClicked() before the dialog opens.
 
     setupUI();
 }
@@ -72,11 +73,11 @@ PlotSettings PlotSettingsDialog::getSettings() const
         : m_xAxisMaxSpinBox->value();
     settings.yAxisMin = m_yAxisMinSpinBox->value();
     settings.yAxisMax = m_yAxisMaxSpinBox->value();
-    // useCustom* is true if the user changed the value from what was seeded
-    settings.useCustomXMin = (settings.xAxisMin != m_seededXMin);
-    settings.useCustomXMax = (settings.xAxisMax != m_seededXMax);
-    settings.useCustomYMin = (settings.yAxisMin != m_seededYMin);
-    settings.useCustomYMax = (settings.yAxisMax != m_seededYMax);
+    // useCustom* is true if the value changed from seed OR was already custom when dialog opened
+    settings.useCustomXMin = m_settings.useCustomXMin || (settings.xAxisMin != m_seededXMin);
+    settings.useCustomXMax = m_settings.useCustomXMax || (settings.xAxisMax != m_seededXMax);
+    settings.useCustomYMin = m_settings.useCustomYMin || (settings.yAxisMin != m_seededYMin);
+    settings.useCustomYMax = m_settings.useCustomYMax || (settings.yAxisMax != m_seededYMax);
     settings.plotTitle = m_plotTitleEdit->text();
     settings.fontFamily = m_fontFamilyComboBox->currentText();
     settings.titleFontSize = m_titleFontSizeSpinBox->value();
@@ -609,6 +610,11 @@ void PlotSettingsDialog::onResetDefaults()
 {
     PlotSettings defaults;
     m_settings = defaults;
+    // Explicitly clear custom range flags so getSettings() doesn't resurrect them
+    m_settings.useCustomXMin = false;
+    m_settings.useCustomXMax = false;
+    m_settings.useCustomYMin = false;
+    m_settings.useCustomYMax = false;
     
     // Update all controls with default values
     m_showGridCheckBox->setChecked(defaults.showGrid);
