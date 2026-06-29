@@ -490,8 +490,10 @@ void PlotWidget::applyPlotSettings(const PlotSettings &settings, bool skipAxisRa
     }
 
     // Apply error bar cap width
-    if (m_chartView)
+    if (m_chartView) {
         m_chartView->setErrorBarCapWidth(settings.errorBarCapWidth);
+        m_chartView->setErrorBarLineWidth(settings.errorBarLineWidth);
+    }
 
     // Update internal settings
     m_showGrid = settings.showGrid;
@@ -538,6 +540,7 @@ void PlotWidget::saveSettings() const
     s.setValue("lineWidth",         m_plotSettings.lineWidth);
     s.setValue("markerSize",        m_plotSettings.markerSize);
     s.setValue("errorBarCapWidth",  m_plotSettings.errorBarCapWidth);
+    s.setValue("errorBarLineWidth", m_plotSettings.errorBarLineWidth);
 
     // Axes
     s.setValue("showAxisLabels",   m_plotSettings.showAxisLabels);
@@ -613,7 +616,8 @@ void PlotWidget::loadSettings()
 
     m_plotSettings.lineWidth        = s.value("lineWidth",        m_plotSettings.lineWidth).toInt();
     m_plotSettings.markerSize       = s.value("markerSize",       m_plotSettings.markerSize).toInt();
-    m_plotSettings.errorBarCapWidth = s.value("errorBarCapWidth", m_plotSettings.errorBarCapWidth).toInt();
+    m_plotSettings.errorBarCapWidth  = s.value("errorBarCapWidth",  m_plotSettings.errorBarCapWidth).toInt();
+    m_plotSettings.errorBarLineWidth = s.value("errorBarLineWidth", m_plotSettings.errorBarLineWidth).toInt();
 
     m_plotSettings.showAxisLabels      = s.value("showAxisLabels",      m_plotSettings.showAxisLabels).toBool();
     m_plotSettings.showAxisTitles      = s.value("showAxisTitles",      m_plotSettings.showAxisTitles).toBool();

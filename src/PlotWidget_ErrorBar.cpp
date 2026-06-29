@@ -184,7 +184,7 @@ void ErrorBarChartView::paintErrorBars(QPainter *painter, const QPoint &viewport
             QColor penColor = scatterSeries->pen().color();
             color = penColor.isValid() ? penColor : scatterSeries->brush().color();
         }
-        painter->setPen(QPen(color, 1.5));
+        painter->setPen(QPen(color, m_errorBarLineWidth));
 
         double xMin, xMax, yMin, yMax;
         if (QValueAxis *valueXAxis = qobject_cast<QValueAxis*>(xAxis)) {

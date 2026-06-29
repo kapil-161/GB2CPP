@@ -50,6 +50,7 @@ struct PlotSettings {
 
     // Error bar settings
     int errorBarCapWidth = 5;
+    int errorBarLineWidth = 2;
     
     // Axis settings
     bool showAxisLabels = true;
@@ -170,6 +171,7 @@ private:
     // Marker controls
     QSpinBox *m_markerSizeSpinBox;
     QSpinBox *m_errorBarCapWidthSpinBox;
+    QSpinBox *m_errorBarLineWidthSpinBox;
     
     // Axis controls
     QCheckBox *m_showAxisLabelsCheckBox;

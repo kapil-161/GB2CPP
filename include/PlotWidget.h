@@ -98,6 +98,7 @@ public:
     void clearAxisBreaks() { m_axisBreaks.clear(); m_axisSegments.clear(); }
     void setAxisLineColor(const QColor &c) { m_axisLineColor = c; update(); }
     void setErrorBarCapWidth(int w) { m_errorBarCapWidth = w; }
+    void setErrorBarLineWidth(int w) { m_errorBarLineWidth = w; }
     void paintAxisBorder(QPainter *painter, const QPoint &viewportOffset = QPoint(0, 0));
 
     // Box plot — all drawn via custom painter (no stacked bar series)
@@ -130,6 +131,7 @@ private:
 
     QMap<QAbstractSeries*, QVector<ErrorBarData>> m_errorBars;
     int m_errorBarCapWidth = 5;
+    int m_errorBarLineWidth = 2;
     QVector<BoxPlotStats> m_boxStats;
     double m_bpYMin  = 0.0;
     double m_bpYMax  = 0.0;
