@@ -1109,6 +1109,17 @@ void PlotWidget::plotTimeSeries(
             m_plotSettings.useCustomXMax = false;
         }
 
+        // If the Y variable(s) or experiment changed, discard any custom axis range
+        // so the new data auto-fits instead of being clipped/stretched by the old range.
+        bool yVarsChanged  = (yVars != m_currentYVars);
+        bool expChanged    = (selectedExperiment != m_selectedExperiment);
+        if (yVarsChanged || expChanged) {
+            m_plotSettings.useCustomXMin = false;
+            m_plotSettings.useCustomXMax = false;
+            m_plotSettings.useCustomYMin = false;
+            m_plotSettings.useCustomYMax = false;
+        }
+
         m_currentXVar = xVar;
         m_currentYVars = yVars;
         m_treatmentNames = treatmentNames;

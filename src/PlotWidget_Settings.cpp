@@ -489,6 +489,10 @@ void PlotWidget::applyPlotSettings(const PlotSettings &settings, bool skipAxisRa
             vAxesBp2.first()->setTitleText(settings.showAxisTitles ? settings.yAxisTitle : "");
     }
 
+    // Apply error bar cap width
+    if (m_chartView)
+        m_chartView->setErrorBarCapWidth(settings.errorBarCapWidth);
+
     // Update internal settings
     m_showGrid = settings.showGrid;
     m_showLegend = settings.showLegend;
@@ -531,8 +535,9 @@ void PlotWidget::saveSettings() const
     s.setValue("plotMeanReps",  m_plotSettings.plotMeanReps);
 
     // Lines & markers
-    s.setValue("lineWidth",  m_plotSettings.lineWidth);
-    s.setValue("markerSize", m_plotSettings.markerSize);
+    s.setValue("lineWidth",         m_plotSettings.lineWidth);
+    s.setValue("markerSize",        m_plotSettings.markerSize);
+    s.setValue("errorBarCapWidth",  m_plotSettings.errorBarCapWidth);
 
     // Axes
     s.setValue("showAxisLabels",   m_plotSettings.showAxisLabels);
@@ -606,8 +611,9 @@ void PlotWidget::loadSettings()
     m_plotSettings.errorBarType  = s.value("errorBarType",  m_plotSettings.errorBarType).toString();
     m_plotSettings.plotMeanReps  = s.value("plotMeanReps",  m_plotSettings.plotMeanReps).toBool();
 
-    m_plotSettings.lineWidth  = s.value("lineWidth",  m_plotSettings.lineWidth).toInt();
-    m_plotSettings.markerSize = s.value("markerSize", m_plotSettings.markerSize).toInt();
+    m_plotSettings.lineWidth        = s.value("lineWidth",        m_plotSettings.lineWidth).toInt();
+    m_plotSettings.markerSize       = s.value("markerSize",       m_plotSettings.markerSize).toInt();
+    m_plotSettings.errorBarCapWidth = s.value("errorBarCapWidth", m_plotSettings.errorBarCapWidth).toInt();
 
     m_plotSettings.showAxisLabels      = s.value("showAxisLabels",      m_plotSettings.showAxisLabels).toBool();
     m_plotSettings.showAxisTitles      = s.value("showAxisTitles",      m_plotSettings.showAxisTitles).toBool();

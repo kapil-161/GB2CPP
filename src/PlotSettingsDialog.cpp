@@ -53,6 +53,7 @@ PlotSettings PlotSettingsDialog::getSettings() const
     settings.showSnapshot = m_showSnapshotCheckBox->isChecked();
     settings.lineWidth = m_lineWidthSpinBox->value();
     settings.markerSize = m_markerSizeSpinBox->value();
+    settings.errorBarCapWidth = m_errorBarCapWidthSpinBox->value();
     settings.showAxisLabels = m_showAxisLabelsCheckBox->isChecked();
     settings.showAxisTitles = m_showAxisTitlesCheckBox->isChecked();
     settings.xAxisTitle = m_xAxisTitleEdit->text();
@@ -468,8 +469,20 @@ void PlotSettingsDialog::setupUI()
     m_markerSizeSpinBox->setRange(4, 20);
     m_markerSizeSpinBox->setValue(m_settings.markerSize);
     markerLayout->addWidget(m_markerSizeSpinBox, 0, 1);
-    
+
     linesMarkersLayout->addWidget(markerGroup);
+
+    // Error bar settings group
+    QGroupBox *errorBarGroup = new QGroupBox("Error Bar Settings");
+    QGridLayout *errorBarLayout = new QGridLayout(errorBarGroup);
+
+    errorBarLayout->addWidget(new QLabel("Cap Width (px):"), 0, 0);
+    m_errorBarCapWidthSpinBox = new QSpinBox();
+    m_errorBarCapWidthSpinBox->setRange(2, 30);
+    m_errorBarCapWidthSpinBox->setValue(m_settings.errorBarCapWidth);
+    errorBarLayout->addWidget(m_errorBarCapWidthSpinBox, 0, 1);
+
+    linesMarkersLayout->addWidget(errorBarGroup);
     linesMarkersLayout->addStretch();
     
     tabWidget->addTab(linesMarkersTab, "Lines & Markers");
@@ -632,6 +645,7 @@ void PlotSettingsDialog::onResetDefaults()
     }
     m_lineWidthSpinBox->setValue(defaults.lineWidth);
     m_markerSizeSpinBox->setValue(defaults.markerSize);
+    m_errorBarCapWidthSpinBox->setValue(defaults.errorBarCapWidth);
     m_showAxisLabelsCheckBox->setChecked(defaults.showAxisLabels);
     m_showAxisTitlesCheckBox->setChecked(defaults.showAxisTitles);
     m_xAxisTitleEdit->setText(defaults.xAxisTitle);

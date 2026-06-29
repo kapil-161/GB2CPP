@@ -47,6 +47,9 @@ struct PlotSettings {
     
     // Marker settings
     int markerSize = 8;
+
+    // Error bar settings
+    int errorBarCapWidth = 5;
     
     // Axis settings
     bool showAxisLabels = true;
@@ -166,6 +169,7 @@ private:
     
     // Marker controls
     QSpinBox *m_markerSizeSpinBox;
+    QSpinBox *m_errorBarCapWidthSpinBox;
     
     // Axis controls
     QCheckBox *m_showAxisLabelsCheckBox;

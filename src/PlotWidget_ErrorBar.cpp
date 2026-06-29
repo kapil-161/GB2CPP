@@ -216,7 +216,7 @@ void ErrorBarChartView::paintErrorBars(QPainter *painter, const QPoint &viewport
             double bottomY = y + errorHeight;
 
             painter->drawLine(QPointF(x, topY), QPointF(x, bottomY));
-            const double capWidth = 5.0;
+            const double capWidth = m_errorBarCapWidth;
             painter->drawLine(QPointF(x - capWidth, topY), QPointF(x + capWidth, topY));
             painter->drawLine(QPointF(x - capWidth, bottomY), QPointF(x + capWidth, bottomY));
         }
