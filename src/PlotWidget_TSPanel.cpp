@@ -1015,6 +1015,27 @@ void PlotWidget::buildMultiPanelLegend()
         hdr->setText(txt);
     }
 
+    // Auto-expand legend panel if treatment names are wider than current panel width.
+    // Fixed overhead per row: 30 (obs) + 30 (sim) + ~24 (margins+spacing) = 84px.
+    {
+        QFont f;
+        f.setPointSize(fontSize);
+        QFontMetrics fm(f);
+        int maxTextW = 0;
+        for (const QString &key : entryOrder) {
+            const TrtEntry &e = entries[key];
+            QSharedPointer<PlotData> ref = e.sim ? e.sim : e.obs;
+            if (ref)
+                maxTextW = qMax(maxTextW, fm.horizontalAdvance(ref->treatmentName));
+        }
+        int needed = maxTextW + 84 + 12; // +12 for scrollbar margin
+        if (needed > m_legendUserWidth) {
+            m_legendUserWidth = qMin(needed, 500); // cap at 500px
+            if (m_legendPanel)
+                m_legendPanel->setFixedWidth(m_legendUserWidth);
+        }
+    }
+
     m_legendLayout->addStretch();
 
     if (!m_obsVisible) setObsSeriesVisible(false);

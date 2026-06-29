@@ -185,7 +185,15 @@ void PlotWidget::applyPlotSettings(const PlotSettings &settings, bool skipAxisRa
 
     // Apply axis titles (skip for scatter mode — it has its own measured/simulated titles)
     if (!m_isScatterMode) {
-        QString xTitle = settings.xAxisTitle.isEmpty() ? m_currentXVar : settings.xAxisTitle;
+        QString xTitle = settings.xAxisTitle;
+        if (xTitle.isEmpty()) {
+            // Try full description from DATA.CDE (e.g. "Days after planting")
+            QPair<QString,QString> info = DataProcessor::getVariableInfo(m_currentXVar);
+            if ((m_currentXVar == "DAP" || m_currentXVar == "DAS") && !info.second.isEmpty())
+                xTitle = QString(info.second).remove(" (#)").remove(".").trimmed();
+            else
+                xTitle = info.first.isEmpty() ? m_currentXVar : info.first;
+        }
 
         QString yTitle = settings.yAxisTitle;
         setAxisTitles(xTitle, yTitle);
@@ -672,6 +680,6 @@ void PlotWidget::setXAxisVariable(const QString &xVar)
     // Re-plot with new X variable if we have data
     if (m_simData.rowCount > 0 && !m_currentYVars.isEmpty()) {
         updatePlotWithScaling();
-    } else {
+        applyPlotSettings(m_plotSettings, true);
     }
 }
