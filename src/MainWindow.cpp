@@ -2939,21 +2939,13 @@ void MainWindow::clearMetrics()
 
 void MainWindow::onPlotWidgetXVariableChanged(const QString &xVariable)
 {
-    
-    // Update the X variable combo box to reflect the change
+    // Sync combo box only — setXAxisVariable already triggered updatePlotWithScaling
     if (m_xVariableComboBox) {
-        // Find the index for the new X variable
         int index = m_xVariableComboBox->findData(xVariable);
         if (index >= 0) {
-            // Temporarily block signals to avoid infinite loop
             m_xVariableComboBox->blockSignals(true);
             m_xVariableComboBox->setCurrentIndex(index);
             m_xVariableComboBox->blockSignals(false);
-            
-            
-            // Refresh the plot with the new X variable
-            updatePlot();
-        } else {
         }
     }
 }

@@ -611,4 +611,7 @@ void PlotWidget::plotScatter(
 
         m_legendLayout->addWidget(row);
     }
+
+    // Apply saved settings (fonts, marker size, colors) to newly built scatter panels
+    applyPlotSettings(m_plotSettings, true);
 }
