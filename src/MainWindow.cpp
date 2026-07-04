@@ -2430,7 +2430,7 @@ void MainWindow::onRefreshFiles()
 {
     if (!m_selectedFolder.isEmpty()) {
         m_fileChangedOnDisk = false;
-        m_statusWidget->showInfo("Refreshing file list...");
+        m_statusWidget->showInfo("Refreshing data...");
 
         // Save current selection so we can restore it after repopulating
         QStringList previousSelection;
@@ -2499,7 +2499,7 @@ void MainWindow::onFileSelectionChanged()
         } else if (m_tabWidget && m_tabWidget->currentIndex() == 0) {
             m_statusWidget->showInfo("Click outfile and variables, then click 'Plot' to view time series");
         } else if (m_tabWidget && m_tabWidget->currentIndex() == 1) {
-            m_statusWidget->showInfo("Click outfile and click refresh data to view data");
+            m_statusWidget->showInfo("Click outfile and click 'Refresh Data' to view data");
         }
 
         return;
@@ -2960,7 +2960,7 @@ void MainWindow::unselectAllYVars()
 void MainWindow::refreshOutputFiles()
 {
     if (!m_selectedFolder.isEmpty()) {
-        showSuccess("Refreshing file list...");
+        showSuccess("Refreshing data...");
         populateFiles(m_selectedFolder);
     } else {
         populateFolders();
