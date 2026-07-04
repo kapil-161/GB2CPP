@@ -76,7 +76,7 @@ void DataTableWidget::setupUI()
     // Add tables to tabs
     m_tabWidget->addTab(m_simTableView, "Simulated Data");
     m_tabWidget->addTab(m_obsTableView, "Observed Data");
-    m_tabWidget->setCurrentIndex(1);  // Start with observed data tab (typically fewer rows, opens faster)
+    m_tabWidget->setCurrentIndex(0);  // Start with simulated data tab
     
     m_mainLayout->addWidget(m_tabWidget);
     

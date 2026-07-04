@@ -197,7 +197,7 @@ void PlotWidget::setupUI()
                          "QPushButton:checked { background-color: #0078d4; color: white; border-color: #0078d4; }";
 
     m_refreshButton->setStyleSheet(buttonStyle);
-    m_refreshButton->setToolTip("Refresh Data");
+    m_refreshButton->setToolTip("Refresh output files");
     m_dasButton->setStyleSheet(buttonStyle);
     m_dapButton->setStyleSheet(buttonStyle);
     m_dateButton->setStyleSheet(buttonStyle);
@@ -4817,7 +4817,7 @@ void PlotWidget::setupPreplotPanel()
 
     // Hint at bottom
     m_preplotHintLabel = new QLabel("Select an outfile, then select a Y variable, and click 'Plot' to apply.");
-    m_preplotHintLabel->setStyleSheet("font-size: 11px; color: #666666; padding: 2px 0px;");
+    m_preplotHintLabel->setStyleSheet("font-size: 9px; color: #999999; padding: 2px 0px;");
     m_preplotHintLabel->setWordWrap(true);
     layout->addWidget(m_preplotHintLabel);
 
