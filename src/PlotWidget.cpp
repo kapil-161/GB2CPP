@@ -55,6 +55,7 @@ PlotWidget::PlotWidget(QWidget *parent)
     , m_legendStack(nullptr)
     , m_preplotPanel(nullptr)
     , m_treatmentSelectList(nullptr)
+    , m_preplotHintLabel(nullptr)
     , m_chart(nullptr)
     , m_chartView(nullptr)
     , m_bottomContainer(nullptr)
@@ -222,7 +223,7 @@ void PlotWidget::setupUI()
     m_dasButton->setCheckable(true);
     m_dapButton->setCheckable(true);
     m_dateButton->setCheckable(true);
-    m_dateButton->setChecked(true); // Default to DATE
+    // No button checked until data is loaded
     
     m_bottomLayout->addWidget(m_refreshButton);
     m_bottomLayout->addSpacing(8);
@@ -1109,11 +1110,12 @@ void PlotWidget::plotTimeSeries(
             m_plotSettings.useCustomXMax = false;
         }
 
-        // If the Y variable(s) or experiment changed, discard any custom axis range
+        // If the Y variable(s), experiment, or folder changed, discard any custom axis range
         // so the new data auto-fits instead of being clipped/stretched by the old range.
         bool yVarsChanged  = (yVars != m_currentYVars);
         bool expChanged    = (selectedExperiment != m_selectedExperiment);
-        if (yVarsChanged || expChanged) {
+        bool folderChanged = (selectedFolder != m_selectedFolder);
+        if (yVarsChanged || expChanged || folderChanged) {
             m_plotSettings.useCustomXMin = false;
             m_plotSettings.useCustomXMax = false;
             m_plotSettings.useCustomYMin = false;
@@ -2870,6 +2872,11 @@ void PlotWidget::clear()
     // Reset scatter mode and show buttons (they'll be hidden again if scatter mode is set)
     m_isScatterMode = false;
     setXAxisButtonsVisible(true);
+
+    // Unselect x-axis buttons until new data determines the actual axis
+    if (m_dasButton) m_dasButton->setChecked(false);
+    if (m_dapButton) m_dapButton->setChecked(false);
+    if (m_dateButton) m_dateButton->setChecked(false);
 
     // Hide scatter panel area and restore normal chart view
     if (m_scatterScrollArea) m_scatterScrollArea->setVisible(false);
@@ -4809,10 +4816,10 @@ void PlotWidget::setupPreplotPanel()
     layout->addWidget(m_treatmentSelectList, 1);
 
     // Hint at bottom
-    QLabel *hintLabel = new QLabel("Click Refresh Plot to apply.");
-    hintLabel->setStyleSheet("font-size: 9px; color: #999999; padding: 2px 0px;");
-    hintLabel->setWordWrap(true);
-    layout->addWidget(hintLabel);
+    m_preplotHintLabel = new QLabel("Select an outfile, then select a Y variable, and click 'Plot' to apply.");
+    m_preplotHintLabel->setStyleSheet("font-size: 9px; color: #999999; padding: 2px 0px;");
+    m_preplotHintLabel->setWordWrap(true);
+    layout->addWidget(m_preplotHintLabel);
 
     connect(allBtn, &QPushButton::clicked, this, [this]() {
         for (int i = 0; i < m_treatmentSelectList->count(); ++i)
@@ -4918,6 +4925,21 @@ void PlotWidget::showTreatmentSelection(bool onlyIfNoPlot)
     if (onlyIfNoPlot && !m_plotDataList.isEmpty())
         return;
     m_legendStack->setCurrentIndex(0);
+}
+
+void PlotWidget::updatePreplotHint(bool hasOutfile, bool hasYVariable, bool noFilesInFolder)
+{
+    if (!m_preplotHintLabel) return;
+
+    if (noFilesInFolder) {
+        m_preplotHintLabel->setText("No output files found in this crop folder. Select a different crop or run a simulation.");
+    } else if (!hasOutfile) {
+        m_preplotHintLabel->setText("Select an outfile, then select a Y variable, and click 'Plot' to apply.");
+    } else if (!hasYVariable) {
+        m_preplotHintLabel->setText("Select a Y variable, then click 'Plot' to apply.");
+    } else {
+        m_preplotHintLabel->setText("Click 'Plot' to apply.");
+    }
 }
 
 // ── Animation ─────────────────────────────────────────────────────────────

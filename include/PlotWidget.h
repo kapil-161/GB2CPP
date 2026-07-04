@@ -256,6 +256,7 @@ public:
         const QMap<QString, QMap<QString, QString>> &treatmentNames = QMap<QString, QMap<QString, QString>>());
     QStringList getSelectedTreatments() const;
     void showTreatmentSelection(bool onlyIfNoPlot = false);
+    void updatePreplotHint(bool hasOutfile, bool hasYVariable, bool noFilesInFolder = false);
 
     // Simple legend functionality (matching Python)
     
@@ -412,6 +413,7 @@ private:
     QStackedWidget *m_legendStack;         // page 0 = treatment pre-selection, page 1 = legend
     QWidget *m_preplotPanel;              // treatment selection shown in legend area before first plot
     QListWidget *m_treatmentSelectList;   // checkboxes for treatment pre-selection
+    QLabel *m_preplotHintLabel;           // contextual hint text in the preplot panel
     QChart *m_chart;
     ErrorBarChartView *m_chartView;
     

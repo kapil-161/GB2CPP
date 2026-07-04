@@ -304,7 +304,12 @@ void MainWindow::setupControlPanel()
     headerLayout->setContentsMargins(0, 0, 0, 0);
     
     QLabel *titleLabel = new QLabel("Output Files");
-    titleLabel->setStyleSheet("font-weight: bold;");
+    {
+        QFont f = titleLabel->font();
+        f.setBold(true);
+        f.setStyleStrategy(QFont::PreferAntialias);
+        titleLabel->setFont(f);
+    }
     headerLayout->addWidget(titleLabel);
     m_fileGroupLabel = titleLabel;
     headerLayout->addStretch(1);
@@ -360,14 +365,26 @@ void MainWindow::setupControlPanel()
     
     // X Variable
     QLabel *xVarLabel = new QLabel("X Variable");
-    xVarLabel->setStyleSheet("font-weight: bold; font-size: 11px;");
+    xVarLabel->setStyleSheet("font-size: 11px;");
+    {
+        QFont f = xVarLabel->font();
+        f.setBold(true);
+        f.setStyleStrategy(QFont::PreferAntialias);
+        xVarLabel->setFont(f);
+    }
     tsLayout->addWidget(xVarLabel);
     m_xVariableComboBox = new QComboBox();
     tsLayout->addWidget(m_xVariableComboBox);
 
     // Y Variables
     QLabel *yVarLabel = new QLabel("Y Variables");
-    yVarLabel->setStyleSheet("font-weight: bold; font-size: 11px;");
+    yVarLabel->setStyleSheet("font-size: 11px;");
+    {
+        QFont f = yVarLabel->font();
+        f.setBold(true);
+        f.setStyleStrategy(QFont::PreferAntialias);
+        yVarLabel->setFont(f);
+    }
     tsLayout->addWidget(yVarLabel);
     
     // Y Variable search
@@ -489,7 +506,13 @@ void MainWindow::setupDataPanel()
     dataLayout->addLayout(dataSelectorLayout);
     
     m_dataInfoLabel = new QLabel("No data loaded");
-    m_dataInfoLabel->setStyleSheet("font-weight: bold; padding: 5px;");
+    m_dataInfoLabel->setStyleSheet("padding: 5px;");
+    {
+        QFont f = m_dataInfoLabel->font();
+        f.setBold(true);
+        f.setStyleStrategy(QFont::PreferAntialias);
+        m_dataInfoLabel->setFont(f);
+    }
     dataLayout->addWidget(m_dataInfoLabel);
     
     m_dataTableWidget = new DataTableWidget();
@@ -516,7 +539,13 @@ void MainWindow::setupDataPanel()
 
     // Time Series section
     m_statsTSHeader = new QLabel("Time Series Statistics");
-    m_statsTSHeader->setStyleSheet("font-weight: bold; font-size: 13px; color: #1565C0; padding: 4px 0;");
+    m_statsTSHeader->setStyleSheet("font-size: 13px; color: #1565C0; padding: 4px 0;");
+    {
+        QFont f = m_statsTSHeader->font();
+        f.setBold(true);
+        f.setStyleStrategy(QFont::PreferAntialias);
+        m_statsTSHeader->setFont(f);
+    }
     statsLayout->addWidget(m_statsTSHeader);
     m_statsTSWidget = new MetricsTableWidget();
     statsLayout->addWidget(m_statsTSWidget);
@@ -529,7 +558,13 @@ void MainWindow::setupDataPanel()
 
     // Scatter Plot section
     m_statsScatterHeader = new QLabel("Scatter Plot Statistics");
-    m_statsScatterHeader->setStyleSheet("font-weight: bold; font-size: 13px; color: #1565C0; padding: 4px 0;");
+    m_statsScatterHeader->setStyleSheet("font-size: 13px; color: #1565C0; padding: 4px 0;");
+    {
+        QFont f = m_statsScatterHeader->font();
+        f.setBold(true);
+        f.setStyleStrategy(QFont::PreferAntialias);
+        m_statsScatterHeader->setFont(f);
+    }
     statsLayout->addWidget(m_statsScatterHeader);
     m_statsScatterWidget = new MetricsTableWidget();
     statsLayout->addWidget(m_statsScatterWidget);
@@ -1191,7 +1226,7 @@ void MainWindow::onCDECodesReference()
 void MainWindow::onDataFileChanged()
 {
     // Handle file selection change - don't auto-plot, wait for manual refresh
-    // User must click "Refresh Plot" button to update plot
+    // User must click "Plot" button to update plot
 }
 
 void MainWindow::onXVariableChanged()
@@ -1245,6 +1280,8 @@ void MainWindow::onYVariableChanged()
         // Clear plots and metrics when Y variables are unselected
         if (m_plotWidget) {
             m_plotWidget->clear();
+            bool hasOutfile = m_fileListWidget && !m_fileListWidget->selectedItems().isEmpty();
+            m_plotWidget->updatePreplotHint(hasOutfile, false);
         }
         if (m_scatterPlotWidget) {
             m_scatterPlotWidget->clear();
@@ -1254,7 +1291,10 @@ void MainWindow::onYVariableChanged()
     }
 
     // Show treatment selection panel so user can review before refreshing
-    if (m_plotWidget) m_plotWidget->showTreatmentSelection(true);
+    if (m_plotWidget) {
+        m_plotWidget->showTreatmentSelection(true);
+        m_plotWidget->updatePreplotHint(true, true);
+    }
 
     // Show prompt message based on current tab
     if (m_tabWidget && m_tabWidget->currentIndex() == 0) {
@@ -1382,7 +1422,7 @@ void MainWindow::onTabChanged(int index)
         if (!selectedItems.isEmpty() && (m_currentData.rowCount == 0 || m_variableSelectionChanged || m_dataNeedsRefresh)) {
             m_statusWidget->showInfo("Click 'Plot' to view the time series plot with current selections");
         } else if (selectedItems.isEmpty()) {
-            m_statusWidget->showInfo("Click outfile and variables, then click 'Refresh Plot' to view time series");
+            m_statusWidget->showInfo("Click outfile and variables, then click 'Plot' to view time series");
         }
 
     } else if (index == 1) {
@@ -1435,7 +1475,7 @@ void MainWindow::onTabChanged(int index)
         if (!selectedItems.isEmpty() && (m_evaluateData.rowCount == 0 || m_variableSelectionChanged || m_dataNeedsRefresh)) {
             m_statusWidget->showInfo("Click 'Plot' to view the scatter plot with current selections");
         } else if (selectedItems.isEmpty()) {
-            m_statusWidget->showInfo("Select EVALUATE.OUT file and variables, then click 'Refresh Plot' to view scatter plot");
+            m_statusWidget->showInfo("Select EVALUATE.OUT file and variables, then click 'Plot' to view scatter plot");
         }
     }
 
@@ -2134,16 +2174,17 @@ void MainWindow::resetInterface()
     
     if (m_plotWidget) {
         m_plotWidget->clear();
+        m_plotWidget->updatePreplotHint(false, false);
     }
-    
+
     if (m_scatterPlotWidget) {
         m_scatterPlotWidget->clear();
     }
-    
+
     if (m_dataTableWidget) {
         m_dataTableWidget->clear();
     }
-    
+
     // Clear metrics when interface is reset
     clearMetrics();
 }
@@ -2317,6 +2358,11 @@ void MainWindow::populateFiles(const QString &folderName)
     if (outFiles.isEmpty()) {
         m_fileListWidget->addItem("No .OUT files found");
         m_statusWidget->showInfo(QString("No output files found in folder: %1").arg(folderName));
+        if (m_plotWidget) {
+            m_plotWidget->setAvailableTreatments(QStringList());
+            m_plotWidget->clear();
+            m_plotWidget->updatePreplotHint(false, false, true);
+        }
         return;
     }
     
@@ -2369,11 +2415,13 @@ void MainWindow::onFolderSelectionChanged()
     }
     
     m_selectedFolder = selectedFolder;
-    populateFiles(selectedFolder);
-    
+
     // Clear current data since folder changed
     resetInterface();
-    
+
+    // Populate files after reset so the preplot hint reflects the new folder's actual state
+    populateFiles(selectedFolder);
+
     // Also clear metrics when crop changes
     clearMetrics();
 }
@@ -2429,22 +2477,27 @@ void MainWindow::onFileSelectionChanged()
         updateVariableComboBoxes();
 
         // Clear the plot and treatment list (treatments come from selected outfiles)
+        bool noFilesInFolder = (m_fileListWidget->count() == 1 &&
+                                 m_fileListWidget->item(0)->text() == "No .OUT files found");
         if (m_plotWidget) {
             m_plotWidget->setAvailableTreatments(QStringList());
             m_plotWidget->clear();
+            m_plotWidget->updatePreplotHint(false, false, noFilesInFolder);
         }
-        
+
         // Clear scatter plot
         if (m_scatterPlotWidget) {
             m_scatterPlotWidget->clear();
         }
-        
+
         // Clear metrics
         clearMetrics();
 
         // Show info message based on current tab
-        if (m_tabWidget && m_tabWidget->currentIndex() == 0) {
-            m_statusWidget->showInfo("Click outfile and variables, then click 'Refresh Plot' to view time series");
+        if (noFilesInFolder) {
+            // Folder-empty status message already shown by populateFiles()
+        } else if (m_tabWidget && m_tabWidget->currentIndex() == 0) {
+            m_statusWidget->showInfo("Click outfile and variables, then click 'Plot' to view time series");
         } else if (m_tabWidget && m_tabWidget->currentIndex() == 1) {
             m_statusWidget->showInfo("Click outfile and click refresh data to view data");
         }
@@ -2681,6 +2734,11 @@ void MainWindow::onFileSelectionChanged()
             updateTreatmentComboBox();
         }
 
+        if (m_plotWidget) {
+            bool hasYVar = m_yVariableComboBox && !m_yVariableComboBox->selectedItems().isEmpty();
+            m_plotWidget->updatePreplotHint(true, hasYVar);
+        }
+
         // Mark data as needing refresh for the data table, but don't set it yet
         markDataNeedsRefresh();
         
@@ -2720,7 +2778,7 @@ void MainWindow::onFileSelectionChanged()
         // Show prompt message based on current tab
         if (m_tabWidget && m_tabWidget->currentIndex() == 0) {
             if (hasRegularFile) {
-                m_statusWidget->showInfo(QString("Loaded %1 regular .OUT file(s) for time series plots. Select variables and click 'Refresh Plot'.").arg(selectedItems.size()));
+                m_statusWidget->showInfo(QString("Loaded %1 regular .OUT file(s) for time series plots. Select variables and click 'Plot'.").arg(selectedItems.size()));
             } else if (hasEvaluateFile) {
                 if (isCommandLineMode) {
                     // In command line mode, we already switched tabs, so this message won't show
@@ -2734,7 +2792,7 @@ void MainWindow::onFileSelectionChanged()
         } else if (m_tabWidget && m_tabWidget->currentIndex() == 2) {
             // Scatter Plot tab
             if (hasEvaluateFile) {
-                m_statusWidget->showInfo(QString("Loaded %1 EVALUATE.OUT file(s). Select X and Y variables and click 'Refresh Plot' to view scatter plot").arg(selectedItems.size()));
+                m_statusWidget->showInfo(QString("Loaded %1 EVALUATE.OUT file(s). Select X and Y variables and click 'Plot' to view scatter plot").arg(selectedItems.size()));
             } else {
                 m_statusWidget->showInfo("No EVALUATE.OUT files selected. Please select EVALUATE.OUT files for scatter plots.");
             }
