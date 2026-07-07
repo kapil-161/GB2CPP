@@ -231,8 +231,7 @@ public:
     QString getPlotCSV() const;
     QString getPlotRCode() const;  // ggplot2 R script reproducing the current plot
     QString getScatterCSV() const; // CSV export for multi-panel scatter (VARIABLE,EXPERIMENT,SIMULATED,MEASURED)
-    void exportPlot(const QString &filePath, const QString &format = "PNG");
-    void exportPlot(const QString &filePath, const QString &format, int width, int height, int dpi);
+    void exportPlot(const QString &filePath, const QString &format = "PNG", int dpi = 300);
     void exportPlotComposite(const QString &filePath, const QString &format, int width, int height, int dpi);
     void copyPlotToClipboard();  // Copy plot to clipboard
     QPixmap cropToContent(const QPixmap &source);
@@ -419,6 +418,7 @@ private:
     
     // X-axis control buttons
     QWidget *m_bottomContainer;
+    QWidget *m_bottomStatusWidget = nullptr;  // status bar embedded via setBottomStatusWidget; hidden during export
     QHBoxLayout *m_bottomLayout;
     QPushButton *m_refreshButton;
     QPushButton *m_dateButton;

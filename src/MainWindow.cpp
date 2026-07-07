@@ -23,6 +23,7 @@
 #include <QTextBrowser>
 #include <QDialog>
 #include <QDialogButtonBox>
+#include <QInputDialog>
 #include <QDragEnterEvent>
 #include <QDragMoveEvent>
 #include <QDropEvent>
@@ -899,7 +900,7 @@ void MainWindow::onExportPlot()
         this,
         "Export Plot",
         QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation),
-        "PNG Files (*.png);;JPG Files (*.jpg);;PDF Files (*.pdf);;All Files (*)",
+        "PNG Files (*.png);;PDF Files (vector) (*.pdf);;JPG Files (*.jpg);;All Files (*)",
         &selectedFilter
     );
 
@@ -916,12 +917,35 @@ void MainWindow::onExportPlot()
     if (fi.suffix().isEmpty())
         fileName += ext;
 
+    // A typed extension wins over the selected filter (e.g. "plot.pdf" under the PNG filter)
+    QString suffix = QFileInfo(fileName).suffix().toLower();
+    if (suffix == "pdf")                          format = "PDF";
+    else if (suffix == "jpg" || suffix == "jpeg") format = "JPG";
+    else if (suffix == "png")                     format = "PNG";
+
+    // PDF is vector — resolution-independent. For raster formats ask the target DPI.
+    int dpi = 300;
+    if (format != "PDF") {
+        QStringList dpiOptions = {
+            "300 DPI — journal publication",
+            "600 DPI — high-resolution print",
+            "150 DPI — presentation",
+            "96 DPI — screen size"
+        };
+        bool dpiOk = false;
+        QString choice = QInputDialog::getItem(this, "Export Resolution",
+            "Image resolution:", dpiOptions, 0, false, &dpiOk);
+        if (!dpiOk) return;
+        dpi = choice.section(' ', 0, 0).toInt();
+    }
 
     bool isScatterTab = (m_tabWidget && m_tabWidget->currentIndex() == 2);
     PlotWidget *activeWidget = (isScatterTab && m_scatterPlotWidget) ? m_scatterPlotWidget : m_plotWidget;
     if (activeWidget) {
-        activeWidget->exportPlot(fileName, format);
-        m_statusWidget->showSuccess("Plot exported successfully");
+        activeWidget->exportPlot(fileName, format, dpi);
+        m_statusWidget->showSuccess(format == "PDF"
+            ? "Plot exported as vector PDF"
+            : QString("Plot exported at %1 DPI").arg(dpi));
     }
 }
 

@@ -37,6 +37,7 @@
 #include <QClipboard>
 #include <QApplication>
 #include <QPdfWriter>
+#include <QPicture>
 #include <QEnterEvent>
 #include <QContextMenuEvent>
 #include <QDrag>
@@ -414,8 +415,10 @@ void PlotWidget::setupUI()
 
 void PlotWidget::setBottomStatusWidget(QWidget *widget)
 {
-    if (widget && m_leftLayout)
+    if (widget && m_leftLayout) {
         m_leftLayout->addWidget(widget, 0);
+        m_bottomStatusWidget = widget;
+    }
 }
 
 void PlotWidget::setupChart()
@@ -3433,25 +3436,29 @@ QString PlotWidget::getScatterCSV() const
 }
 
 // xPct/yPct: top-left corner of legend as % of plot area (0=left/top, 100=right/bottom)
-static void overlayLegend(QPixmap &pixmap, QWidget *legendWidget, const QString &position,
-                          QRectF plotArea = QRectF(), double xPct = 80.0, double yPct = 5.0)
+// Paints in the painter's logical coordinate system, so the same code path serves the
+// on-screen clipboard copy, high-DPI raster export, and vector PDF export.
+static void overlayLegend(QPainter *p, QWidget *legendWidget, const QString &position,
+                          QSizeF canvasSize, QRectF plotArea = QRectF(),
+                          double xPct = 80.0, double yPct = 5.0)
 {
-    if (!legendWidget || position == "outside-right") return;
-    // Constrain width so the grabbed pixmap reflects only legend content, not the full panel width
+    if (!p || !legendWidget || position == "outside-right") return;
+    // Constrain width so the rendered widget reflects only legend content, not the full panel width
     int savedMaxW = legendWidget->maximumWidth();
     legendWidget->setMaximumWidth(200);
     legendWidget->adjustSize();
-    QPixmap legendPx = legendWidget->grab();
-    legendWidget->setMaximumWidth(savedMaxW);
-    if (legendPx.isNull()) return;
-    int lw = legendPx.width();
-    int lh = legendPx.height();
+    int lw = legendWidget->width();
+    int lh = legendWidget->height();
+    if (lw <= 0 || lh <= 0) {
+        legendWidget->setMaximumWidth(savedMaxW);
+        return;
+    }
 
-    // Use plot area if provided, otherwise full pixmap
+    // Use plot area if provided, otherwise full canvas
     double areaLeft   = plotArea.isValid() ? plotArea.left()   : 0;
     double areaTop    = plotArea.isValid() ? plotArea.top()    : 0;
-    double areaWidth  = plotArea.isValid() ? plotArea.width()  : pixmap.width();
-    double areaHeight = plotArea.isValid() ? plotArea.height() : pixmap.height();
+    double areaWidth  = plotArea.isValid() ? plotArea.width()  : canvasSize.width();
+    double areaHeight = plotArea.isValid() ? plotArea.height() : canvasSize.height();
 
     // Place legend top-left corner at (xPct%, yPct%) of the plot area
     int x = qRound(areaLeft + (xPct / 100.0) * areaWidth);
@@ -3461,15 +3468,17 @@ static void overlayLegend(QPixmap &pixmap, QWidget *legendWidget, const QString 
     x = qBound(qRound(areaLeft), x, qRound(areaLeft + areaWidth  - lw));
     y = qBound(qRound(areaTop),  y, qRound(areaTop  + areaHeight - lh));
 
-    QPainter p(&pixmap);
-    p.fillRect(x - 4, y - 4, lw + 8, lh + 8, QColor(255, 255, 255, 230));
-    p.setPen(QColor(180, 180, 180));
-    p.drawRect(x - 4, y - 4, lw + 7, lh + 7);
-    p.drawPixmap(x, y, legendPx);
-    p.end();
+    p->save();
+    p->fillRect(x - 4, y - 4, lw + 8, lh + 8, QColor(255, 255, 255, 230));
+    p->setPen(QColor(180, 180, 180));
+    p->drawRect(x - 4, y - 4, lw + 7, lh + 7);
+    legendWidget->render(p, QPoint(x, y), QRegion(),
+                         QWidget::DrawWindowBackground | QWidget::DrawChildren);
+    p->restore();
+    legendWidget->setMaximumWidth(savedMaxW);
 }
 
-void PlotWidget::exportPlot(const QString &filePath, const QString &format)
+void PlotWidget::exportPlot(const QString &filePath, const QString &format, int dpi)
 {
     if (!this) return;
 
@@ -3484,39 +3493,30 @@ void PlotWidget::exportPlot(const QString &filePath, const QString &format)
     if (insideLegend && m_legendStack) m_legendStack->setVisible(false);
     bool bottomWasVisible = m_bottomContainer && m_bottomContainer->isVisible();
     if (m_bottomContainer) m_bottomContainer->setVisible(false);
+    bool statusWasVisible = m_bottomStatusWidget && m_bottomStatusWidget->isVisible();
+    if (m_bottomStatusWidget) m_bottomStatusWidget->setVisible(false);
     QApplication::processEvents();
 
-    QPixmap pixmap = QPixmap(this->size());
-    pixmap.fill(Qt::white);
-    {
-        QPainter painter(&pixmap);
-        painter.setRenderHint(QPainter::Antialiasing, true);
-        painter.setRenderHint(QPainter::TextAntialiasing, true);
-        painter.setRenderHint(QPainter::SmoothPixmapTransform, true);
-        this->render(&painter);
+    // Plot area in widget-logical coordinates, for positioning the inside legend
+    QRectF plotArea;
+    if (insideLegend && m_chart && m_chartView) {
+        QPointF offset = m_chartView->mapTo(this, QPoint(0, 0));
+        plotArea = m_chart->plotArea().translated(offset);
     }
 
-    if (insideLegend) {
+    auto restoreLegendForOverlay = [&]() {
         if (m_legendStack) m_legendStack->setVisible(legendStackWasVisible);
         QApplication::processEvents();
-        QRectF plotArea;
-        if (m_chart && m_chartView) {
-            QRectF pa = m_chart->plotArea();
-            QPointF offset = m_chartView->mapTo(this, QPoint(0, 0));
-            plotArea = pa.translated(offset);
-        }
-        overlayLegend(pixmap, m_legendWidget, m_plotSettings.legendPosition,
-                      plotArea, m_plotSettings.legendX, m_plotSettings.legendY);
-    }
-
-    if (m_legendStack && !insideLegend) m_legendStack->setVisible(legendStackWasVisible);
-    if (m_bottomContainer) m_bottomContainer->setVisible(bottomWasVisible);
+    };
 
     bool ok = false;
     if (filePath.endsWith(".pdf", Qt::CaseInsensitive)) {
         // Verify the path is writable before handing to QPdfWriter
         QFile testFile(filePath);
         if (!testFile.open(QIODevice::WriteOnly)) {
+            if (m_legendStack) m_legendStack->setVisible(legendStackWasVisible);
+            if (m_bottomContainer) m_bottomContainer->setVisible(bottomWasVisible);
+            if (m_bottomStatusWidget) m_bottomStatusWidget->setVisible(statusWasVisible);
             QMessageBox::critical(nullptr, "Export Failed",
                 QString("Cannot write to:\n%1\n\n%2").arg(filePath, testFile.errorString()));
             return;
@@ -3524,26 +3524,71 @@ void PlotWidget::exportPlot(const QString &filePath, const QString &format)
         testFile.close();
         testFile.remove();
 
-        if (pixmap.isNull() || pixmap.width() <= 0 || pixmap.height() <= 0) {
-            QMessageBox::critical(nullptr, "Export Failed", "Nothing to export — plot pixmap is empty.");
-            return;
-        }
+        // True vector PDF: render the widget hierarchy directly into the PDF paint
+        // device, so text stays text and lines stay vectors at any zoom level.
+        // NOTE: unlike on-screen/raster painting, this path does NOT clip children
+        // to their parent widget — child widgets must not overdraw their bounds
+        // (see LegendSampleWidget sizing in PlotWidget_Legend.cpp).
         QPdfWriter writer(filePath);
-        // Use 150 DPI — gives a clean A4-ish page for typical plot sizes
-        const int pdfDpi = 150;
-        QSizeF sizeMm(pixmap.width() * 25.4 / pdfDpi, pixmap.height() * 25.4 / pdfDpi);
+        // Device units = widget logical pixels (96/inch); output is vector either way
+        const int pdfDpi = 96;
+        writer.setResolution(pdfDpi);
+        // Page physical size = widget logical size at 96 px/inch
+        QSizeF sizeMm(this->width() * 25.4 / 96.0, this->height() * 25.4 / 96.0);
         writer.setPageSize(QPageSize(sizeMm, QPageSize::Millimeter));
         writer.setPageMargins(QMarginsF(0, 0, 0, 0));
-        writer.setResolution(pdfDpi);
         QPainter pdfPainter(&writer);
         ok = pdfPainter.isActive();
         if (ok) {
-            pdfPainter.drawPixmap(0, 0, writer.width(), writer.height(), pixmap);
+            pdfPainter.setRenderHint(QPainter::Antialiasing, true);
+            pdfPainter.setRenderHint(QPainter::TextAntialiasing, true);
+            pdfPainter.setRenderHint(QPainter::SmoothPixmapTransform, true);
+            pdfPainter.fillRect(QRectF(QPointF(0, 0), QSizeF(this->size())), Qt::white);
+            this->render(&pdfPainter, QPoint(), QRegion(),
+                         QWidget::DrawWindowBackground | QWidget::DrawChildren);
+            if (insideLegend) {
+                restoreLegendForOverlay();
+                overlayLegend(&pdfPainter, m_legendWidget, m_plotSettings.legendPosition,
+                              QSizeF(this->size()), plotArea,
+                              m_plotSettings.legendX, m_plotSettings.legendY);
+            }
             pdfPainter.end();
         }
     } else {
-        ok = pixmap.save(filePath, format.toUtf8().constData());
+        // High-resolution raster: supersample via device pixel ratio so fonts and
+        // lines are re-rendered sharply at the target DPI instead of upscaled.
+        const double scale = qMax(1.0, dpi / 96.0);
+        QPixmap pixmap(this->size() * scale);
+        pixmap.setDevicePixelRatio(scale);
+        pixmap.fill(Qt::white);
+        {
+            QPainter painter(&pixmap);
+            painter.setRenderHint(QPainter::Antialiasing, true);
+            painter.setRenderHint(QPainter::TextAntialiasing, true);
+            painter.setRenderHint(QPainter::SmoothPixmapTransform, true);
+            this->render(&painter);
+            if (insideLegend) {
+                restoreLegendForOverlay();
+                overlayLegend(&painter, m_legendWidget, m_plotSettings.legendPosition,
+                              QSizeF(this->size()), plotArea,
+                              m_plotSettings.legendX, m_plotSettings.legendY);
+            }
+        }
+        // Embed physical resolution so journals and word processors read the
+        // intended print size instead of assuming 96 DPI
+        QImage image = pixmap.toImage();
+        const int dotsPerMeter = qRound(dpi / 0.0254);
+        image.setDotsPerMeterX(dotsPerMeter);
+        image.setDotsPerMeterY(dotsPerMeter);
+        const int quality = (format.compare("JPG", Qt::CaseInsensitive) == 0 ||
+                             format.compare("JPEG", Qt::CaseInsensitive) == 0) ? 95 : -1;
+        ok = image.save(filePath, format.toUtf8().constData(), quality);
     }
+
+    if (m_legendStack) m_legendStack->setVisible(legendStackWasVisible);
+    if (m_bottomContainer) m_bottomContainer->setVisible(bottomWasVisible);
+    if (m_bottomStatusWidget) m_bottomStatusWidget->setVisible(statusWasVisible);
+
     if (!ok)
         QMessageBox::critical(nullptr, "Export Failed",
             QString("Could not save plot to:\n%1\n\nCheck the path is writable.").arg(filePath));
@@ -3621,6 +3666,8 @@ void PlotWidget::copyPlotToClipboard()
     if (insideLegend && m_legendStack) m_legendStack->setVisible(false);
     bool bottomWasVisible = m_bottomContainer && m_bottomContainer->isVisible();
     if (m_bottomContainer) m_bottomContainer->setVisible(false);
+    bool statusWasVisible = m_bottomStatusWidget && m_bottomStatusWidget->isVisible();
+    if (m_bottomStatusWidget) m_bottomStatusWidget->setVisible(false);
     QApplication::processEvents();
 
     QPixmap pixmap = this->grab();
@@ -3634,102 +3681,18 @@ void PlotWidget::copyPlotToClipboard()
             QPointF offset = m_chartView->mapTo(this, QPoint(0, 0));
             plotArea = pa.translated(offset);
         }
-        overlayLegend(pixmap, m_legendWidget, m_plotSettings.legendPosition,
-                      plotArea, m_plotSettings.legendX, m_plotSettings.legendY);
+        QPainter overlayPainter(&pixmap);
+        overlayLegend(&overlayPainter, m_legendWidget, m_plotSettings.legendPosition,
+                      QSizeF(this->size()), plotArea,
+                      m_plotSettings.legendX, m_plotSettings.legendY);
     }
     if (m_legendStack && !insideLegend) m_legendStack->setVisible(legendStackWasVisible);
     if (m_bottomContainer) m_bottomContainer->setVisible(bottomWasVisible);
+    if (m_bottomStatusWidget) m_bottomStatusWidget->setVisible(statusWasVisible);
 
     QClipboard *clipboard = QApplication::clipboard();
     if (clipboard)
         clipboard->setPixmap(pixmap);
-}
-
-void PlotWidget::exportPlot(const QString &filePath, const QString &format, int width, int height, int dpi)
-{
-    if (!this) return;
-    
-    // Ensure the widget is properly laid out before export; force chart view repaint so error bars are painted
-    this->update();
-    if (m_chartView) {
-        m_chartView->update();
-        m_chartView->repaint();
-    }
-    this->repaint();
-    QApplication::processEvents();
-    
-    // Force layout update to ensure all widgets are properly positioned
-    if (m_mainLayout) {
-        m_mainLayout->update();
-        m_mainLayout->activate();
-    }
-    
-    // Get the actual widget size
-    QSize actualSize = this->size();
-    
-    // Create a high-resolution pixmap
-    QPixmap pixmap(width, height);
-    pixmap.fill(Qt::white);
-    
-    // Set device pixel ratio for high DPI
-    double devicePixelRatio = dpi / 96.0;
-    pixmap.setDevicePixelRatio(devicePixelRatio);
-    
-    // Create painter with high quality settings
-    QPainter painter(&pixmap);
-    painter.setRenderHint(QPainter::Antialiasing, true);
-    painter.setRenderHint(QPainter::TextAntialiasing, true);
-    painter.setRenderHint(QPainter::SmoothPixmapTransform, true);
-    
-    // Calculate scaling to fit the target dimensions
-    if (actualSize.width() > 0 && actualSize.height() > 0) {
-        double scaleX = (double)width / actualSize.width();
-        double scaleY = (double)height / actualSize.height();
-        
-        // Use the smaller scale to maintain aspect ratio
-        double scale = qMin(scaleX, scaleY);
-        painter.scale(scale, scale);
-        
-    }
-    
-    // Hide bottom button bar so it doesn't appear in the exported image
-    bool bottomWasVisible = m_bottomContainer && m_bottomContainer->isVisible();
-    if (m_bottomContainer) m_bottomContainer->setVisible(false);
-
-    bool insideLegend = m_showLegend && m_plotSettings.legendPosition != "outside-right";
-    bool legendStackWasVisible = m_legendStack && m_legendStack->isVisible();
-    if (insideLegend && m_legendStack) m_legendStack->setVisible(false);
-
-    QApplication::processEvents();
-
-    // Render the main widget with all its children
-    this->render(&painter, QPoint(), this->rect(), QWidget::DrawChildren);
-
-    if (m_bottomContainer) m_bottomContainer->setVisible(bottomWasVisible);
-    if (insideLegend && m_legendStack) m_legendStack->setVisible(legendStackWasVisible);
-
-    painter.end();
-
-    // Composite legend overlay after scaling
-    if (insideLegend) {
-        QRectF plotArea;
-        if (m_chart && m_chartView) {
-            QSizeF actualSize = this->size();
-            double scaleX = (actualSize.width()  > 0) ? (double)width  / actualSize.width()  : 1.0;
-            double scaleY = (actualSize.height() > 0) ? (double)height / actualSize.height() : 1.0;
-            double scale  = qMin(scaleX, scaleY);
-            QRectF pa = m_chart->plotArea();
-            QPointF offset = m_chartView->mapTo(this, QPoint(0, 0));
-            QRectF widgetPlotArea = pa.translated(offset);
-            plotArea = QRectF(widgetPlotArea.left()  * scale, widgetPlotArea.top()    * scale,
-                              widgetPlotArea.width() * scale, widgetPlotArea.height() * scale);
-        }
-        overlayLegend(pixmap, m_legendWidget, m_plotSettings.legendPosition, plotArea, m_plotSettings.legendX, m_plotSettings.legendY);
-    }
-    
-    // Save the pixmap
-    bool saved = pixmap.save(filePath, format.toUtf8().constData());
-    
 }
 
 QPixmap PlotWidget::cropToContent(const QPixmap &source)

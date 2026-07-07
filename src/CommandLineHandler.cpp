@@ -341,7 +341,11 @@ void CommandLineHandler::headlessAutoPlot()
     QTimer::singleShot(2000, this, [this]() {
         PlotWidget *plot = m_mainWindow->getPlotWidget();
         if (plot && !m_args.savePlotPath.isEmpty()) {
-            plot->exportPlotComposite(m_args.savePlotPath, "PNG", 1200, 800, 96);
+            // Render at a fixed canvas size, then export at 300 DPI (or vector PDF
+            // if the save path ends in .pdf) via the publication-quality path
+            plot->resize(1200, 800);
+            QApplication::processEvents(QEventLoop::AllEvents, 500);
+            plot->exportPlot(m_args.savePlotPath, "PNG", 300);
         }
         if (!m_args.saveMetricsPath.isEmpty()) {
             if (!m_mainWindow->saveMetricsToFile(m_args.saveMetricsPath)) {

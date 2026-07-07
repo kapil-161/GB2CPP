@@ -432,6 +432,8 @@ void PlotWidget::createLegendRowFromData(const QMap<QString, QVariant>& treatmen
                 scatterData->brush,
                 QString()
             );
+            // Must fit the 30px column (see obsSample note below)
+            sample->setFixedSize(28, 15);
             symbolLayout->addWidget(sample);
         }
 
@@ -477,6 +479,9 @@ void PlotWidget::createLegendRowFromData(const QMap<QString, QVariant>& treatmen
             obsData->brush,
             QString()
         );
+        // Must fit the 30px column: parent clipping hides overflow on screen but
+        // not in exports (QWidget::render to PDF does not clip child overdraw)
+        obsSample->setFixedSize(28, 15);
         obsLayout->addWidget(obsSample);
     } else {
         QLabel* placeholder = new QLabel("-");
@@ -506,6 +511,8 @@ void PlotWidget::createLegendRowFromData(const QMap<QString, QVariant>& treatmen
             QBrush(),
             QString()
         );
+        // Must fit the 30px column (see obsSample note above)
+        simSample->setFixedSize(28, 15);
         simLayout->addWidget(simSample);
     } else {
         QLabel* placeholder = new QLabel("-");
