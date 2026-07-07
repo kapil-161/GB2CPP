@@ -926,12 +926,7 @@ void MainWindow::onExportPlot()
     // PDF is vector — resolution-independent. For raster formats ask the target DPI.
     int dpi = 300;
     if (format != "PDF") {
-        QStringList dpiOptions = {
-            "300 DPI — journal publication",
-            "600 DPI — high-resolution print",
-            "150 DPI — presentation",
-            "96 DPI — screen size"
-        };
+        QStringList dpiOptions = { "300 DPI", "600 DPI", "150 DPI", "96 DPI" };
         bool dpiOk = false;
         QString choice = QInputDialog::getItem(this, "Export Resolution",
             "Image resolution:", dpiOptions, 0, false, &dpiOk);
