@@ -133,18 +133,27 @@ QVariant MetricsTableModel::data(const QModelIndex& index, int role) const
         
         // Numeric fields - format as numbers
         if (columnName == "R²") {
-            if (value.canConvert<double>()) {
-                return QString::number(value.toDouble(), 'f', 3);
+            // canConvert<double>() is true even for non-numeric QStrings (e.g. "-"); a
+            // failed toDouble() silently returns 0.0, which would print as "0.000".
+            // Use the ok flag so unparseable/placeholder values fall through to "-".
+            bool ok = false;
+            double r2 = value.toDouble(&ok);
+            if (ok) {
+                return QString::number(r2, 'f', 3);
             }
-            // If R² not provided, show "-"
-            return value.toString().isEmpty() ? "-" : value.toString();
+            QString s = value.toString();
+            return s.isEmpty() ? "-" : s;
         }
         
         if (columnName == "n" || columnName == "Obs. Mean" || columnName == "Sim. Mean" ||
             columnName == "RMSE" || columnName == "NRMSE" || columnName == "d-stat" ||
             columnName == "BIAS" || columnName == "MSEs" || columnName == "MSEu" ||
             columnName == "MSEs/MSE" || columnName == "MSEu/MSE") {
-            if (value.canConvert<double>()) {
+            // See R² branch above: canConvert<double>() alone doesn't catch a
+            // non-numeric placeholder string, which toDouble() would silently read as 0.
+            bool numOk = false;
+            value.toDouble(&numOk);
+            if (numOk) {
                 if (columnName == "n") {
                     return QString::number((int)value.toDouble());
                 } else if (columnName == "d-stat") {
