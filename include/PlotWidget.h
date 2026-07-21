@@ -204,7 +204,7 @@ public:
         const QStringList &yVars,
         const DataTable &obsData,
         const QMap<QString, QMap<QString, QString>> &treatmentNames = QMap<QString, QMap<QString, QString>>(),
-        const QMap<QString, QString> &yVarFileFilter = QMap<QString, QString>()
+        const QMap<QString, QStringList> &yVarFileFilter = QMap<QString, QStringList>()
     );
     
     // Scatter plot function for model evaluation (simulated vs measured)
@@ -299,7 +299,7 @@ private:
     void plotDatasets(const DataTable &simData, const DataTable &obsData,
                      const QString &xVar, const QStringList &yVars,
                      const QStringList &treatments, const QString &selectedExperiment,
-                     const QMap<QString, QString> &yVarFileFilter = QMap<QString, QString>());
+                     const QMap<QString, QStringList> &yVarFileFilter = QMap<QString, QStringList>());
     void plotOsuBoxPlot(const DataTable &simData, const QStringList &yVars,
                         const QStringList &treatments, const QString &selectedExperiment);
     QVector<ErrorBarData> aggregateReplicates(const QVector<QPointF> &points, const QString &xVar, double xTolerance = 0.01);
@@ -452,7 +452,7 @@ private:
     QMap<QString, QMap<QString, ScalingInfo>> m_scaleFactors;
     QMap<QString, double> m_appliedScalingFactors;  // Simpler storage for label
     QMap<QString, QMap<QString, QString>> m_treatmentNames;
-    QMap<QString, QString> m_yVarFileFilter;  // col → source filename; empty = no filter
+    QMap<QString, QStringList> m_yVarFileFilter;  // col → allowed source filenames; empty/absent = no filter
     QString m_currentXVar;
     QStringList m_currentYVars;
     QStringList m_currentTreatments;

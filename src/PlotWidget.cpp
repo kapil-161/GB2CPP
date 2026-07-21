@@ -1072,7 +1072,7 @@ void PlotWidget::plotTimeSeries(
     const QStringList &yVars,
     const DataTable &obsData,
     const QMap<QString, QMap<QString, QString>> &treatmentNames,
-    const QMap<QString, QString> &yVarFileFilter)
+    const QMap<QString, QStringList> &yVarFileFilter)
 {
     m_isScatterMode = false;
 
@@ -1542,7 +1542,7 @@ QVector<ErrorBarData> PlotWidget::aggregateReplicates(const QVector<QPointF> &po
 void PlotWidget::plotDatasets(const DataTable &simData, const DataTable &obsData,
                              const QString &xVar, const QStringList &yVars,
                              const QStringList &treatments, const QString &selectedExperiment,
-                             const QMap<QString, QString> &yVarFileFilter)
+                             const QMap<QString, QStringList> &yVarFileFilter)
 {
     // Clear existing chart and set up appropriate axes
     clearChart();
@@ -1619,17 +1619,19 @@ void PlotWidget::plotDatasets(const DataTable &simData, const DataTable &obsData
         // Group data by experiment and treatment combination
         QMap<QString, QVector<QPointF>> experimentTreatmentData;
 
-        // Pre-fetch source file filter for this variable
-        QString requiredSrcFile = yVarFileFilter.value(yVar);
+        // Pre-fetch source file filter for this variable — a variable selected from
+        // multiple files' groups (same column name, e.g. CWAD in two Sequence .OPG
+        // files) must accept rows from ANY of those files, not just one.
+        QStringList requiredSrcFiles = yVarFileFilter.value(yVar);
 
         for (int row = 0; row < simData.rowCount; ++row) {
             if (row >= xColumn->data.size() || row >= yColumn->data.size() || row >= trtColumn->data.size()) {
                 continue;
             }
 
-            // Skip rows from a different source file when a file filter is active for this variable
-            if (!requiredSrcFile.isEmpty() && srcFileColumn && row < srcFileColumn->data.size()) {
-                if (srcFileColumn->data[row].toString() != requiredSrcFile)
+            // Skip rows from a source file not in the allowed set when a file filter is active for this variable
+            if (!requiredSrcFiles.isEmpty() && srcFileColumn && row < srcFileColumn->data.size()) {
+                if (!requiredSrcFiles.contains(srcFileColumn->data[row].toString()))
                     continue;
             }
 

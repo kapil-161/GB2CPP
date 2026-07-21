@@ -2057,8 +2057,10 @@ void MainWindow::updatePlot()
     
     // Get selected Y variables from ListWidget.
     // In multi-file mode UserRole holds "filename::COL"; decode into plain yVars + file filter.
+    // The same column (e.g. CWAD) can be selected from more than one file's group — collect
+    // ALL source files per column instead of overwriting, or the earlier file's rows get dropped.
     QStringList yVars;
-    QMap<QString, QString> yVarFileFilter; // col → source filename (empty = no filter)
+    QMap<QString, QStringList> yVarFileFilter; // col → allowed source filenames (empty = no filter)
     QList<QListWidgetItem*> selectedItems = m_yVariableComboBox->selectedItems();
     for (QListWidgetItem* item : selectedItems) {
         QString key = item->data(Qt::UserRole).toString();
@@ -2067,7 +2069,7 @@ void MainWindow::updatePlot()
             QString file = key.left(sep);
             QString col  = key.mid(sep + 2);
             if (!yVars.contains(col)) yVars.append(col);
-            yVarFileFilter[col] = file;
+            if (!yVarFileFilter[col].contains(file)) yVarFileFilter[col].append(file);
         } else {
             if (!yVars.contains(key)) yVars.append(key);
         }
