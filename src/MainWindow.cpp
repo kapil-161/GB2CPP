@@ -1173,6 +1173,17 @@ void MainWindow::onUserManual()
   <li>Optional positional args — specific <code>.OUT</code> files to pre-select</li>
 </ul>
 
+<h3 style="color:#1976D2;">macOS Invocation</h3>
+<p>On macOS, run the executable inside the app bundle instead of <code>GB2.exe</code>:</p>
+<pre style="background:#F5F5F5; padding:8px; border-radius:4px;">/Applications/DSSAT48/Tools/GB2CPP/build_macos/bin/GB2.app/Contents/MacOS/GB2 &lt;DSSATBase&gt; &lt;CropDir&gt; [file1.OUT] ...</pre>
+<p>Interactive invocations (no <code>--save</code>) work with no extra setup. For true <b>headless</b> runs (<code>--save</code> or <code>--scatter</code>, no window shown), macOS additionally needs <code>QT_QPA_PLATFORM=offscreen</code> — but the app bundle only ships the <code>cocoa</code> platform plugin, so plain <code>offscreen</code> mode aborts with <code>SIGABRT</code> unless you also point Qt at an installation that has the <code>offscreen</code> plugin (e.g. a Homebrew Qt install):</p>
+<pre style="background:#F5F5F5; padding:8px; border-radius:4px; white-space:pre-wrap;">QT_QPA_PLATFORM=offscreen \
+QT_QPA_PLATFORM_PLUGIN_PATH=/opt/homebrew/Cellar/qt/&lt;version&gt;/share/qt/plugins/platforms \
+/Applications/DSSAT48/Tools/GB2CPP/build_macos/bin/GB2.app/Contents/MacOS/GB2 \
+  /Applications/DSSAT48 /Applications/DSSAT48/Wheat PlantGro.OUT \
+  --xvar DAP --yvar LAID --save /tmp/growth.png</pre>
+<p>Find the matching plugin path with <code>find /opt/homebrew -iname "libqoffscreen.dylib"</code>. Substitute the Homebrew Qt version installed on the machine. For a distributable, standalone headless build, bundle the <code>offscreen</code> plugin into <code>GB2.app/Contents/PlugIns/platforms/</code> so this environment variable isn't required.</p>
+
 <h3 style="color:#1976D2;">Optional flags</h3>
 <table border="1" cellpadding="4" cellspacing="0" style="border-collapse:collapse;">
   <tr style="background:#E3F2FD;"><th>Flag</th><th>Argument</th><th>Description</th></tr>
