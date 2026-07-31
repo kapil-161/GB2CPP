@@ -1224,6 +1224,47 @@ GB2.exe C:/DSSAT48 C:/DSSAT48/Wheat KSAS8101.WHT --xvar DATE --yvar GWAD --save 
 
 <p><b>Note:</b> When <code>--save</code> is used, GB2 renders the plot and exits automatically. Relative output paths are resolved against the terminal's working directory at the time GB2 was launched.</p>
 
+<h2 style="color:#1565C0;">13. AI Agent Integration (MCP Server)</h2>
+<p>GB2 ships an <a href="https://modelcontextprotocol.io">MCP</a> server (<code>mcp_server/</code>, project <code>gb2-mcp</code>) that wraps the headless CLI above as tools an AI agent can call directly &mdash; e.g. asking Claude "plot LAI vs DAS for the Wheat crop and show me the RMSE" instead of typing the command yourself. It works on both <b>macOS</b> and <b>Windows</b> &mdash; it auto-detects the OS and picks the matching binary path, DSSAT base, and Qt headless setup (Homebrew Qt on macOS, the <code>C:\Qt\...\mingw_64</code> install on Windows, same as <code>run_headless.bat</code>).</p>
+
+<h3 style="color:#1976D2;">Setup</h3>
+<pre style="background:#F5F5F5; padding:8px; border-radius:4px;">cd mcp_server
+python3 -m venv .venv
+./.venv/bin/pip install -e .</pre>
+<p>This installs the <code>gb2-mcp</code> console script into <code>mcp_server/.venv/bin/gb2-mcp</code>.</p>
+
+<h3 style="color:#1976D2;">Available tools</h3>
+<table border="1" cellpadding="4" cellspacing="0" style="border-collapse:collapse;">
+  <tr style="background:#E3F2FD;"><th>Tool</th><th>Purpose</th></tr>
+  <tr><td><code>list_output_files(crop_dir)</code></td><td>List DSSAT output files (<code>PlantGro.OUT</code>, <code>Evaluate.OUT</code>, ...) in a crop directory</td></tr>
+  <tr><td><code>plot_timeseries(...)</code></td><td>Headless time-series/box plot, optionally with a fit-metrics CSV</td></tr>
+  <tr><td><code>plot_scatter(...)</code></td><td>Headless simulated-vs-measured scatter plot from <code>Evaluate.OUT</code></td></tr>
+  <tr><td><code>read_plot_image(path)</code></td><td>Return a previously generated PNG so the agent can view it inline</td></tr>
+</table>
+
+<h3 style="color:#1976D2;">Claude Code</h3>
+<pre style="background:#F5F5F5; padding:8px; border-radius:4px; white-space:pre-wrap;">claude mcp add gb2 -- /Applications/DSSAT48/Tools/GB2CPP/mcp_server/.venv/bin/gb2-mcp</pre>
+<p>Or add to <code>.mcp.json</code> in the project root:</p>
+<pre style="background:#F5F5F5; padding:8px; border-radius:4px; white-space:pre-wrap;">{
+  "mcpServers": {
+    "gb2": {
+      "command": "/Applications/DSSAT48/Tools/GB2CPP/mcp_server/.venv/bin/gb2-mcp"
+    }
+  }
+}</pre>
+
+<h3 style="color:#1976D2;">Claude Desktop</h3>
+<p>Add the same block to <code>~/Library/Application Support/Claude/claude_desktop_config.json</code>, then restart Claude Desktop. GB2's tools appear under the connector icon.</p>
+<pre style="background:#F5F5F5; padding:8px; border-radius:4px; white-space:pre-wrap;">{
+  "mcpServers": {
+    "gb2": {
+      "command": "/Applications/DSSAT48/Tools/GB2CPP/mcp_server/.venv/bin/gb2-mcp"
+    }
+  }
+}</pre>
+
+<p><b>Note:</b> Headless rendering (<code>--save</code>/<code>--scatter</code>) needs the Homebrew Qt <code>offscreen</code> plugin (see §12 macOS Invocation above); the server auto-detects it, or you can set <code>GB2_QT_PLATFORM_PLUGIN_PATH</code> explicitly. See <code>mcp_server/README.md</code> for full configuration options.</p>
+
 </body></html>
     )");
 
