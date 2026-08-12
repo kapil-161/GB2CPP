@@ -233,15 +233,26 @@ if not defined NSIS_PATH (
     goto :skip_nsis
 )
 
-REM Extract full version (includes git hash) from version_generated.h and pass to NSIS
-REM Using GB2_VERSION_FULL (e.g. 2.0.120-45f9a34) ensures each unique build gets a unique
-REM marker file, so the launcher always re-extracts the latest exe without manual temp clearing.
+REM Extract full version (includes git hash) from version_generated.h — display only.
 set GB2_VERSION_FULL=unknown
 for /f "tokens=3" %%v in ('findstr /c:"#define GB2_VERSION_FULL " "%PROJECT_DIR%include\version_generated.h"') do set GB2_VERSION_FULL=%%v
 set GB2_VERSION_FULL=%GB2_VERSION_FULL:"=%
 if not defined QUIET_MODE echo Packaging version: %GB2_VERSION_FULL%
 
-"%NSIS_PATH%" /DVERSION=%GB2_VERSION_FULL% gb2_launcher.nsi
+REM Content hash of the ACTUAL packaged binary. This — not the git version — keys
+REM the launcher's extracted runtime, so a different binary always re-extracts even
+REM if the version string happens to match, and an identical binary is never
+REM confused with a stale cache. Fixes "gave 2.0.60, opened stale 2.0.40" on another PC.
+set GB2_PAYLOAD_HASH=
+for /f "skip=1 tokens=* delims=" %%h in ('certutil -hashfile "%PROJECT_DIR%manual_deployment\GB2.exe" MD5') do (
+    if not defined GB2_PAYLOAD_HASH set GB2_PAYLOAD_HASH=%%h
+)
+REM Strip any spaces certutil may insert
+set GB2_PAYLOAD_HASH=%GB2_PAYLOAD_HASH: =%
+if not defined GB2_PAYLOAD_HASH set GB2_PAYLOAD_HASH=nohash
+if not defined QUIET_MODE echo Payload hash: %GB2_PAYLOAD_HASH%
+
+"%NSIS_PATH%" /DVERSION=%GB2_VERSION_FULL% /DPAYLOADHASH=%GB2_PAYLOAD_HASH% gb2_launcher.nsi
 if %ERRORLEVEL% neq 0 (
     echo ERROR: NSIS packaging failed!
     goto :skip_nsis
