@@ -65,6 +65,8 @@ Section
 
     SetOutPath "$8\platforms"
     File "manual_deployment\platforms\qwindows.dll"
+    ; Offscreen plugin so GB2 --mcp can render headless plot children without a window
+    File "manual_deployment\platforms\qoffscreen.dll"
 
     SetOutPath "$8\resources"
     File "manual_deployment\resources\final.ico"

@@ -97,6 +97,7 @@ set(SOURCES
     src/PandasTableModel.cpp
     src/DataTableWidget.cpp
     src/CommandLineHandler.cpp
+    src/McpServer.cpp
     src/SingleInstanceApp.cpp
     src/PlotSettingsDialog.cpp
     src/CDECodesDialog.cpp

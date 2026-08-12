@@ -1247,9 +1247,24 @@ GB2.exe C:/DSSAT48 C:/DSSAT48/Wheat KSAS8101.WHT --xvar DATE --yvar GWAD --save 
 <p><b>Note:</b> When <code>--save</code> is used, GB2 renders the plot and exits automatically. Relative output paths are resolved against the terminal's working directory at the time GB2 was launched.</p>
 
 <h2 style="color:#1565C0;">13. AI Agent Integration (MCP Server)</h2>
-<p>GB2 ships an <a href="https://modelcontextprotocol.io">MCP</a> server (<code>mcp_server/</code>, project <code>gb2-mcp</code>) that wraps the headless CLI above as tools an AI agent can call directly &mdash; e.g. asking Claude "plot LAI vs DAS for the Wheat crop and show me the RMSE" instead of typing the command yourself. It works on both <b>macOS</b> and <b>Windows</b> &mdash; it auto-detects the OS and picks the matching binary path, DSSAT base, and Qt headless setup (Homebrew Qt on macOS, the <code>C:\Qt\...\mingw_64</code> install on Windows, same as <code>run_headless.bat</code>).</p>
+<p>GB2 can be driven directly by an AI agent (e.g. Claude) via the <a href="https://modelcontextprotocol.io">Model Context Protocol</a> &mdash; ask it "plot LAI vs DAS for the Wheat crop and show me the RMSE" instead of typing the command yourself. There are two ways to connect, both exposing the same tools (<code>list_output_files</code>, <code>plot_timeseries</code>, <code>plot_scatter</code>, <code>read_plot_image</code>).</p>
 
-<h3 style="color:#1976D2;">Setup</h3>
+<h3 style="color:#1976D2;">Option A &mdash; Built-in mode (recommended, no Python)</h3>
+<p>The GB2 executable itself is an MCP server. Just run it with <code>--mcp</code> and it speaks MCP over stdin/stdout, so nothing else needs to be installed &mdash; the single exe is all an agent needs.</p>
+<p><b>Claude Code:</b></p>
+<pre style="background:#F5F5F5; padding:8px; border-radius:4px; white-space:pre-wrap;">claude mcp add gb2 -- "C:\Program Files\gb2\GB2.exe" --mcp</pre>
+<p>Or add to <code>.mcp.json</code> / <code>claude_desktop_config.json</code> (use the full path to your GB2.exe):</p>
+<pre style="background:#F5F5F5; padding:8px; border-radius:4px; white-space:pre-wrap;">{
+  "mcpServers": {
+    "gb2": { "command": "C:\\path\\to\\GB2.exe", "args": ["--mcp"] }
+  }
+}</pre>
+<p><b>Do not run <code>GB2.exe</code> directly to "test" it</b> &mdash; it is a GUI app with no console help text. In <code>--mcp</code> mode it waits for JSON-RPC on stdin; an MCP client drives it. Plot requests are rendered by GB2 in the background (using its bundled offscreen mode) and returned to the agent.</p>
+
+<h3 style="color:#1976D2;">Option B &mdash; Standalone Python adapter (<code>gb2-mcp</code>)</h3>
+<p>A separate Python package under <code>mcp_server/</code> that shells out to a built GB2 executable. Useful on macOS or when you prefer to keep the adapter outside the app.</p>
+
+<h4>Setup</h4>
 <pre style="background:#F5F5F5; padding:8px; border-radius:4px;">cd mcp_server
 python3 -m venv .venv
 ./.venv/bin/pip install -e .</pre>

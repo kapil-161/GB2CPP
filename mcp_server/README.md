@@ -5,6 +5,13 @@ plotting/metrics CLI as tools an AI agent (Claude Desktop, Claude Code, or any
 other MCP client) can call directly — no manual command-line invocation
 needed.
 
+> **Prefer the built-in server for most cases.** GB2 now speaks MCP itself:
+> just run `GB2.exe --mcp` and point your MCP client at it — no Python, no
+> separate install. Register it with
+> `claude mcp add gb2 -- "C:\path\to\GB2.exe" --mcp`. This `gb2-mcp` Python
+> package is the alternative for macOS, or when you want the adapter to live
+> outside the app. Both expose the identical tools.
+
 It works by shelling out to the built GB2 executable with the documented
 headless flags (`--xvar`/`--yvar`/`--save`/`--metrics`/`--scatter`/
 `--scatter-vars`/`--scatter-metrics`/`--boxplot`; see the "Command-Line /

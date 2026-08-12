@@ -20,6 +20,7 @@
 #include "Config.h"
 #include "CommandLineHandler.h"
 #include "SingleInstanceApp.h"
+#include "McpServer.h"
 
 // Enable/disable debug output
 Q_LOGGING_CATEGORY(appCategory, "app")
@@ -281,7 +282,15 @@ int main(int argc, char *argv[])
     
     int newArgc = argvPtrs.size() - 1;
     char **newArgv = argvPtrs.data();
-    
+
+    // MCP server mode: GB2.exe --mcp speaks JSON-RPC over stdin/stdout so an AI
+    // agent can drive GB2 directly. Branch out BEFORE any console attach or GUI
+    // setup so the client's inherited stdio pipes stay intact, and before the
+    // single-instance check so it never blocks (it holds no GUI lock).
+    if (args.contains("--mcp", Qt::CaseInsensitive)) {
+        return runMcpServer(newArgc, newArgv);
+    }
+
     // Setup message handler based on build type and verbose mode
     if (g_verboseMode) {
         // Verbose mode: show all debug output
@@ -375,8 +384,13 @@ int main(int argc, char *argv[])
     }
 #endif
     
-    // Check if another instance is already running (always enforced).
-    if (!app.isFirstInstance()) {
+    // Check if another instance is already running. Headless render invocations
+    // (--save / --scatter, e.g. spawned by --mcp mode or DSSAT batch) must NOT be
+    // blocked or pop an "already running" dialog while the GUI is open — they are
+    // short-lived batch jobs, so skip the single-instance guard for them.
+    bool headlessRender = app.arguments().contains("--save", Qt::CaseInsensitive) ||
+                          app.arguments().contains("--scatter", Qt::CaseInsensitive);
+    if (!headlessRender && !app.isFirstInstance()) {
 #ifdef ENABLE_DEBUG_OUTPUT
         qCWarning(appCategory) << "Another instance of" << Config::APP_NAME << "is already running";
 #endif

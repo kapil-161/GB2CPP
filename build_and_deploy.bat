@@ -199,6 +199,14 @@ if %ERRORLEVEL% neq 0 (
     exit /b 1
 )
 
+REM windeployqt only ships the GUI platform plugin (qwindows). GB2 --mcp renders
+REM its headless plot children with QT_QPA_PLATFORM=offscreen, so also bundle the
+REM offscreen plugin — the MCP server auto-selects it when present next to the exe.
+if exist "%QT_DIR%\plugins\platforms\qoffscreen.dll" (
+    copy /Y "%QT_DIR%\plugins\platforms\qoffscreen.dll" manual_deployment\platforms\ >nul
+    if not defined QUIET_MODE echo Bundled offscreen platform plugin for --mcp headless rendering
+)
+
 if not defined QUIET_MODE echo.
 if not defined QUIET_MODE echo Step 6: Removing unnecessary files and folders...
 REM Remove unwanted plugin folders (KEEP platforms folder - it's essential!)
