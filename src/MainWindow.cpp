@@ -1105,31 +1105,26 @@ void MainWindow::onUserManual()
 </ul>
 
 <h3 style="color:#1976D2;">Model Assessment Statistics</h3>
-<p>These statistics quantify how closely simulated values match observed measurements (the 1:1 line).
-No single number tells the whole story — read them together. A model can have a high R&sup2; yet still be
-biased, so always pair a correlation measure (R&sup2;, d-stat) with an error-magnitude measure (RMSE, NRMSE)
-and a direction-of-error measure (Bias, MSE decomposition).</p>
+<p>These statistics quantify how closely simulated values match observed measurements (the 1:1 line).</p>
 <table border="1" cellpadding="4" cellspacing="0" style="border-collapse:collapse;">
-  <tr style="background:#E3F2FD;"><th>Statistic</th><th>Meaning</th><th>Good values</th></tr>
-  <tr><td><b>n</b></td><td>Number of simulated–observed pairs the statistics are computed from.</td><td>Larger is more reliable</td></tr>
-  <tr><td><b>R&sup2;</b></td><td>Coefficient of determination — fraction of the variation in the observations explained by the simulations. Measures correlation/scatter, <i>not</i> agreement with the 1:1 line, and is sensitive to outliers.</td><td>&rarr; 1.0</td></tr>
-  <tr><td><b>RMSE</b></td><td>Root mean squared error, in the variable's own units — the typical size of the simulated&minus;observed difference. Penalizes large errors more heavily.</td><td>Lower (0 = perfect)</td></tr>
-  <tr><td><b>NRMSE</b></td><td>RMSE normalized by the observed mean, as a percent — lets you compare fit across variables with different units. Rule of thumb: &lt;10% excellent, 10–20% good, 20–30% fair, &gt;30% poor.</td><td>Lower</td></tr>
-  <tr><td><b>d-stat</b></td><td>Willmott's index of agreement (0–1) — a bounded measure of how well simulations track observations relative to the 1:1 line, less sensitive to outliers than R&sup2;.</td><td>&rarr; 1.0</td></tr>
-  <tr><td><b>Bias</b></td><td>Dimensionless bias index, (mean&nbsp;simulated &minus; mean&nbsp;observed) / mean&nbsp;observed. Sign shows the direction of systematic error: <b>positive = over-prediction</b>, <b>negative = under-prediction</b>.</td><td>&rarr; 0 (unbiased)</td></tr>
+  <tr style="background:#E3F2FD;"><th>Statistic</th><th>Definition</th></tr>
+  <tr><td><b>n</b></td><td>Number of simulated–observed pairs the statistics are computed from.</td></tr>
+  <tr><td><b>R&sup2;</b></td><td>Coefficient of determination — fraction of the variation in the observations explained by the simulations.</td></tr>
+  <tr><td><b>RMSE</b></td><td>Root mean squared error, in the variable's own units.</td></tr>
+  <tr><td><b>NRMSE</b></td><td>RMSE normalized by the observed mean, expressed as a percent.</td></tr>
+  <tr><td><b>d-stat</b></td><td>Willmott's index of agreement (0–1).</td></tr>
+  <tr><td><b>Bias</b></td><td>Dimensionless bias index, (mean&nbsp;simulated &minus; mean&nbsp;observed) / mean&nbsp;observed.</td></tr>
 </table>
 
 <h3 style="color:#1976D2;">MSE Decomposition (MSEs / MSEu)</h3>
-<p>The total mean squared error (MSE = RMSE&sup2;) is split, following Willmott, into two parts that always
-sum to the total. The table reports each as a <b>fraction of the total MSE</b>, so the two columns add up to 1:</p>
+<p>The total mean squared error (MSE = RMSE&sup2;) is split, following Willmott, into a systematic and an
+unsystematic part that always sum to the total. The table reports each as a <b>fraction of the total MSE</b>,
+so the two columns add up to 1:</p>
 <table border="1" cellpadding="4" cellspacing="0" style="border-collapse:collapse;">
-  <tr style="background:#E3F2FD;"><th>Column</th><th>Definition</th><th>Interpretation</th></tr>
-  <tr><td><b>MSEs/MSE</b><br>(systematic)</td><td>The share of the error captured by the best-fit line through the simulated–observed points — i.e. consistent over/under-prediction or a slope that departs from the 1:1 line.</td><td>Points to a fixable problem: recalibrating or correcting the model can reduce it.</td></tr>
-  <tr><td><b>MSEu/MSE</b><br>(unsystematic)</td><td>The remaining random scatter of the points around that best-fit line.</td><td>The model's inherent noise floor — generally <i>not</i> removable by calibration.</td></tr>
+  <tr style="background:#E3F2FD;"><th>Column</th><th>Definition</th></tr>
+  <tr><td><b>MSEs/MSE</b> (systematic)</td><td>The share of the error captured by the best-fit line through the simulated–observed points.</td></tr>
+  <tr><td><b>MSEu/MSE</b> (unsystematic)</td><td>The remaining scatter of the points around that best-fit line.</td></tr>
 </table>
-<p><b>How to read it:</b> a well-performing model concentrates its error in the <i>unsystematic</i> component
-(MSEu/MSE near 1, MSEs/MSE near 0) — the remaining error is essentially irreducible noise. A large
-<i>systematic</i> share (MSEs/MSE) is a signal that the model is biased or mis-calibrated and could be improved.</p>
 
 <h2 style="color:#1565C0;">6. Data View Tab</h2>
 <ul>
