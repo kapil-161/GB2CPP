@@ -229,7 +229,12 @@ bool DataProcessor::readOutFile(const QString &filePath, DataTable &table)
             QString afterColon = parseColonSeparatedLine(line);
             QStringList parts = afterColon.simplified().split(' ', Qt::SkipEmptyParts);
             if (!parts.isEmpty()) {
-                currentExp = parts[0];
+                // Most modules write the bare 8-char experiment code (e.g. "KSAS8101"),
+                // but disease/pest module outputs (e.g. DISMO.OUT) write the full X-file
+                // name "QUIN0604.SBX". Experiment codes never contain a dot, so strip any
+                // ".{crop}X" extension — otherwise the observed T-file lookup builds a bad
+                // pattern ("QUIN0604.SBX.SBT") and no observed data is found.
+                currentExp = parts[0].section('.', 0, 0);
             }
         }
         // Track RUN
