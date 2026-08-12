@@ -457,7 +457,7 @@ void PlotWidget::plotScatter(
         }
 
         // Ordered list so display is consistent regardless of QSet iteration order
-        const QStringList kMetricOrder = {"N", "RMSE", "R²", "d-stat", "BIAS", "MSEs/MSE", "MSEu/MSE"};
+        const QStringList kMetricOrder = {"N", "RMSE", "R²", "d-stat", "Bias", "MSEs/MSE", "MSEu/MSE"};
 
         QStringList statsLines;
         for (const QString &mkey : kMetricOrder) {
@@ -466,6 +466,7 @@ void PlotWidget::plotScatter(
             QString fkey = mkey;
             if (mkey == "d-stat") fkey = "Willmott's d-stat";
             else if (mkey == "R²") fkey = "R²";
+            else if (mkey == "Bias") fkey = "BIAS";  // display "Bias" = dimensionless bias index
             QVariant val = fullMetrics.value(fkey);
             if (!val.isValid()) continue;
             bool ok = false;
@@ -476,7 +477,7 @@ void PlotWidget::plotScatter(
             else if (mkey == "RMSE")  fmt = QString("RMSE = %1").arg(dval, 0, 'f', dval < 1 ? 3 : (dval < 100 ? 2 : 1));
             else if (mkey == "R²")    fmt = QString("R² = %1").arg(dval, 0, 'f', 2);
             else if (mkey == "d-stat") fmt = QString("d = %1").arg(dval, 0, 'f', 3);
-            else if (mkey == "BIAS")  fmt = QString("BIAS = %1").arg(dval, 0, 'f', 3);
+            else if (mkey == "Bias")  fmt = QString("Bias = %1").arg(dval, 0, 'f', 3);
             else if (mkey == "MSEs/MSE") fmt = QString("MSEs/MSE = %1").arg(dval, 0, 'f', 2);
             else if (mkey == "MSEu/MSE") fmt = QString("MSEu/MSE = %1").arg(dval, 0, 'f', 2);
             statsLines << fmt;

@@ -373,7 +373,7 @@ void PlotSettingsDialog::setupUI()
     QGridLayout *scatterMetricsLayout = new QGridLayout(scatterMetricsGroup);
     scatterMetricsGroup->setToolTip("Choose which statistics to display inside each scatter panel");
 
-    QStringList metricOptions = {"RMSE", "R²", "d-stat", "BIAS", "MSEs/MSE", "MSEu/MSE", "N"};
+    QStringList metricOptions = {"RMSE", "R²", "d-stat", "Bias", "MSEs/MSE", "MSEu/MSE", "N"};
     int col = 0, row = 0;
     for (const QString &metric : metricOptions) {
         QCheckBox *cb = new QCheckBox(metric);

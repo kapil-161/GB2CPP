@@ -58,7 +58,7 @@ MetricsTableModel::MetricsTableModel(const QVariantList& data, bool isScatterPlo
     // For scatter plots, exclude Treatment and Treatment Name columns
     if (isScatterPlot) {
         m_headers = {"Experiment", "Crop", "Variable", "n", "R²", "RMSE", "d-stat",
-                     "BIAS", "MSEs/MSE", "MSEu/MSE"};
+                     "Bias", "MSEs/MSE", "MSEu/MSE"};
     } else {
         m_headers = {"Treatment", "Treatment Name", "Experiment", "Crop", "Variable", "n", "Obs. Mean", "Sim. Mean", "R²", "RMSE", "NRMSE", "d-stat"};
     }
@@ -78,7 +78,7 @@ MetricsTableModel::MetricsTableModel(const QVariantList& data, bool isScatterPlo
     m_keyMap["RMSE"] = {"RMSE", "rmse", "root_mean_square_error"};
     m_keyMap["NRMSE"] = {"NRMSE", "nrmse", "normalized_rmse"};
     m_keyMap["d-stat"] = {"d-stat", "Willmott's d-stat", "d_stat", "dstat", "willmott_d"};
-    m_keyMap["BIAS"] = {"BIAS", "BiasIndex", "Bias Index", "Bias index", "bias_index"};
+    m_keyMap["Bias"] = {"BIAS", "BiasIndex", "Bias Index", "Bias index", "bias_index"};
     m_keyMap["MSEs"]     = {"MSEs", "MSE systematic", "MSE_systematic", "MSE_s"};
     m_keyMap["MSEu"]     = {"MSEu", "MSE unsystematic", "MSE_unsystematic", "MSE_u"};
     m_keyMap["MSEs/MSE"] = {"MSEs", "MSE systematic", "MSE_systematic", "MSE_s"};
@@ -147,7 +147,7 @@ QVariant MetricsTableModel::data(const QModelIndex& index, int role) const
         
         if (columnName == "n" || columnName == "Obs. Mean" || columnName == "Sim. Mean" ||
             columnName == "RMSE" || columnName == "NRMSE" || columnName == "d-stat" ||
-            columnName == "BIAS" || columnName == "MSEs" || columnName == "MSEu" ||
+            columnName == "Bias" || columnName == "MSEs" || columnName == "MSEu" ||
             columnName == "MSEs/MSE" || columnName == "MSEu/MSE") {
             // See R² branch above: canConvert<double>() alone doesn't catch a
             // non-numeric placeholder string, which toDouble() would silently read as 0.
@@ -164,7 +164,7 @@ QVariant MetricsTableModel::data(const QModelIndex& index, int role) const
                     return QString::number(value.toDouble(), 'f', 3);
                 } else if (columnName == "NRMSE") {
                     return QString::number(value.toDouble(), 'f', 2) + "%";
-                } else if (columnName == "BIAS") {
+                } else if (columnName == "Bias") {
                     return QString::number(value.toDouble(), 'f', 4);
                 } else if (columnName == "MSEs/MSE" || columnName == "MSEu/MSE") {
                     // Show as fraction of total MSE
@@ -219,7 +219,7 @@ QVariant MetricsTableModel::data(const QModelIndex& index, int role) const
                 return QBrush(QColor("#ffcdd2"));
             }
         }
-        if (columnName == "BIAS") {
+        if (columnName == "Bias") {
             bool ok = false;
             double v = value.toDouble(&ok);
             if (ok) {

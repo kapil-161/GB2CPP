@@ -405,7 +405,12 @@ void PlotWidget::applyPlotSettings(const PlotSettings &settings, bool skipAxisRa
                     va->setGridLineVisible(settings.showGrid);
                     va->setMinorGridLineVisible(settings.showMinorGrid);
                     va->setMinorTickCount(settings.showMinorGrid ? settings.minorTickCount : 0);
-                    va->setTickCount(qMin(tickCount, va->tickCount() > 0 ? 10 : 6));
+                    // Never exceed the round-number count plotScatter already chose for
+                    // this panel's range. Forcing the global count (default 10) here put
+                    // ~10 evenly-spaced, non-round ticks on the narrow square panels, so
+                    // the 3-4 digit X labels collided and Qt elided them to "...".
+                    // (qMin lets a user still reduce ticks live; it just won't crowd them.)
+                    va->setTickCount(qMin(tickCount, va->tickCount()));
                 }
                 if (ch->axes(Qt::Horizontal).contains(axis))
                     axis->setTitleText(settings.showAxisTitles ? "Simulated" : "");
@@ -658,8 +663,11 @@ void PlotWidget::loadSettings()
 
     // Metrics overlays
     QStringList savedScatterMetrics = s.value("scatterMetrics", QStringList()).toStringList();
-    if (!savedScatterMetrics.isEmpty())
+    if (!savedScatterMetrics.isEmpty()) {
+        // Migrate the old all-caps "BIAS" selection key to the current "Bias" label.
+        savedScatterMetrics.replaceInStrings("BIAS", "Bias");
         m_plotSettings.scatterMetrics = QSet<QString>(savedScatterMetrics.begin(), savedScatterMetrics.end());
+    }
 
     QStringList savedTsMetrics = s.value("tsMetrics", QStringList()).toStringList();
     if (!savedTsMetrics.isEmpty())

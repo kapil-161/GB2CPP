@@ -400,6 +400,7 @@ void CommandLineHandler::headlessScatterPlot()
             s.scatterMetrics.clear();
             for (const QString &m : m_args.scatterMetrics) {
                 if (m == "R2") s.scatterMetrics.insert("R\xc2\xb2");  // R²
+                else if (m.compare("BIAS", Qt::CaseInsensitive) == 0) s.scatterMetrics.insert("Bias");
                 else s.scatterMetrics.insert(m);
             }
             plot->setPlotSettings(s);
