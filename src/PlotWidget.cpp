@@ -165,7 +165,19 @@ void PlotWidget::setupUI()
     m_leftContainer->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
     m_leftLayout = new QVBoxLayout(m_leftContainer);
     m_leftLayout->setContentsMargins(0, 0, 0, 0);
-    
+
+    // Floating "Reset zoom" button — appears (top-right of the plot area) only once
+    // the user has zoomed/panned a chart or panel away from the standard view.
+    m_resetZoomButton = new QPushButton(QString::fromUtf8("\xE2\x9F\xB2  Reset zoom"), m_leftContainer);
+    m_resetZoomButton->setCursor(Qt::PointingHandCursor);
+    m_resetZoomButton->setToolTip("Restore the standard view (undo zoom/pan)");
+    m_resetZoomButton->setStyleSheet(
+        "QPushButton { background:#1565C0; color:white; border:none; border-radius:4px; "
+        "padding:5px 12px; font-weight:bold; }"
+        "QPushButton:hover { background:#0d47a1; }");
+    m_resetZoomButton->hide();
+    connect(m_resetZoomButton, &QPushButton::clicked, this, &PlotWidget::resetAllZoom);
+
     // Chart view will be added in setupChart()
     
     // Bottom container with X-axis buttons and scaling label
@@ -611,11 +623,39 @@ void PlotWidget::enforceAxisColors()
     }
 }
 
+void PlotWidget::showResetZoomButton()
+{
+    if (!m_resetZoomButton || !m_leftContainer) return;
+    int bw = m_resetZoomButton->sizeHint().width();
+    m_resetZoomButton->move(m_leftContainer->width() - bw - 16, 10);
+    m_resetZoomButton->raise();
+    m_resetZoomButton->show();
+}
+
+void PlotWidget::hideResetZoomButton()
+{
+    if (m_resetZoomButton) m_resetZoomButton->hide();
+}
+
+void PlotWidget::resetAllZoom()
+{
+    // Restore every chart/panel to its standard view.
+    if (m_chartView && m_chartView->chart()) m_chartView->chart()->zoomReset();
+    for (ErrorBarChartView *cv : m_tsPanelViews)
+        if (cv && cv->chart()) cv->chart()->zoomReset();
+    for (QChartView *cv : m_scatterPanelViews)
+        if (cv && cv->chart()) cv->chart()->zoomReset();
+    m_isZoomed = false;
+    if (!m_isScatterMode && !m_isBoxPlotMode) autoFitAxes();
+    hideResetZoomButton();
+}
+
 void PlotWidget::autoFitAxes()
 {
     m_autoFitPending = false;
     m_isZoomed = false;
-    
+    hideResetZoomButton();  // back to standard view
+
     
     auto series = m_chart->series();
     if (series.isEmpty()) {
@@ -1060,6 +1100,10 @@ void PlotWidget::resizeEvent(QResizeEvent *event)
     // Keep scatter panels square on window resize
     if (m_isScatterMode && m_scatterPanelContainer && m_scatterPanelContainer->isVisible())
         resizeScatterPanels();
+
+    // Keep the floating reset-zoom button pinned to the top-right of the plot area
+    if (m_resetZoomButton && m_resetZoomButton->isVisible())
+        showResetZoomButton();
 }
 
 void PlotWidget::plotTimeSeries(
@@ -4270,6 +4314,7 @@ bool PlotWidget::eventFilter(QObject* obj, QEvent* event)
             else
                 m_chartView->chart()->zoom(1.0 / scaleFactor);
             m_isZoomed = true;
+            showResetZoomButton();
             return true;
         }
         else if (event->type() == QEvent::MouseButtonDblClick) {
@@ -4279,6 +4324,7 @@ bool PlotWidget::eventFilter(QObject* obj, QEvent* event)
                     m_chartView->chart()->zoomReset();
                     autoFitAxes();
                     m_isZoomed = false;
+                    hideResetZoomButton();
                 } else {
                     // Zoom in 2x centred on the cursor
                     QPoint vpos = (obj == m_chartView->viewport())
@@ -4294,6 +4340,7 @@ bool PlotWidget::eventFilter(QObject* obj, QEvent* event)
                     zoomRect = zoomRect.intersected(plotArea);
                     m_chart->zoomIn(zoomRect);
                     m_isZoomed = true;
+                    showResetZoomButton();
                 }
                 return true;
             }
@@ -4304,6 +4351,7 @@ bool PlotWidget::eventFilter(QObject* obj, QEvent* event)
                 m_chartView->chart()->zoomReset();
                 autoFitAxes();
                 m_isZoomed = false;
+                hideResetZoomButton();
                 return true;
             }
             else if (mouseEvent->button() == Qt::RightButton) {
@@ -4342,6 +4390,10 @@ bool PlotWidget::eventFilter(QObject* obj, QEvent* event)
                     if (hit) {
                         selectLegendRowForSeries(hit);
                     }
+                } else {
+                    // A left-drag rectangle is a rubber-band zoom → offer the reset.
+                    m_isZoomed = true;
+                    showResetZoomButton();
                 }
             }
         }

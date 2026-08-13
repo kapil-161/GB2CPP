@@ -219,6 +219,12 @@ public:
     void setData(const DataTable &data);
     void setupAxes(const QString &xVar);
     void autoFitAxes();
+
+    // Floating "Reset zoom" affordance: shown once the user zooms/pans any chart or
+    // panel away from the standard view; clicking it restores every view.
+    void showResetZoomButton();
+    void hideResetZoomButton();
+    void resetAllZoom();
     double calculateNiceMax(double rawMax);
     double calculateNiceInterval(double max);
     double calculateNiceXInterval(double range);
@@ -556,6 +562,7 @@ private:
     QGridLayout *m_scatterPanelGrid = nullptr;
     QScrollArea *m_scatterScrollArea = nullptr;
     QVector<QChartView*> m_scatterPanelViews;
+    QPushButton *m_resetZoomButton = nullptr;  // floating "Reset zoom" overlay
     int m_scatterNCols = 1;
     int m_scatterNRows = 1;
 

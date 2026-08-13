@@ -129,9 +129,11 @@ public:
         const QString &xVar,
         const QVector<ErrorBarChartView::SegmentInfo> &segments,
         bool showTooltip,
+        PlotWidget *owner,
         QObject *parent = nullptr)
         : QObject(parent), m_cv(cv), m_seriesMap(seriesMap),
-          m_xVar(xVar), m_segments(segments), m_showTooltip(showTooltip) {}
+          m_xVar(xVar), m_segments(segments), m_showTooltip(showTooltip),
+          m_owner(owner) {}
 
 protected:
     bool eventFilter(QObject *obj, QEvent *event) override
@@ -144,6 +146,7 @@ protected:
             const double k = 1.15;
             m_cv->chart()->zoom(we->angleDelta().y() > 0 ? k : 1.0 / k);
             m_isZoomed = true;
+            if (m_owner) m_owner->showResetZoomButton();
             return true;
         }
         if (event->type() == QEvent::MouseButtonDblClick) {
@@ -152,6 +155,7 @@ protected:
                 if (m_isZoomed) {
                     m_cv->chart()->zoomReset();
                     m_isZoomed = false;
+                    if (m_owner) m_owner->hideResetZoomButton();
                 } else {
                     QPoint vpos = viewportPos(obj, me);
                     QPointF chartPos = m_cv->chart()->mapFromScene(m_cv->mapToScene(vpos));
@@ -161,6 +165,7 @@ protected:
                     QRectF zoomRect(chartPos.x() - w / 2.0, chartPos.y() - h / 2.0, w, h);
                     m_cv->chart()->zoomIn(zoomRect.intersected(plotArea));
                     m_isZoomed = true;
+                    if (m_owner) m_owner->showResetZoomButton();
                 }
                 return true;
             }
@@ -170,6 +175,7 @@ protected:
             if (me->button() == Qt::MiddleButton) {
                 m_cv->chart()->zoomReset();
                 m_isZoomed = false;
+                if (m_owner) m_owner->hideResetZoomButton();
                 return true;
             }
             if (me->button() == Qt::RightButton) {
@@ -326,6 +332,7 @@ private:
     QVector<ErrorBarChartView::SegmentInfo> m_segments;
     bool m_showTooltip;
     bool m_isZoomed = false;
+    PlotWidget *m_owner = nullptr;
     QPointer<QLabel> m_tooltip;
 };
 
@@ -943,7 +950,7 @@ void PlotWidget::plotTimeSeriesMultiPanel()
         cv->viewport()->setMouseTracking(true);
         auto *panelFilter = new PanelEventFilter(
             cv, panelSeriesMap, m_currentXVar, globalSegInfos,
-            m_plotSettings.showHoverTooltip, cv); // parented to cv — auto-deleted
+            m_plotSettings.showHoverTooltip, this, cv); // parented to cv — auto-deleted
         cv->installEventFilter(panelFilter);
         cv->viewport()->installEventFilter(panelFilter);
         cv->setErrorBarData(panelErrorBars);
@@ -1236,7 +1243,7 @@ QWidget* PlotWidget::buildTSPanelCell(
     cv->setMouseTracking(true);
     cv->viewport()->setMouseTracking(true);
     auto *panelFilter = new PanelEventFilter(cv, panelSeriesMap, m_currentXVar, segInfos,
-                                             m_plotSettings.showHoverTooltip, cv);
+                                             m_plotSettings.showHoverTooltip, this, cv);
     cv->installEventFilter(panelFilter);
     cv->viewport()->installEventFilter(panelFilter);
     cv->setErrorBarData(panelErrorBars);
