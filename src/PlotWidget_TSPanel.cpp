@@ -428,7 +428,10 @@ void PlotWidget::plotTimeSeriesMultiPanel()
         m_tsScrollArea = new QScrollArea();
         m_tsScrollArea->setWidgetResizable(false);
         m_tsScrollArea->setFrameShape(QFrame::NoFrame);
-        m_tsScrollArea->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+        // Show the horizontal scroll bar when the grid is wider than the viewport
+        // (the experiment x variable grid keeps a 260px min panel width rather than
+        // squishing, so it can overflow horizontally).
+        m_tsScrollArea->setHorizontalScrollBarPolicy(Qt::ScrollBarAsNeeded);
         m_tsScrollArea->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
         m_tsScrollArea->setWidgetResizable(true);
 
