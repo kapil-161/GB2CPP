@@ -1101,6 +1101,13 @@ void PlotWidget::resizeEvent(QResizeEvent *event)
     if (m_isScatterMode && m_scatterPanelContainer && m_scatterPanelContainer->isVisible())
         resizeScatterPanels();
 
+    // Re-fit the time-series multi-panel grid so its panels grow/shrink to fill the
+    // new area instead of staying at their earlier (possibly fallback) size and
+    // leaving large empty margins. Deferred so the scroll-area viewport has already
+    // taken its new geometry when we read it.
+    if (m_tsPanelContainer && m_tsPanelContainer->isVisible())
+        QTimer::singleShot(0, this, [this]() { resizeTimeSeriesPanels(); });
+
     // Keep the floating reset-zoom button pinned to the top-right of the plot area
     if (m_resetZoomButton && m_resetZoomButton->isVisible())
         showResetZoomButton();
