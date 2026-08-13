@@ -564,6 +564,9 @@ private:
     QGridLayout *m_tsPanelGrid = nullptr;
     QScrollArea *m_tsScrollArea = nullptr;
     QVector<ErrorBarChartView*> m_tsPanelViews;
+    // Parallel to m_tsPanelViews in the experiment × variable grid: each cell's
+    // (experiment, variable) so the async metrics refresh can place per-cell chips.
+    QVector<QPair<QString,QString>> m_tsGridCells;
     int m_tsNCols = 1;
     int m_tsNRows = 1;
 

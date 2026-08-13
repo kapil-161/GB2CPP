@@ -413,6 +413,10 @@ void PlotWidget::plotTimeSeriesMultiPanel()
 
     // Remove single-panel overlay when switching to multi-panel
     if (m_tsMetricsOverlay) { delete m_tsMetricsOverlay; m_tsMetricsOverlay = nullptr; }
+    // Destroy the previous render's panel metric chips explicitly. Just clearing the
+    // map left the label widgets alive until their parent panel's deferred delete ran,
+    // so a stale chip (e.g. the per-variable pooled value) could linger on the new grid.
+    for (QLabel *lbl : m_tsPanelOverlays.values()) if (lbl) { lbl->hide(); lbl->deleteLater(); }
     m_tsPanelOverlays.clear();
 
     // --- Hide single chart, show TS panel area ---
@@ -544,6 +548,7 @@ void PlotWidget::plotTimeSeriesMultiPanel()
         const QStringList &rows = gridExpOrder;  // experiments → rows
         int nCols = cols.size(), nRows = rows.size();
         m_tsNCols = nCols; m_tsNRows = nRows;
+        m_tsGridCells.clear();
         for (int c = 0; c < nCols; ++c) m_tsPanelGrid->setColumnStretch(c, 1);
 
         // Per-column shared Y max
@@ -580,6 +585,10 @@ void PlotWidget::plotTimeSeriesMultiPanel()
                                                isDateAxis, hasBreaks,
                                                globalBreakInfos, globalSegInfos,
                                                expCode, allXAxes);
+                // Record this cell's (experiment, variable) parallel to m_tsPanelViews
+                // (buildTSPanelCell appended its view) so the async metrics refresh
+                // can place the correct per-cell chip.
+                m_tsGridCells.append(qMakePair(expCode, varCode));
                 m_tsPanelGrid->addWidget(pw, ri, ci);
             }
         }
@@ -1165,10 +1174,11 @@ QWidget* PlotWidget::buildTSPanelCell(
     else           cv->clearAxisBreaks();
     panelLayout->addWidget(cv, 1);
 
-    // --- Metrics chip, pooled over this cell's series (variable + experiment) ---
+    // --- Metrics chip: pool this cell's treatments from m_lastTSMetrics, filtered by
+    //     BOTH variable and experiment so each cell shows its own experiment's fit
+    //     (not the variable-pooled value). ---
     if (!m_plotSettings.tsMetrics.isEmpty() && !m_lastTSMetrics.isEmpty()) {
         double totalN = 0, sumSS = 0, sumObsMean = 0, sumDStat = 0;
-        double pooledDStat = -1.0;
         for (const auto &m : m_lastTSMetrics) {
             if (m.value("Variable").toString() != varCode) continue;
             if (!metricExpFilter.isEmpty() && m.value("Experiment").toString() != metricExpFilter) continue;
@@ -1178,14 +1188,13 @@ QWidget* PlotWidget::buildTSPanelCell(
             totalN += n; sumSS += n * rmse * rmse;
             sumObsMean += n * m.value("ObsMean").toDouble();
             sumDStat   += n * m.value("Willmott's d-stat").toDouble();
-            if (pooledDStat < 0 && m.contains("PooledDStat")) pooledDStat = m.value("PooledDStat").toDouble();
         }
         QStringList statsLines;
         if (totalN > 0) {
             double rmse = std::sqrt(sumSS / totalN);
             double obsMean = sumObsMean / totalN;
             double nrmse = (obsMean > 0) ? (rmse / obsMean) * 100.0 : 0.0;
-            double dStat = (pooledDStat >= 0) ? pooledDStat : sumDStat / totalN;
+            double dStat = sumDStat / totalN;   // n-weighted over this cell's treatments
             if (m_plotSettings.tsMetrics.contains("N"))     statsLines << QString("N = %1").arg((int)totalN);
             if (m_plotSettings.tsMetrics.contains("RMSE"))  statsLines << QString("RMSE = %1").arg(rmse, 0, 'f', rmse < 1 ? 3 : (rmse < 100 ? 2 : 1));
             if (m_plotSettings.tsMetrics.contains("NRMSE")) statsLines << QString("NRMSE = %1%").arg(nrmse, 0, 'f', 1);
@@ -1364,6 +1373,66 @@ void PlotWidget::buildMultiPanelLegend()
 void PlotWidget::refreshTSMetricsOverlay()
 {
     if (m_plotSettings.tsMetrics.isEmpty() || m_lastTSMetrics.isEmpty()) return;
+
+    // Experiment × variable grid: place a chip per cell, keyed on the cell's own
+    // (experiment, variable) from m_tsGridCells — the per-variable path below assumes
+    // m_tsPanelViews[vi] is variable vi's panel, which is false for the 2-D grid.
+    if (m_plotSettings.multiPanelTimeSeries && m_plotSettings.gridByExperiment
+        && !m_tsGridCells.isEmpty()) {
+        int statsFontPt = qBound(7, m_plotSettings.axisTickFontSize, 13);
+        QSet<QString> metricSet(m_plotSettings.tsMetrics.begin(), m_plotSettings.tsMetrics.end());
+        for (int i = 0; i < m_tsPanelViews.size() && i < m_tsGridCells.size(); ++i) {
+            ErrorBarChartView *cv = m_tsPanelViews[i];
+            if (!cv) continue;
+            QWidget *panelWidget = cv->parentWidget();
+            if (!panelWidget) continue;
+            const QString exp = m_tsGridCells[i].first;
+            const QString var = m_tsGridCells[i].second;
+
+            double totalN = 0, sumSS = 0, sumObsMean = 0, sumDStat = 0;
+            for (const auto &m : m_lastTSMetrics) {
+                if (m.value("Variable").toString() != var) continue;
+                if (m.value("Experiment").toString() != exp) continue;
+                double n = m.value("n").toDouble();
+                if (n <= 0) continue;
+                double rmse = m.value("RMSE").toDouble();
+                totalN += n; sumSS += n * rmse * rmse;
+                sumObsMean += n * m.value("ObsMean").toDouble();
+                sumDStat   += n * m.value("Willmott's d-stat").toDouble();
+            }
+            if (totalN <= 0) continue;
+            double rmse = std::sqrt(sumSS / totalN);
+            double obsMean = sumObsMean / totalN;
+            double nrmse = (obsMean > 0) ? (rmse / obsMean) * 100.0 : 0.0;
+            double dStat = sumDStat / totalN;
+
+            QStringList statsLines;
+            if (metricSet.contains("N"))     statsLines << QString("N = %1").arg((int)totalN);
+            if (metricSet.contains("RMSE"))  statsLines << QString("RMSE = %1").arg(rmse, 0, 'f', rmse < 1 ? 3 : (rmse < 100 ? 2 : 1));
+            if (metricSet.contains("NRMSE")) statsLines << QString("NRMSE = %1%").arg(nrmse, 0, 'f', 1);
+            if (metricSet.contains("d-stat"))statsLines << QString("d = %1").arg(dStat, 0, 'f', 3);
+            if (statsLines.isEmpty()) continue;
+
+            const QString overlayKey = exp + "::" + var;
+            if (m_tsPanelOverlays.contains(overlayKey) && m_tsPanelOverlays[overlayKey]) {
+                m_tsPanelOverlays[overlayKey]->setText(statsLines.join("\n"));
+                m_tsPanelOverlays[overlayKey]->adjustSize();
+                m_tsPanelOverlays[overlayKey]->show();
+            } else {
+                QLabel *statsLabel = new QLabel(statsLines.join("\n"), panelWidget);
+                statsLabel->setStyleSheet(QString(
+                    "QLabel { background: rgba(255,255,255,220); font-size: %1pt; "
+                    "padding: 4px 7px; border: 1px solid rgba(0,0,0,40); border-radius: 3px; }").arg(statsFontPt));
+                statsLabel->setAlignment(Qt::AlignLeft | Qt::AlignTop);
+                statsLabel->show(); statsLabel->adjustSize();
+                statsLabel->move(28, 28);
+                statsLabel->raise();
+                new DraggableOverlay(cv, statsLabel, statsLabel);
+                m_tsPanelOverlays[overlayKey] = statsLabel;
+            }
+        }
+        return;
+    }
 
     bool isMultiPanel = m_plotSettings.multiPanelTimeSeries
                         && m_currentYVars.size() >= 2

@@ -340,6 +340,7 @@ void CommandLineHandler::headlessAutoPlot()
         PlotSettings s = plot->getPlotSettings();
         s.multiPanelTimeSeries = true;
         s.gridByExperiment = true;
+        if (s.tsMetrics.isEmpty()) s.tsMetrics = {"RMSE", "d-stat"};
         plot->setPlotSettings(s);
     }
 
