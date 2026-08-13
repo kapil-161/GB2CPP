@@ -540,10 +540,10 @@ void PlotWidget::plotTimeSeriesMultiPanel()
     }
 
     // === Experiment × Variable grid ======================================
-    // Rows = experiments, columns = variables. Y is shared down each column so a
-    // variable reads on one scale across all experiments; X is shared everywhere.
+    // Rows = experiments, columns = variables. Y is shared down each column (a
+    // variable reads on one scale across experiments); X is shared across each ROW
+    // so each experiment keeps its own time window and its variables align in time.
     if (wantGrid) {
-        QVector<QAbstractAxis*> allXAxes;
         const QStringList &cols = varOrder;      // variables  → columns
         const QStringList &rows = gridExpOrder;  // experiments → rows
         int nCols = cols.size(), nRows = rows.size();
@@ -568,8 +568,34 @@ void PlotWidget::plotTimeSeriesMultiPanel()
             colYMax[ci] = (mx > 0.0) ? mx : 1.0;
         }
 
+        static bool gsync = false;  // shared re-entrancy guard for row X-sync
         for (int ri = 0; ri < nRows; ++ri) {
             const QString &expCode = rows[ri];
+
+            // Per-experiment (row) X range so each experiment keeps its own time
+            // window instead of being compressed into one global range. Axis-break
+            // (multi-year gap) mode uses virtual coordinates, so keep the global
+            // range there.
+            double rXMin = globalXMin, rXMax = globalXMax, rDataXMin = dataXMin;
+            if (!hasBreaks) {
+                double lo = std::numeric_limits<double>::max();
+                double hi = std::numeric_limits<double>::lowest();
+                for (const auto &pd : m_plotDataList) {
+                    if (pd->experiment != expCode) continue;
+                    for (const QPointF &pt : pd->points) { lo = qMin(lo, pt.x()); hi = qMax(hi, pt.x()); }
+                }
+                if (m_snapshotActive)
+                    for (const auto &sp : m_snapshotDataList)
+                        if (sp->experiment == expCode)
+                            for (const QPointF &pt : sp->points) { lo = qMin(lo, pt.x()); hi = qMax(hi, pt.x()); }
+                if (lo < hi) {
+                    rDataXMin = lo;
+                    double xpad = (hi - lo) * 0.02;
+                    rXMin = lo - xpad; rXMax = hi + xpad;
+                }
+            }
+
+            QVector<QAbstractAxis*> rowXAxes;
             for (int ci = 0; ci < nCols; ++ci) {
                 const QString &varCode = cols[ci];
                 QVector<QSharedPointer<PlotData>> cellData;
@@ -581,35 +607,34 @@ void PlotWidget::plotTimeSeriesMultiPanel()
                 // Leftmost column also names the experiment (row header); others show the variable.
                 QString strip = (ci == 0) ? (expCode + "  ·  " + varLabel) : varLabel;
                 QWidget *pw = buildTSPanelCell(cellData, varCode, strip, colYMax[ci],
-                                               globalXMin, globalXMax, dataXMin,
+                                               rXMin, rXMax, rDataXMin,
                                                isDateAxis, hasBreaks,
                                                globalBreakInfos, globalSegInfos,
-                                               expCode, allXAxes);
+                                               expCode, rowXAxes);
                 // Record this cell's (experiment, variable) parallel to m_tsPanelViews
                 // (buildTSPanelCell appended its view) so the async metrics refresh
                 // can place the correct per-cell chip.
                 m_tsGridCells.append(qMakePair(expCode, varCode));
                 m_tsPanelGrid->addWidget(pw, ri, ci);
             }
-        }
 
-        // Cross-panel X-axis sync (zoom one → all follow)
-        if (allXAxes.size() > 1) {
-            static bool gsync = false;
-            for (QAbstractAxis *ax : allXAxes) {
-                QVector<QAbstractAxis*> others = allXAxes;
-                if (auto *dt = qobject_cast<QDateTimeAxis*>(ax)) {
-                    QObject::connect(dt, &QDateTimeAxis::rangeChanged, dt,
-                        [others, dt](const QDateTime &mn, const QDateTime &mx){
-                            if (gsync) return; gsync = true;
-                            for (auto *o : others) if (o != dt) if (auto *d = qobject_cast<QDateTimeAxis*>(o)) d->setRange(mn, mx);
-                            gsync = false; });
-                } else if (auto *v = qobject_cast<QValueAxis*>(ax)) {
-                    QObject::connect(v, &QValueAxis::rangeChanged, v,
-                        [others, v](qreal mn, qreal mx){
-                            if (gsync) return; gsync = true;
-                            for (auto *o : others) if (o != v) if (auto *w = qobject_cast<QValueAxis*>(o)) w->setRange(mn, mx);
-                            gsync = false; });
+            // Sync X only within this row (same experiment share a time window)
+            if (rowXAxes.size() > 1) {
+                QVector<QAbstractAxis*> group = rowXAxes;
+                for (QAbstractAxis *ax : rowXAxes) {
+                    if (auto *dt = qobject_cast<QDateTimeAxis*>(ax)) {
+                        QObject::connect(dt, &QDateTimeAxis::rangeChanged, dt,
+                            [group, dt](const QDateTime &mn, const QDateTime &mx){
+                                if (gsync) return; gsync = true;
+                                for (auto *o : group) if (o != dt) if (auto *d = qobject_cast<QDateTimeAxis*>(o)) d->setRange(mn, mx);
+                                gsync = false; });
+                    } else if (auto *v = qobject_cast<QValueAxis*>(ax)) {
+                        QObject::connect(v, &QValueAxis::rangeChanged, v,
+                            [group, v](qreal mn, qreal mx){
+                                if (gsync) return; gsync = true;
+                                for (auto *o : group) if (o != v) if (auto *w = qobject_cast<QValueAxis*>(o)) w->setRange(mn, mx);
+                                gsync = false; });
+                    }
                 }
             }
         }
