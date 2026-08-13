@@ -567,6 +567,7 @@ private:
     // Parallel to m_tsPanelViews in the experiment × variable grid: each cell's
     // (experiment, variable) so the async metrics refresh can place per-cell chips.
     QVector<QPair<QString,QString>> m_tsGridCells;
+    bool m_tsGridHasHeaders = false;  // grid mode adds a vertical experiment-header column at col 0
     int m_tsNCols = 1;
     int m_tsNRows = 1;
 

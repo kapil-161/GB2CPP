@@ -16,8 +16,38 @@
 #include <QDebug>
 #include <QFontMetrics>
 #include <QTextDocument>
+#include <QPainter>
 #include <limits>
 #include "MetricsCalculator.h"
+
+// ---------------------------------------------------------------------------
+// VerticalLabel — paints text rotated 90° (reading bottom-to-top). Used as the
+// experiment row header down the left edge of the experiment × variable grid.
+// ---------------------------------------------------------------------------
+class VerticalLabel : public QWidget {
+public:
+    explicit VerticalLabel(const QString &text, QWidget *parent = nullptr)
+        : QWidget(parent), m_text(text)
+    {
+        setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Expanding);
+    }
+    QSize sizeHint() const override {
+        QFontMetrics fm(font());
+        return QSize(fm.height() + 10, fm.horizontalAdvance(m_text) + 20);
+    }
+protected:
+    void paintEvent(QPaintEvent *) override {
+        QPainter p(this);
+        p.setRenderHint(QPainter::Antialiasing);
+        QFont f = font(); f.setBold(true); p.setFont(f);
+        p.setPen(QColor("#3a4453"));
+        p.translate(0, height());
+        p.rotate(-90);
+        p.drawText(QRect(0, 0, height(), width()), Qt::AlignCenter, m_text);
+    }
+private:
+    QString m_text;
+};
 
 // ---------------------------------------------------------------------------
 // DraggableOverlay — makes a metrics QLabel draggable inside its parent
@@ -323,10 +353,14 @@ void PlotWidget::resizeTimeSeriesPanels()
     if (availW < 300) availW = 800;
     if (availH < 200) availH = 600;
 
+    // Vertical experiment-header column (grid mode only) reserves a fixed strip at col 0.
+    int headerW = m_tsGridHasHeaders ? 26 : 0;
+    int totalCols = nCols + (m_tsGridHasHeaders ? 1 : 0);
+
     // Landscape panels: divide available space by visible rows only (max 3 rows shown at once).
     // Extra rows scroll — this prevents panels from shrinking when many variables are selected.
     int visibleRows = qMin(nRows, 3);
-    int panelW = (availW - margins - spacing * (nCols - 1)) / nCols;
+    int panelW = (availW - margins - headerW - spacing * (totalCols - 1)) / nCols;
     int panelH = (availH - margins - spacing * (visibleRows - 1)) / visibleRows;
 
     // Enforce a minimum and a 3:2 ratio (width:height)
@@ -340,9 +374,14 @@ void PlotWidget::resizeTimeSeriesPanels()
     for (int i = 0; i < m_tsPanelGrid->count(); ++i) {
         QLayoutItem *item = m_tsPanelGrid->itemAt(i);
         if (!item || !item->widget()) continue;
-        item->widget()->setFixedSize(panelW, panelH);
+        int r = 0, c = 0, rs = 0, cs = 0;
+        m_tsPanelGrid->getItemPosition(i, &r, &c, &rs, &cs);
+        if (m_tsGridHasHeaders && c == 0)
+            item->widget()->setFixedSize(headerW, panelH);   // vertical row header
+        else
+            item->widget()->setFixedSize(panelW, panelH);
     }
-    int cW = panelW * nCols + spacing * (nCols - 1) + margins;
+    int cW = headerW + panelW * nCols + spacing * (totalCols - 1) + margins;
     int cH = panelH * nRows + spacing * (nRows - 1) + margins;
     m_tsPanelContainer->setFixedSize(cW, cH);
 }
@@ -426,6 +465,7 @@ void PlotWidget::plotTimeSeriesMultiPanel()
     // Destroy old panel chart views
     for (ErrorBarChartView *cv : m_tsPanelViews) cv->deleteLater();
     m_tsPanelViews.clear();
+    m_tsGridHasHeaders = false;  // only the experiment grid re-enables this
 
     // Create scroll area + container/grid on first use
     if (!m_tsScrollArea) {
@@ -549,7 +589,10 @@ void PlotWidget::plotTimeSeriesMultiPanel()
         int nCols = cols.size(), nRows = rows.size();
         m_tsNCols = nCols; m_tsNRows = nRows;
         m_tsGridCells.clear();
-        for (int c = 0; c < nCols; ++c) m_tsPanelGrid->setColumnStretch(c, 1);
+        // Column 0 holds the vertical experiment (row) header; panels sit in 1..nCols.
+        m_tsGridHasHeaders = true;
+        m_tsPanelGrid->setColumnStretch(0, 0);
+        for (int c = 1; c <= nCols; ++c) m_tsPanelGrid->setColumnStretch(c, 1);
 
         // Per-column shared Y max
         QVector<double> colYMax(nCols, 1.0);
@@ -595,6 +638,10 @@ void PlotWidget::plotTimeSeriesMultiPanel()
                 }
             }
 
+            // Vertical experiment header down the left edge of this row.
+            VerticalLabel *rowHeader = new VerticalLabel(expCode);
+            m_tsPanelGrid->addWidget(rowHeader, ri, 0);
+
             QVector<QAbstractAxis*> rowXAxes;
             for (int ci = 0; ci < nCols; ++ci) {
                 const QString &varCode = cols[ci];
@@ -604,9 +651,8 @@ void PlotWidget::plotTimeSeriesMultiPanel()
                         cellData.append(pd);
                 QPair<QString,QString> vinf = DataProcessor::getVariableInfo(varCode);
                 QString varLabel = vinf.first.isEmpty() ? varCode : vinf.first;
-                // Leftmost column also names the experiment (row header); others show the variable.
-                QString strip = (ci == 0) ? (expCode + "  ·  " + varLabel) : varLabel;
-                QWidget *pw = buildTSPanelCell(cellData, varCode, strip, colYMax[ci],
+                // Experiment is now the vertical row header, so every cell shows just the variable.
+                QWidget *pw = buildTSPanelCell(cellData, varCode, varLabel, colYMax[ci],
                                                rXMin, rXMax, rDataXMin,
                                                isDateAxis, hasBreaks,
                                                globalBreakInfos, globalSegInfos,
@@ -615,7 +661,7 @@ void PlotWidget::plotTimeSeriesMultiPanel()
                 // (buildTSPanelCell appended its view) so the async metrics refresh
                 // can place the correct per-cell chip.
                 m_tsGridCells.append(qMakePair(expCode, varCode));
-                m_tsPanelGrid->addWidget(pw, ri, ci);
+                m_tsPanelGrid->addWidget(pw, ri, ci + 1);   // +1: column 0 is the header
             }
 
             // Sync X only within this row (same experiment share a time window)
