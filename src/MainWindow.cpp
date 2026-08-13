@@ -2552,15 +2552,46 @@ void MainWindow::onRefreshFiles()
                 previousSelection << item->text();
         }
 
+        // Also remember the X and Y variable selection. Refreshing usually reloads
+        // updated data for the SAME files (e.g. after re-running a simulation), so
+        // the user's variable picks should survive rather than being cleared.
+        QStringList previousYVars;
+        if (m_yVariableComboBox) {
+            for (int i = 0; i < m_yVariableComboBox->count(); ++i) {
+                QListWidgetItem *it = m_yVariableComboBox->item(i);
+                if (it && it->isSelected())
+                    previousYVars << it->data(Qt::UserRole).toString();
+            }
+        }
+        QString previousXVar = m_xVariableComboBox ? m_xVariableComboBox->currentData().toString()
+                                                   : QString();
+
         populateFiles(m_selectedFolder);
 
-        // Restore previous selection (re-select files that still exist after refresh)
+        // Restore previous selection (re-select files that still exist after refresh).
+        // This re-triggers onFileSelectionChanged, which reloads data and rebuilds the
+        // variable combos — so restore the variable selection AFTER this.
         if (m_fileListWidget && !previousSelection.isEmpty()) {
             for (int i = 0; i < m_fileListWidget->count(); ++i) {
                 QListWidgetItem *item = m_fileListWidget->item(i);
                 if (item && previousSelection.contains(item->text()))
                     item->setSelected(true);
             }
+        }
+
+        // Restore X and Y variable selection — re-select whatever still exists in the
+        // reloaded data; variables that are gone are simply left unselected.
+        if (m_yVariableComboBox && !previousYVars.isEmpty()) {
+            for (int i = 0; i < m_yVariableComboBox->count(); ++i) {
+                QListWidgetItem *it = m_yVariableComboBox->item(i);
+                if (it && previousYVars.contains(it->data(Qt::UserRole).toString()))
+                    it->setSelected(true);
+            }
+        }
+        if (m_xVariableComboBox && !previousXVar.isEmpty()) {
+            int xi = m_xVariableComboBox->findData(previousXVar);
+            if (xi != -1)
+                m_xVariableComboBox->setCurrentIndex(xi);
         }
     } else {
         populateFolders();
