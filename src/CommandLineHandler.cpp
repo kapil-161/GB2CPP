@@ -86,7 +86,18 @@ CommandLineArgs CommandLineHandler::parseCommandLineArgs(const QStringList &args
         // Scatter headless mode only needs crop name (1 positional arg)
         if (result.scatterMode && params.size() >= 1) {
             result.cropName = params[0];
-            result.dssatBase = "C:/DSSAT48";
+            // Resolve the DSSAT base the same portable way the rest of the app does
+            // (DSSAT_PATH env var, then Config base/search paths) instead of hardcoding
+            // a Windows path — otherwise headless scatter breaks on macOS or any
+            // non-default install.
+            result.dssatBase = DataProcessor::getDSSATBase();
+            if (result.dssatBase.isEmpty()) {
+#ifdef Q_OS_WIN
+                result.dssatBase = "C:/DSSAT48";
+#else
+                result.dssatBase = "/Applications/DSSAT48";
+#endif
+            }
             result.cropDir = result.dssatBase + "/" + result.cropName;
             result.isValid = true;
             return result;
