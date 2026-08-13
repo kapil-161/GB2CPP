@@ -354,9 +354,21 @@ void PlotWidget::resizeTimeSeriesPanels()
 // ---------------------------------------------------------------------------
 void PlotWidget::plotTimeSeriesMultiPanel()
 {
-    bool wantPanel = m_plotSettings.multiPanelTimeSeries
-                     && m_currentYVars.size() >= 2
-                     && !m_plotDataList.isEmpty();
+    // Distinct experiments present (drives the experiment x variable grid mode)
+    QStringList gridExpOrder;
+    for (const auto &pd : m_plotDataList)
+        if (!pd->experiment.isEmpty() && !gridExpOrder.contains(pd->experiment))
+            gridExpOrder.append(pd->experiment);
+
+    bool wantGrid = m_plotSettings.multiPanelTimeSeries
+                    && m_plotSettings.gridByExperiment
+                    && gridExpOrder.size() >= 2
+                    && !m_plotDataList.isEmpty();
+
+    bool wantPanel = wantGrid
+                     || (m_plotSettings.multiPanelTimeSeries
+                         && m_currentYVars.size() >= 2
+                         && !m_plotDataList.isEmpty());
 
     // --- Revert to single-chart mode ---
     if (!wantPanel) {
@@ -518,6 +530,81 @@ void PlotWidget::plotTimeSeriesMultiPanel()
             si.realEnd      = s.end;
             globalSegInfos.append(si);
         }
+    }
+
+    // === Experiment × Variable grid ======================================
+    // Rows = experiments, columns = variables. Y is shared down each column so a
+    // variable reads on one scale across all experiments; X is shared everywhere.
+    if (wantGrid) {
+        QVector<QAbstractAxis*> allXAxes;
+        const QStringList &cols = varOrder;      // variables  → columns
+        const QStringList &rows = gridExpOrder;  // experiments → rows
+        int nCols = cols.size(), nRows = rows.size();
+        m_tsNCols = nCols; m_tsNRows = nRows;
+        for (int c = 0; c < nCols; ++c) m_tsPanelGrid->setColumnStretch(c, 1);
+
+        // Per-column shared Y max
+        QVector<double> colYMax(nCols, 1.0);
+        for (int ci = 0; ci < nCols; ++ci) {
+            double mx = std::numeric_limits<double>::lowest();
+            for (const auto &pd : m_plotDataList) {
+                if (pd->variable != cols[ci]) continue;
+                for (const QPointF &pt : pd->points) mx = qMax(mx, pt.y());
+                if (pd->isObserved && !pd->errorBars.isEmpty())
+                    for (const ErrorBarData &eb : pd->errorBars) mx = qMax(mx, eb.meanY + eb.errorValue);
+            }
+            if (m_snapshotActive)
+                for (const auto &sp : m_snapshotDataList)
+                    if (sp->variable == cols[ci])
+                        for (const QPointF &pt : sp->points) mx = qMax(mx, pt.y());
+            colYMax[ci] = (mx > 0.0) ? mx : 1.0;
+        }
+
+        for (int ri = 0; ri < nRows; ++ri) {
+            const QString &expCode = rows[ri];
+            for (int ci = 0; ci < nCols; ++ci) {
+                const QString &varCode = cols[ci];
+                QVector<QSharedPointer<PlotData>> cellData;
+                for (const auto &pd : m_plotDataList)
+                    if (pd->variable == varCode && pd->experiment == expCode)
+                        cellData.append(pd);
+                QPair<QString,QString> vinf = DataProcessor::getVariableInfo(varCode);
+                QString varLabel = vinf.first.isEmpty() ? varCode : vinf.first;
+                // Leftmost column also names the experiment (row header); others show the variable.
+                QString strip = (ci == 0) ? (expCode + "  ·  " + varLabel) : varLabel;
+                QWidget *pw = buildTSPanelCell(cellData, varCode, strip, colYMax[ci],
+                                               globalXMin, globalXMax, dataXMin,
+                                               isDateAxis, hasBreaks,
+                                               globalBreakInfos, globalSegInfos,
+                                               expCode, allXAxes);
+                m_tsPanelGrid->addWidget(pw, ri, ci);
+            }
+        }
+
+        // Cross-panel X-axis sync (zoom one → all follow)
+        if (allXAxes.size() > 1) {
+            static bool gsync = false;
+            for (QAbstractAxis *ax : allXAxes) {
+                QVector<QAbstractAxis*> others = allXAxes;
+                if (auto *dt = qobject_cast<QDateTimeAxis*>(ax)) {
+                    QObject::connect(dt, &QDateTimeAxis::rangeChanged, dt,
+                        [others, dt](const QDateTime &mn, const QDateTime &mx){
+                            if (gsync) return; gsync = true;
+                            for (auto *o : others) if (o != dt) if (auto *d = qobject_cast<QDateTimeAxis*>(o)) d->setRange(mn, mx);
+                            gsync = false; });
+                } else if (auto *v = qobject_cast<QValueAxis*>(ax)) {
+                    QObject::connect(v, &QValueAxis::rangeChanged, v,
+                        [others, v](qreal mn, qreal mx){
+                            if (gsync) return; gsync = true;
+                            for (auto *o : others) if (o != v) if (auto *w = qobject_cast<QValueAxis*>(o)) w->setRange(mn, mx);
+                            gsync = false; });
+                }
+            }
+        }
+
+        QTimer::singleShot(0, this, [this]() { resizeTimeSeriesPanels(); });
+        buildMultiPanelLegend();
+        return;
     }
 
     // --- Build one panel per variable ---
@@ -890,6 +977,235 @@ void PlotWidget::plotTimeSeriesMultiPanel()
 
     // --- Build flat treatment legend (one entry per treatment, no variable grouping) ---
     buildMultiPanelLegend();
+}
+
+// ---------------------------------------------------------------------------
+// buildTSPanelCell — construct one panel (strip title + chart view + optional
+// metrics chip) for the given series and return its container widget. Registers
+// the chart view in m_tsPanelViews and its X axis in allXAxes so the caller can
+// sync/resize. Used by the experiment x variable grid; the per-variable panel
+// mode above has its own inline loop.
+// ---------------------------------------------------------------------------
+QWidget* PlotWidget::buildTSPanelCell(
+    const QVector<QSharedPointer<PlotData>>& cellData,
+    const QString& varCode, const QString& stripTitle,
+    double yMaxOverride,
+    double gXMin, double gXMax, double dXMin,
+    bool isDateAxis, bool hasBreaks,
+    const QVector<ErrorBarChartView::BreakInfo>& breakInfos,
+    const QVector<ErrorBarChartView::SegmentInfo>& segInfos,
+    const QString& metricExpFilter,
+    QVector<QAbstractAxis*>& allXAxes)
+{
+    // --- Y range (0-based like the main chart), optionally overridden so a whole
+    //     grid column shares one scale ---
+    double yDataMax = std::numeric_limits<double>::lowest();
+    for (const auto &pd : cellData) {
+        for (const QPointF &pt : pd->points) yDataMax = qMax(yDataMax, pt.y());
+        if (pd->isObserved && !pd->errorBars.isEmpty())
+            for (const ErrorBarData &eb : pd->errorBars) yDataMax = qMax(yDataMax, eb.meanY + eb.errorValue);
+    }
+    if (yMaxOverride > 0.0) yDataMax = yMaxOverride;
+    if (yDataMax <= 0.0) yDataMax = 1.0;
+
+    QChart *chart = new QChart();
+    chart->setBackgroundBrush(QBrush(m_plotSettings.backgroundColor));
+    chart->setPlotAreaBackgroundBrush(QBrush(m_plotSettings.plotAreaColor));
+    chart->setPlotAreaBackgroundVisible(true);
+    chart->legend()->setVisible(false);
+    chart->setMargins(QMargins(8, 0, 4, 4));
+    chart->setTitle("");
+
+    QMap<QAbstractSeries*, QVector<ErrorBarData>>    panelErrorBars;
+    QMap<QAbstractSeries*, QSharedPointer<PlotData>> panelSeriesMap;
+    for (const auto &pd : cellData) {
+        if (pd->isObserved) {
+            QScatterSeries *ss = new QScatterSeries();
+            ss->setColor(pd->color);
+            ss->setBorderColor(pd->color.darker(120));
+            ss->setMarkerSize(m_plotSettings.markerSize);
+            ss->setMarkerShape(getMarkerShape(pd->symbol));
+            ss->setUseOpenGL(false);
+            for (const QPointF &pt : pd->points) ss->append(pt);
+            chart->addSeries(ss);
+            pd->pen = ss->pen(); pd->brush = ss->brush(); pd->series = ss;
+            panelSeriesMap[ss] = pd;
+            if (!pd->errorBars.isEmpty()) panelErrorBars[ss] = pd->errorBars;
+        } else {
+            QLineSeries *ls = new QLineSeries();
+            QPen solidPen(pd->pen); solidPen.setStyle(Qt::SolidLine);
+            ls->setPen(solidPen);
+            for (const QPointF &pt : pd->points) ls->append(pt);
+            chart->addSeries(ls);
+            pd->pen = solidPen; pd->series = ls;
+            panelSeriesMap[ls] = pd;
+        }
+    }
+
+    QFont tickFont(m_plotSettings.fontFamily, m_plotSettings.axisTickFontSize);
+    QFont titleFont(m_plotSettings.fontFamily, m_plotSettings.axisLabelFontSize);
+    titleFont.setBold(m_plotSettings.boldAxisLabels);
+
+    // --- X axis (date / date-with-breaks / numeric) ---
+    QAbstractAxis *xAxis = nullptr;
+    if (isDateAxis && !hasBreaks) {
+        QDateTimeAxis *dtAx = new QDateTimeAxis();
+        dtAx->setFormat("d MMM");
+        dtAx->setMin(QDateTime::fromMSecsSinceEpoch((qint64)gXMin));
+        dtAx->setMax(QDateTime::fromMSecsSinceEpoch((qint64)gXMax));
+        dtAx->setTickCount(calculateOptimalDateTickCount());
+        dtAx->setLabelsFont(tickFont);
+        dtAx->setLabelsVisible(m_plotSettings.showAxisLabels);
+        dtAx->setGridLineVisible(m_plotSettings.showGrid);
+        chart->addAxis(dtAx, Qt::AlignBottom);
+        dtAx->setLinePen(QPen(m_plotSettings.axisLineColor));
+        dtAx->setLabelsBrush(QBrush(Qt::black));
+        xAxis = dtAx;
+    } else if (isDateAxis && hasBreaks) {
+        QValueAxis *vAx = new QValueAxis();
+        vAx->setRange(gXMin, gXMax);
+        vAx->setTickCount(2);
+        vAx->setLabelsVisible(false);
+        vAx->setGridLineVisible(m_plotSettings.showGrid);
+        chart->addAxis(vAx, Qt::AlignBottom);
+        vAx->setLinePen(QPen(m_plotSettings.axisLineColor));
+        xAxis = vAx;
+    } else {
+        QValueAxis *vAx = new QValueAxis();
+        double xRange = gXMax - gXMin;
+        double xInterval = calculateNiceXInterval(xRange);
+        while (xRange / xInterval > 6.0) xInterval *= 2.0;
+        double cleanXMin = std::floor(gXMin / xInterval) * xInterval;
+        if (dXMin >= 0.0 && cleanXMin < 0.0) cleanXMin = 0.0;
+        double cleanXMax = std::ceil(gXMax / xInterval) * xInterval;
+        int xTickCount = qRound((cleanXMax - cleanXMin) / xInterval) + 1;
+        if (xTickCount < 3) xTickCount = 3;
+        vAx->setRange(cleanXMin, cleanXMax);
+        vAx->setTickCount(xTickCount);
+        vAx->setLabelFormat("%.0f");
+        vAx->setLabelsFont(tickFont);
+        vAx->setLabelsVisible(m_plotSettings.showAxisLabels);
+        vAx->setGridLineVisible(m_plotSettings.showGrid);
+        chart->addAxis(vAx, Qt::AlignBottom);
+        vAx->setLinePen(QPen(m_plotSettings.axisLineColor));
+        vAx->setLabelsBrush(QBrush(Qt::black));
+        xAxis = vAx;
+    }
+
+    // --- Y axis (nice interval, 0-based unless overridden by custom min) ---
+    double tickInterval = m_plotSettings.yAxisTickSpacing > 0.0
+                          ? m_plotSettings.yAxisTickSpacing
+                          : calculateNiceYInterval(yDataMax * 1.05);
+    double alignedMax = std::ceil(yDataMax * 1.05 / tickInterval) * tickInterval;
+    if (alignedMax <= yDataMax) alignedMax += tickInterval;
+    int numIntervals = qBound(2, qRound(alignedMax / tickInterval), 5);
+    int yTickCount = numIntervals + 1;
+    int autoDecimals = 0;
+    if (m_plotSettings.yAxisDecimals >= 0) autoDecimals = m_plotSettings.yAxisDecimals;
+    else if (alignedMax < 100.0) {
+        if      (tickInterval < 0.01) autoDecimals = 4;
+        else if (tickInterval < 0.1)  autoDecimals = 3;
+        else if (tickInterval < 1.0)  autoDecimals = 2;
+        else if (tickInterval < 10.0) autoDecimals = 1;
+    }
+    QValueAxis *yAx = new QValueAxis();
+    yAx->setRange(0.0, alignedMax);
+    yAx->setTickCount(yTickCount);
+    yAx->setLabelFormat(QString("%.%1f").arg(autoDecimals));
+    yAx->setLabelsFont(tickFont);
+    yAx->setLabelsVisible(m_plotSettings.showAxisLabels);
+    yAx->setGridLineVisible(m_plotSettings.showGrid);
+    chart->addAxis(yAx, Qt::AlignLeft);
+    yAx->setLinePen(QPen(m_plotSettings.axisLineColor));
+    yAx->setLabelsBrush(QBrush(Qt::black));
+
+    for (QAbstractSeries *s : chart->series())
+        if (auto *xy = qobject_cast<QXYSeries*>(s)) { xy->attachAxis(xAxis); xy->attachAxis(yAx); }
+    allXAxes.append(xAxis);
+
+    // --- Panel widget: strip title + chart view ---
+    QWidget *panelWidget = new QWidget();
+    panelWidget->setFixedSize(300, 180);
+    panelWidget->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
+    QVBoxLayout *panelLayout = new QVBoxLayout(panelWidget);
+    panelLayout->setContentsMargins(0, 0, 0, 0);
+    panelLayout->setSpacing(0);
+
+    QPair<QString, QString> varInfo = DataProcessor::getVariableInfo(varCode);
+    QString labelText = stripTitle.isEmpty()
+                        ? (varInfo.first.isEmpty() ? varCode : varInfo.first)
+                        : stripTitle;
+    QLabel *stripLabel = new QLabel(labelText);
+    stripLabel->setAlignment(Qt::AlignCenter);
+    int stripFontPx = m_plotSettings.titleFontSize > 0 ? m_plotSettings.titleFontSize : 10;
+    stripLabel->setStyleSheet(QString(
+        "QLabel { background-color: #e8e8e8; border-bottom: 1px solid #cccccc; "
+        "font-weight: bold; font-size: %1px; padding: 2px 4px; }").arg(stripFontPx));
+    stripLabel->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+    panelLayout->addWidget(stripLabel);
+
+    ErrorBarChartView *cv = new ErrorBarChartView(chart);
+    cv->setRenderHint(QPainter::Antialiasing);
+    cv->setFrameShape(QFrame::NoFrame);
+    cv->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+    cv->setDragMode(QGraphicsView::RubberBandDrag);
+    cv->setRubberBand(QChartView::RectangleRubberBand);
+    cv->setMouseTracking(true);
+    cv->viewport()->setMouseTracking(true);
+    auto *panelFilter = new PanelEventFilter(cv, panelSeriesMap, m_currentXVar, segInfos,
+                                             m_plotSettings.showHoverTooltip, cv);
+    cv->installEventFilter(panelFilter);
+    cv->viewport()->installEventFilter(panelFilter);
+    cv->setErrorBarData(panelErrorBars);
+    cv->setAxisLineColor(m_plotSettings.axisLineColor);
+    if (hasBreaks) cv->setAxisBreaks(breakInfos, segInfos);
+    else           cv->clearAxisBreaks();
+    panelLayout->addWidget(cv, 1);
+
+    // --- Metrics chip, pooled over this cell's series (variable + experiment) ---
+    if (!m_plotSettings.tsMetrics.isEmpty() && !m_lastTSMetrics.isEmpty()) {
+        double totalN = 0, sumSS = 0, sumObsMean = 0, sumDStat = 0;
+        double pooledDStat = -1.0;
+        for (const auto &m : m_lastTSMetrics) {
+            if (m.value("Variable").toString() != varCode) continue;
+            if (!metricExpFilter.isEmpty() && m.value("Experiment").toString() != metricExpFilter) continue;
+            double n = m.value("n").toDouble();
+            if (n <= 0) continue;
+            double rmse = m.value("RMSE").toDouble();
+            totalN += n; sumSS += n * rmse * rmse;
+            sumObsMean += n * m.value("ObsMean").toDouble();
+            sumDStat   += n * m.value("Willmott's d-stat").toDouble();
+            if (pooledDStat < 0 && m.contains("PooledDStat")) pooledDStat = m.value("PooledDStat").toDouble();
+        }
+        QStringList statsLines;
+        if (totalN > 0) {
+            double rmse = std::sqrt(sumSS / totalN);
+            double obsMean = sumObsMean / totalN;
+            double nrmse = (obsMean > 0) ? (rmse / obsMean) * 100.0 : 0.0;
+            double dStat = (pooledDStat >= 0) ? pooledDStat : sumDStat / totalN;
+            if (m_plotSettings.tsMetrics.contains("N"))     statsLines << QString("N = %1").arg((int)totalN);
+            if (m_plotSettings.tsMetrics.contains("RMSE"))  statsLines << QString("RMSE = %1").arg(rmse, 0, 'f', rmse < 1 ? 3 : (rmse < 100 ? 2 : 1));
+            if (m_plotSettings.tsMetrics.contains("NRMSE")) statsLines << QString("NRMSE = %1%").arg(nrmse, 0, 'f', 1);
+            if (m_plotSettings.tsMetrics.contains("d-stat"))statsLines << QString("d = %1").arg(dStat, 0, 'f', 3);
+        }
+        if (!statsLines.isEmpty()) {
+            int statsFontPt = qBound(7, m_plotSettings.axisTickFontSize, 13);
+            QLabel *statsLabel = new QLabel(statsLines.join("\n"), panelWidget);
+            statsLabel->setStyleSheet(QString(
+                "QLabel { background: rgba(255,255,255,220); font-size: %1pt; "
+                "padding: 4px 7px; border: 1px solid rgba(0,0,0,40); border-radius: 3px; }").arg(statsFontPt));
+            statsLabel->setAlignment(Qt::AlignLeft | Qt::AlignTop);
+            statsLabel->show(); statsLabel->adjustSize();
+            statsLabel->move(28, stripLabel->sizeHint().height() + 8);
+            statsLabel->raise();
+            new DraggableOverlay(cv, statsLabel, statsLabel);
+            QString key = metricExpFilter.isEmpty() ? varCode : (metricExpFilter + "::" + varCode);
+            m_tsPanelOverlays[key] = statsLabel;
+        }
+    }
+
+    m_tsPanelViews.append(cv);
+    return panelWidget;
 }
 
 void PlotWidget::buildMultiPanelLegend()

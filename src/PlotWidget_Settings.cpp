@@ -117,6 +117,7 @@ void PlotWidget::onSettingsButtonClicked()
         bool boxReplot        = (m_plotSettings.yAxisTickSpacing    != newSettings.yAxisTickSpacing) ||
                                 (m_plotSettings.yAxisDecimals      != newSettings.yAxisDecimals);
         bool layoutChanged    = (m_plotSettings.multiPanelTimeSeries != newSettings.multiPanelTimeSeries) ||
+                                (m_plotSettings.gridByExperiment     != newSettings.gridByExperiment) ||
                                 (m_plotSettings.plotMeanReps        != newSettings.plotMeanReps);
 
         applyPlotSettings(newSettings);
@@ -527,6 +528,7 @@ void PlotWidget::saveSettings() const
     // Interaction & Layout
     s.setValue("showHoverTooltip", m_plotSettings.showHoverTooltip);
     s.setValue("multiPanelTimeSeries", m_plotSettings.multiPanelTimeSeries);
+    s.setValue("gridByExperiment", m_plotSettings.gridByExperiment);
     s.setValue("rememberLastCropFolder", m_plotSettings.rememberLastCropFolder);
 
     // Legend
@@ -607,6 +609,7 @@ void PlotWidget::loadSettings()
 
     m_plotSettings.showHoverTooltip = s.value("showHoverTooltip", m_plotSettings.showHoverTooltip).toBool();
     m_plotSettings.multiPanelTimeSeries = s.value("multiPanelTimeSeries", m_plotSettings.multiPanelTimeSeries).toBool();
+    m_plotSettings.gridByExperiment = s.value("gridByExperiment", m_plotSettings.gridByExperiment).toBool();
     m_plotSettings.rememberLastCropFolder = s.value("rememberLastCropFolder", m_plotSettings.rememberLastCropFolder).toBool();
 
     m_plotSettings.showLegend     = s.value("showLegend",     m_plotSettings.showLegend).toBool();

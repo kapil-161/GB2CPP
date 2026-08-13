@@ -28,6 +28,7 @@ struct CommandLineArgs {
     QStringList scatterMetrics;      // --scatter-metrics "RMSE,R2,d-stat"
 
     bool boxPlotMode = false;        // --boxplot
+    bool gridMode = false;           // --grid : experiment × variable multi-panel grid
 };
 
 class CommandLineHandler : public QObject

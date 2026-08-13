@@ -104,6 +104,7 @@ struct PlotSettings {
 
     // Layout settings
     bool multiPanelTimeSeries = false;  // tile Y variables in a grid instead of overlaying
+    bool gridByExperiment = false;      // with multiPanel: tile a matrix (rows=experiment, cols=variable)
     bool rememberLastCropFolder = false; // restore last selected crop folder on startup
 
     // Treatment filter (empty excludedSeriesKeys = show all)
@@ -218,6 +219,7 @@ private:
 
     // Layout controls
     QCheckBox *m_multiPanelTSCheckBox;
+    QCheckBox *m_gridByExperimentCheckBox;
     QCheckBox *m_rememberLastCropFolderCheckBox;
 
     // Scatter metrics checkboxes

@@ -250,6 +250,7 @@ QJsonObject toolPlotTimeseries(const QJsonObject &args)
 #endif
     QString metricsPath = args.value("metrics_path").toString();
     bool boxplot = args.value("boxplot").toBool(false);
+    bool grid = args.value("grid").toBool(false);
     int timeoutMs = static_cast<int>(args.value("timeout_seconds").toDouble(30.0) * 1000.0);
 
     QDir().mkpath(QFileInfo(savePath).absolutePath());
@@ -261,6 +262,7 @@ QJsonObject toolPlotTimeseries(const QJsonObject &args)
     a << "--xvar" << xvar << "--yvar" << yvars.join(",") << "--save" << savePath;
     if (!metricsPath.isEmpty()) a << "--metrics" << metricsPath;
     if (boxplot) a << "--boxplot";
+    if (grid) a << "--grid";
 
     return runHeadless(a, savePath, metricsPath, timeoutMs);
 }
@@ -349,6 +351,9 @@ QJsonArray toolDefinitions()
         props["metrics_path"] = strSchema("Optional absolute path to also save fit metrics as CSV.");
         QJsonObject boxp; boxp["type"] = "boolean"; boxp["description"] = "Render as a box plot instead of lines.";
         props["boxplot"] = boxp;
+        QJsonObject gridp; gridp["type"] = "boolean";
+        gridp["description"] = "Tile an experiment x variable grid (rows=experiment, cols=variable) when 2+ experiments are present.";
+        props["grid"] = gridp;
         QJsonObject tos; tos["type"] = "number"; tos["description"] = "Max seconds to wait for the render.";
         props["timeout_seconds"] = tos;
         QJsonObject schema; schema["type"] = "object"; schema["properties"] = props;

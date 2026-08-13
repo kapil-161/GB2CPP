@@ -45,6 +45,7 @@ PlotSettings PlotSettingsDialog::getSettings() const
     settings.showLegend = m_showLegendCheckBox->isChecked();
     settings.showHoverTooltip = m_showHoverTooltipCheckBox->isChecked();
     settings.multiPanelTimeSeries = m_multiPanelTSCheckBox->isChecked();
+    settings.gridByExperiment = m_gridByExperimentCheckBox->isChecked();
     settings.rememberLastCropFolder = m_rememberLastCropFolderCheckBox->isChecked();
     settings.legendPosition = "outside-right";
     settings.plotMeanReps = m_plotMeanRepsCheckBox->isChecked();
@@ -313,6 +314,11 @@ void PlotSettingsDialog::setupUI()
     m_multiPanelTSCheckBox->setChecked(m_settings.multiPanelTimeSeries);
     m_multiPanelTSCheckBox->setToolTip("When enabled and 2+ Y variables are selected, each variable is shown in its own panel");
     layoutGroupLayout->addWidget(m_multiPanelTSCheckBox);
+
+    m_gridByExperimentCheckBox = new QCheckBox("     ↳ Tile as experiment × variable grid (rows = experiments)");
+    m_gridByExperimentCheckBox->setChecked(m_settings.gridByExperiment);
+    m_gridByExperimentCheckBox->setToolTip("With multi-panel on and 2+ experiments loaded, tile a matrix: one row per experiment, one column per variable. Y is shared down each column.");
+    layoutGroupLayout->addWidget(m_gridByExperimentCheckBox);
 
     m_rememberLastCropFolderCheckBox = new QCheckBox("Remember last selected crop folder on startup");
     m_rememberLastCropFolderCheckBox->setChecked(m_settings.rememberLastCropFolder);
@@ -643,6 +649,7 @@ void PlotSettingsDialog::onResetDefaults()
     m_showLegendCheckBox->setChecked(defaults.showLegend);
     m_showHoverTooltipCheckBox->setChecked(defaults.showHoverTooltip);
     m_multiPanelTSCheckBox->setChecked(defaults.multiPanelTimeSeries);
+    m_gridByExperimentCheckBox->setChecked(defaults.gridByExperiment);
     m_rememberLastCropFolderCheckBox->setChecked(defaults.rememberLastCropFolder);
     m_showErrorBarsCheckBox->setChecked(defaults.showErrorBars);
     m_showSnapshotCheckBox->setChecked(defaults.showSnapshot);

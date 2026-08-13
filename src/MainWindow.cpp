@@ -1149,7 +1149,9 @@ so the two columns add up to 1:</p>
   <li><b>Style:</b> line width, marker size, color palette</li>
   <li><b>Axes:</b> custom min/max overrides for X and Y</li>
   <li><b>Error Bars:</b> SD or SE bars for replicated experiments (observed data points)</li>
-  <li><b>Multi-Panel Grid:</b> one panel per Y variable instead of overlaid lines</li>
+  <li><b>Multi-Panel Grid:</b> one panel per Y variable instead of overlaid lines. Tick the nested
+      <b>experiment&nbsp;&times;&nbsp;variable grid</b> option to instead tile a matrix — one row per experiment,
+      one column per variable, with Y shared down each column — when 2+ experiments are loaded.</li>
   <li><b>Hover Tooltip:</b> show/hide variable + value tooltip on mouse hover</li>
   <li><b>Plot Mean of Replicates:</b> average replicates (sequence OSU files)</li>
   <li><b>Scatter Panel Metrics:</b> choose which statistics appear inside each scatter panel</li>
@@ -1214,6 +1216,7 @@ QT_QPA_PLATFORM_PLUGIN_PATH=/opt/homebrew/Cellar/qt/&lt;version&gt;/share/qt/plu
   <tr><td><code>--save</code></td><td><code>plot.png</code></td><td>Render and save the plot image, then exit (headless)</td></tr>
   <tr><td><code>--metrics</code></td><td><code>metrics.csv</code></td><td>Save time-series metrics to CSV (use with <code>--save</code>)</td></tr>
   <tr><td><code>--boxplot</code></td><td>—</td><td>Render as a box plot (OSU seasonal files)</td></tr>
+  <tr><td><code>--grid</code></td><td>—</td><td>Tile an experiment&nbsp;&times;&nbsp;variable grid (rows = experiments, columns = variables)</td></tr>
   <tr><td><code>--scatter</code></td><td>—</td><td>Headless scatter plot mode (requires EVALUATE.OUT)</td></tr>
   <tr><td><code>--scatter-vars</code></td><td><code>VAR1,VAR2</code></td><td>Limit scatter panels to these variables</td></tr>
   <tr><td><code>--scatter-metrics</code></td><td><code>RMSE,R2</code></td><td>Override which statistics appear in scatter panels</td></tr>

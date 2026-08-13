@@ -321,6 +321,19 @@ private:
     void resizeScatterPanels();
     QPixmap grabScatterAtSize(int panelSide);
     void plotTimeSeriesMultiPanel();
+    // Builds one time-series panel (chart view + strip title + metrics overlay) from
+    // the given series, registers it in m_tsPanelViews/allXAxes, and returns the
+    // container widget for the caller to place in the grid. Shared by the
+    // per-variable panel mode and the experiment x variable grid.
+    QWidget* buildTSPanelCell(const QVector<QSharedPointer<PlotData>>& cellData,
+                              const QString& varCode, const QString& stripTitle,
+                              double yMaxOverride,
+                              double gXMin, double gXMax, double dXMin,
+                              bool isDateAxis, bool hasBreaks,
+                              const QVector<ErrorBarChartView::BreakInfo>& breakInfos,
+                              const QVector<ErrorBarChartView::SegmentInfo>& segInfos,
+                              const QString& metricExpFilter,
+                              QVector<QAbstractAxis*>& allXAxes);
     void resizeTimeSeriesPanels();
     void buildMultiPanelLegend();
 

@@ -40,6 +40,8 @@ CommandLineArgs CommandLineHandler::parseCommandLineArgs(const QStringList &args
                 result.saveMetricsPath = tokens[++i];
             } else if (tok == "--boxplot") {
                 result.boxPlotMode = true;
+            } else if (tok == "--grid") {
+                result.gridMode = true;
             } else if (tok == "--scatter") {
                 result.scatterMode = true;
                 result.headlessMode = true;
@@ -331,6 +333,14 @@ void CommandLineHandler::headlessAutoPlot()
     if (m_args.boxPlotMode) {
         PlotWidget *pw = m_mainWindow->getPlotWidget();
         if (pw) pw->setBoxPlotMode(true);
+    }
+
+    // Enable experiment × variable grid if requested
+    if (m_args.gridMode) {
+        PlotSettings s = plot->getPlotSettings();
+        s.multiPanelTimeSeries = true;
+        s.gridByExperiment = true;
+        plot->setPlotSettings(s);
     }
 
     // Trigger plot update
