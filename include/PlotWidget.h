@@ -449,6 +449,7 @@ private:
     QLabel *m_scalingLabel;
 
     // Animation controls
+    QWidget     *m_animContainer   = nullptr;  // wraps reset/play/slider/label as one unit
     QPushButton *m_animResetButton = nullptr;
     QPushButton *m_animPlayButton  = nullptr;
     QSlider     *m_animSlider      = nullptr;

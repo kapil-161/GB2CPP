@@ -5014,6 +5014,7 @@ void PlotWidget::setupAnimControls()
     animLayout->addWidget(m_animLabel);
     animContainer->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
     m_bottomLayout->addWidget(animContainer, 1);
+    m_animContainer = animContainer;
 
     m_animTimer = new QTimer(this);
     m_animTimer->setInterval(150);
