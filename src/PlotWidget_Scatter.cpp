@@ -80,6 +80,12 @@ void PlotWidget::plotScatter(
     m_currentYVars = varNames;     // store so replot from settings dialog works
     m_scatterExportData.clear();
     setXAxisButtonsVisible(false);
+    // Set the bottom bar's chrome state up front, before the validation checks below
+    // that can return early — otherwise a call with no variables/data yet (e.g. a stray
+    // replot triggered while the user is still picking variables) leaves whatever chrome
+    // state was already showing instead of the correct scatter-mode one.
+    if (m_bottomContainer) m_bottomContainer->setVisible(true);
+    setScatterChromeHidden(true);
 
     // Cap at 9 variables
     QStringList vars = varNames.mid(0, 9);
@@ -180,15 +186,7 @@ void PlotWidget::plotScatter(
     // --- Build / reset scatter panel area ---
     // Hide the regular chart view; show scatter panels instead
     if (m_chartView) m_chartView->setVisible(false);
-    // Keep the bottom bar (and its Refresh Data button) visible in scatter mode so
-    // users can reload output files (e.g. after re-running a simulation) without
-    // switching to the Time Series tab. Only hide the controls that don't apply to
-    // the scatter/panel-grid view — DAS/DAP/DATE and Box Plot are already hidden by
-    // setXAxisButtonsVisible(false) above.
-    if (m_bottomContainer) m_bottomContainer->setVisible(true);
-    if (m_treatmentsButton) m_treatmentsButton->setVisible(false);
-    if (m_snapshotBtn) m_snapshotBtn->setVisible(false);
-    if (m_animContainer) m_animContainer->setVisible(false);
+    // (Bottom bar / chrome visibility was already set at the top of this function.)
 
     // Destroy old panels
     for (QChartView *cv : m_scatterPanelViews) { cv->deleteLater(); }

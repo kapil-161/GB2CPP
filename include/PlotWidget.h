@@ -252,6 +252,9 @@ public:
     void setAxisTitles(const QString &xTitle, const QString &yTitle);
     void setXAxisButtonsVisible(bool visible);  // Show/hide DAS, DAP, DATE buttons
     void setBoxPlotButtonVisible(bool visible); // Show/hide Box Plot toggle button
+    void setScatterChromeHidden(bool hidden);   // Hide/show Treatments, Snapshot, animation controls (not applicable to scatter panel view)
+    void setScatterOnlyWidget(bool enabled);    // Mark this instance as permanently scatter-only: clear()/applyPlotSettings() must
+                                                 // never re-show DAS/DAP/DATE or Snapshot on it, no matter what triggers them.
     void setBoxPlotMode(bool enabled);          // Programmatically enable/disable box plot mode
     void setPreplotPanelVisible(bool visible);  // Show/hide treatment pre-selection panel and button
     void setBottomStatusWidget(QWidget *widget); // Embed a widget below the bottom bar (plot-area-only, does not extend under legend)
@@ -447,6 +450,9 @@ private:
     QPushButton *m_boxPlotButton;
     QPushButton *m_treatmentsButton;
     QLabel *m_scalingLabel;
+    bool m_scatterOnlyWidget = false;  // true for the dedicated scatter-tab PlotWidget instance;
+                                        // gates clear()/applyPlotSettings() so they can't undo the
+                                        // scatter chrome hiding regardless of call order.
 
     // Animation controls
     QWidget     *m_animContainer   = nullptr;  // wraps reset/play/slider/label as one unit

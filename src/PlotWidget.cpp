@@ -428,6 +428,12 @@ void PlotWidget::setupUI()
 void PlotWidget::setBottomStatusWidget(QWidget *widget)
 {
     if (widget && m_leftLayout) {
+        // The same shared status widget gets moved between the time-series and scatter
+        // PlotWidget instances as the user switches tabs (a QWidget can only have one
+        // parent). Skip re-adding if it's already parented here, or repeated tab
+        // switches within the same instance would pile up duplicate layout entries.
+        if (m_leftLayout->indexOf(widget) != -1)
+            return;
         m_leftLayout->addWidget(widget, 0);
         m_bottomStatusWidget = widget;
     }
@@ -2925,9 +2931,12 @@ void PlotWidget::clear()
     // Stop any running animation
     stopAnim();
 
-    // Reset scatter mode and show buttons (they'll be hidden again if scatter mode is set)
+    // Reset scatter mode and show buttons (they'll be hidden again if scatter mode is set).
+    // The dedicated scatter-tab widget (m_scatterOnlyWidget) never shows DAS/DAP/DATE —
+    // clear() is called from many places (variable/file selection, refresh, etc.) and must
+    // not undo that just because a fresh plot cycle is starting.
     m_isScatterMode = false;
-    setXAxisButtonsVisible(true);
+    setXAxisButtonsVisible(!m_scatterOnlyWidget);
 
     // Unselect x-axis buttons until new data determines the actual axis
     if (m_dasButton) m_dasButton->setChecked(false);
@@ -4014,6 +4023,19 @@ void PlotWidget::setXAxisButtonsVisible(bool visible)
     if (m_dateButton) m_dateButton->setVisible(visible);
     // Box plot button is only for OSU summary files; hide whenever x-buttons are hidden
     if (!visible && m_boxPlotButton) m_boxPlotButton->setVisible(false);
+}
+
+void PlotWidget::setScatterChromeHidden(bool hidden)
+{
+    if (m_treatmentsButton) m_treatmentsButton->setVisible(!hidden);
+    if (m_snapshotBtn) m_snapshotBtn->setVisible(!hidden);
+    if (m_animContainer) m_animContainer->setVisible(!hidden);
+}
+
+void PlotWidget::setScatterOnlyWidget(bool enabled)
+{
+    m_scatterOnlyWidget = enabled;
+    setScatterChromeHidden(enabled);
 }
 
 void PlotWidget::setBoxPlotButtonVisible(bool visible)

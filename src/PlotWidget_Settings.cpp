@@ -170,11 +170,13 @@ void PlotWidget::applyPlotSettings(const PlotSettings &settings, bool skipAxisRa
 {
     // Show/hide the Snapshot button per the Plot Settings toggle. If it's being
     // turned off while a snapshot is active, clear the snapshot so no orphan
-    // ghost overlay is left behind.
+    // ghost overlay is left behind. Never show it on the dedicated scatter-tab
+    // widget — Snapshot doesn't apply to the scatter panel grid.
     if (m_snapshotBtn) {
-        if (!settings.showSnapshot && m_snapshotActive)
+        bool showSnapshot = settings.showSnapshot && !m_scatterOnlyWidget;
+        if (!showSnapshot && m_snapshotActive)
             clearSnapshot();
-        m_snapshotBtn->setVisible(settings.showSnapshot);
+        m_snapshotBtn->setVisible(showSnapshot);
     }
 
     // Apply grid settings

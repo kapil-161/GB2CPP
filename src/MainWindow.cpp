@@ -528,6 +528,11 @@ void MainWindow::setupDataPanel()
     // Use PlotWidget for scatter plots (same widget, different mode)
     m_scatterPlotWidget = new PlotWidget();
     m_scatterPlotWidget->setPreplotPanelVisible(false);
+    // This instance only ever shows scatter panels — Treatments, Snapshot, DAS/DAP/DATE,
+    // and the animation scrubber never apply here. Mark it permanently scatter-only so
+    // clear()/applyPlotSettings() (called from many places: variable/file selection,
+    // refresh, the Plot Settings dialog) can never re-show them regardless of call order.
+    m_scatterPlotWidget->setScatterOnlyWidget(true);
     scatterPlotLayout->addWidget(m_scatterPlotWidget);
     
     m_tabWidget->addTab(scatterPlotWidget, "Scatter Plot");
@@ -1492,6 +1497,19 @@ void MainWindow::onTabChanged(int index)
         m_savedXVar = m_xVariableComboBox ? m_xVariableComboBox->currentData().toString() : QString();
     }
     s_previousTab = index;
+
+    // m_statusWidget is a single shared widget embedded into whichever PlotWidget's
+    // layout last claimed it (QWidget can only have one parent) — reparent it to the
+    // plot tab that's actually visible so Info/Success/Warning messages (e.g. "file
+    // changed on disk", "Loaded N file(s)...") are seen regardless of which tab the
+    // user is on, not just Time Series.
+    if (m_statusWidget) {
+        if (index == 2 && m_scatterPlotWidget) {
+            m_scatterPlotWidget->setBottomStatusWidget(m_statusWidget);
+        } else if (m_plotWidget) {
+            m_plotWidget->setBottomStatusWidget(m_statusWidget);
+        }
+    }
 
     // Handle tab switching - load data lazily like Python version
     if (index == 0) {
