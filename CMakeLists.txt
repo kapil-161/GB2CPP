@@ -41,6 +41,14 @@ configure_file(
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# Set when configuring against a truly static Qt build (CMAKE_PREFIX_PATH
+# pointing at a Qt compiled with -static), as opposed to the normal dynamic
+# Qt kit — whose MinGW .a files are import libs, not real static archives,
+# even though they share the same .a extension. Governs GB2_STATIC_BUILD
+# (see McpServer.cpp), since a static build has no platforms/*.dll files to
+# probe for at runtime — everything is baked into the exe already.
+option(GB2_STATIC_QT "Building against a fully static Qt (no plugin DLLs to load)" OFF)
+
 # Force static linking - only look for .a files (Windows/Linux only)
 if(WIN32 OR UNIX AND NOT APPLE)
     set(CMAKE_FIND_LIBRARY_SUFFIXES .a)
@@ -137,10 +145,10 @@ target_link_libraries(GB2 Qt6::Core Qt6::Widgets Qt6::Charts)
 if(WIN32)
     # Import Qt6 plugins statically for Windows
     qt_import_plugins(GB2
-        INCLUDE Qt6::QWindowsIntegrationPlugin Qt6::QICOPlugin Qt6::QJpegPlugin Qt6::QGifPlugin
+        INCLUDE Qt6::QWindowsIntegrationPlugin Qt6::QOffscreenIntegrationPlugin Qt6::QICOPlugin Qt6::QJpegPlugin Qt6::QGifPlugin
         EXCLUDE Qt6::QXcbIntegrationPlugin Qt6::QCocoaIntegrationPlugin
     )
-    
+
     # Link Windows system libraries
     target_link_libraries(GB2 
         # Windows system libraries
@@ -192,6 +200,10 @@ endif()
 target_compile_definitions(GB2 PRIVATE
     $<$<CONFIG:Release>:QT_NO_DEBUG_OUTPUT>
 )
+
+if(GB2_STATIC_QT)
+    target_compile_definitions(GB2 PRIVATE GB2_STATIC_BUILD)
+endif()
 
 # Set output directory
 set_target_properties(GB2 PROPERTIES

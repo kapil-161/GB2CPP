@@ -14,7 +14,7 @@ REM Set Qt license bypass
 set QTFRAMEWORK_BYPASS_LICENSE_CHECK=1
 
 REM Code signing (optional): set one of these BEFORE running this script to
-REM sign the built exe(s). Unset = builds stay unsigned, exactly as before.
+REM sign the built exe. Unset = build stays unsigned, exactly as before.
 REM   GB2_SIGN_CERT           path to a .pfx certificate file
 REM   GB2_SIGN_PASS           password for that .pfx (paired with GB2_SIGN_CERT)
 REM   GB2_SIGN_THUMBPRINT     SHA1 thumbprint of a cert in the Windows cert
@@ -27,25 +27,24 @@ REM Windows Kits install location.
 REM Set paths - These will be auto-detected or you can override them
 set PROJECT_DIR=%~dp0
 
-REM Try to auto-detect Qt installation
-set QT_DIR=
+REM GB2 is linked against a statically-built Qt (no Qt6*.dll, no wrapper/
+REM extraction step at build or run time — see CMakeLists.txt's GB2_STATIC_QT
+REM option). This is a one-time local build separate from the normal Qt
+REM installer; see C:\Qt6Static for the qtbase+qtcharts source/build trees
+REM used to produce it.
+set STATIC_QT_DIR=C:\Qt6Static\install
 set CMAKE_PATH=
 set MINGW_PATH=
+set NINJA_PATH=
 
-REM Check common Qt installation locations
-for %%i in (6.8.1 6.8.2 6.9.1 6.11.1 6.11.0 6.7.1 6.6.1) do (
-    if exist "C:\Qt\%%i\mingw_64\" (
-        set QT_DIR=C:\Qt\%%i\mingw_64
-        echo Found Qt at: C:\Qt\%%i\mingw_64
-        goto :found_qt
-    )
+if not exist "%STATIC_QT_DIR%\lib\cmake\Qt6" (
+    echo ERROR: Static Qt install not found at %STATIC_QT_DIR%
+    echo This build requires a Qt6 built with -static ^(qtbase + qtcharts,
+    echo matching the MinGW toolchain below^). It is not part of the normal
+    echo Qt online installer and must be built from source once.
+    pause
+    exit /b 1
 )
-
-echo ERROR: Qt not found. Please install Qt 6.x with MinGW to C:\Qt (https://www.qt.io/download-qt-installer)
-pause
-exit /b 1
-
-:found_qt
 
 REM Auto-detect CMake
 if exist "C:\Qt\Tools\CMake\bin\cmake.exe" (
@@ -58,7 +57,16 @@ if exist "C:\Qt\Tools\CMake\bin\cmake.exe" (
     set CMAKE_PATH=cmake.exe
 )
 
-REM Auto-detect MinGW
+REM Auto-detect Ninja (used as the CMake generator for the static build)
+if exist "C:\Qt\Tools\Ninja\ninja.exe" (
+    set NINJA_PATH=C:\Qt\Tools\Ninja\ninja.exe
+) else (
+    set NINJA_PATH=ninja.exe
+)
+
+REM Auto-detect MinGW - must be the SAME toolchain the static Qt was built
+REM with (mingw1310_64), since static Qt's .a archives are compiler-ABI
+REM specific.
 for %%i in (mingw1310_64 mingw1120_64 mingw1020_64) do (
     if exist "C:\Qt\Tools\%%i\bin" (
         set MINGW_PATH=C:\Qt\Tools\%%i\bin
@@ -71,14 +79,6 @@ set MINGW_PATH=C:\Qt\Tools\mingw1310_64\bin
 
 :found_mingw
 echo Found MinGW at: %MINGW_PATH%
-
-REM Check if paths exist
-if not exist "%QT_DIR%" (
-    echo ERROR: Qt directory not found: %QT_DIR%
-    echo Please update QT_DIR in this script
-    pause
-    exit /b 1
-)
 
 if not exist "%CMAKE_PATH%" (
     echo ERROR: CMake not found: %CMAKE_PATH%
@@ -97,12 +97,6 @@ if not exist "%MINGW_PATH%" (
 echo Step 1: Cleaning previous build...
 cd /d "%PROJECT_DIR%"
 
-REM Clear any previously extracted runtime so the updated exe is used on next launch
-if exist "%TEMP%\GB2_runtime" (
-    echo Clearing cached runtime: %TEMP%\GB2_runtime
-    rmdir /s /q "%TEMP%\GB2_runtime"
-)
-
 REM Clear stale single-instance lock so first launch after build is never blocked
 if exist "%TEMP%\GB2.instance.lock" (
     echo Clearing stale instance lock: %TEMP%\GB2.instance.lock
@@ -111,8 +105,7 @@ if exist "%TEMP%\GB2.instance.lock" (
 
 REM Force kill any processes using the build directory
 taskkill /f /im cmake.exe 2>nul
-taskkill /f /im mingw32-make.exe 2>nul
-taskkill /f /im g++.exe 2>nul
+taskkill /f /im GB2.exe 2>nul
 
 REM Wait and try to remove directory
 timeout /t 2 /nobreak >nul
@@ -129,7 +122,7 @@ mkdir build_win
 cd build_win
 
 echo.
-if not defined QUIET_MODE echo Step 2: Configuring with CMake...
+if not defined QUIET_MODE echo Step 2: Configuring with CMake ^(static Qt^)...
 
 REM Add MinGW to PATH temporarily
 set PATH=%MINGW_PATH%;%PATH%
@@ -143,18 +136,19 @@ if not exist "%MINGW_PATH%\g++.exe" (
 
 if not defined QUIET_MODE (
     echo Using compiler: %MINGW_PATH%\g++.exe
-    echo Using Qt path: %QT_DIR%
+    echo Using static Qt path: %STATIC_QT_DIR%
 )
 
 if defined QUIET_MODE (
-    "%CMAKE_PATH%" .. -G "MinGW Makefiles" -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER="%MINGW_PATH%\g++.exe" -DCMAKE_C_COMPILER="%MINGW_PATH%\gcc.exe" -DCMAKE_MAKE_PROGRAM="%MINGW_PATH%\mingw32-make.exe" -DCMAKE_PREFIX_PATH="%QT_DIR%" >nul 2>&1
+    "%CMAKE_PATH%" .. -G Ninja -DCMAKE_BUILD_TYPE=Release -DGB2_STATIC_QT=ON -DCMAKE_CXX_COMPILER="%MINGW_PATH%\g++.exe" -DCMAKE_C_COMPILER="%MINGW_PATH%\gcc.exe" -DCMAKE_MAKE_PROGRAM="%NINJA_PATH%" -DCMAKE_PREFIX_PATH="%STATIC_QT_DIR%" >nul 2>&1
 ) else (
-    "%CMAKE_PATH%" .. -G "MinGW Makefiles" ^
+    "%CMAKE_PATH%" .. -G Ninja ^
       -DCMAKE_BUILD_TYPE=Release ^
+      -DGB2_STATIC_QT=ON ^
       -DCMAKE_CXX_COMPILER="%MINGW_PATH%\g++.exe" ^
       -DCMAKE_C_COMPILER="%MINGW_PATH%\gcc.exe" ^
-      -DCMAKE_MAKE_PROGRAM="%MINGW_PATH%\mingw32-make.exe" ^
-      -DCMAKE_PREFIX_PATH="%QT_DIR%"
+      -DCMAKE_MAKE_PROGRAM="%NINJA_PATH%" ^
+      -DCMAKE_PREFIX_PATH="%STATIC_QT_DIR%"
 )
 
 if %ERRORLEVEL% neq 0 (
@@ -166,9 +160,9 @@ if %ERRORLEVEL% neq 0 (
 if not defined QUIET_MODE echo.
 if not defined QUIET_MODE echo Step 3: Building application...
 if defined QUIET_MODE (
-    "%MINGW_PATH%\mingw32-make.exe" >nul 2>&1
+    "%CMAKE_PATH%" --build . >nul 2>&1
 ) else (
-    "%MINGW_PATH%\mingw32-make.exe"
+    "%CMAKE_PATH%" --build .
 )
 
 if %ERRORLEVEL% neq 0 (
@@ -183,7 +177,7 @@ cd /d "%PROJECT_DIR%"
 if exist manual_deployment rmdir /s /q manual_deployment
 mkdir manual_deployment
 
-REM Copy executable
+REM Copy executable - statically linked, no Qt6*.dll / MinGW runtime DLLs needed
 if exist build_win\bin\GB2.exe (
     copy build_win\bin\GB2.exe manual_deployment\
 ) else (
@@ -195,98 +189,33 @@ if exist build_win\bin\GB2.exe (
 
 call :sign_exe "%PROJECT_DIR%manual_deployment\GB2.exe"
 
-REM Copy resources
+REM Small resources folder (icons) - not embedded in the exe, loaded by
+REM relative path at runtime (see main.cpp setupApplicationIcon). Just data
+REM files sitting next to the exe, not a wrapper/extraction step.
 if exist resources xcopy /E /I resources manual_deployment\resources
 
 REM Copy license text so it ships alongside the exe
 if exist LICENSE copy /Y LICENSE manual_deployment\LICENSE.txt >nul
 
 if not defined QUIET_MODE echo.
-if not defined QUIET_MODE echo Step 5: Deploying Qt6 dependencies...
-if defined QUIET_MODE (
-    "%QT_DIR%\bin\windeployqt.exe" --release --no-translations --no-system-d3d-compiler --no-opengl-sw manual_deployment\GB2.exe >nul 2>&1
+if not defined QUIET_MODE echo Step 5: Deploying directly to C:\DSSAT48\Tools\GB2\...
+REM No windeployqt, no NSIS wrapper: GB2.exe is fully self-contained (static
+REM Qt + static MinGW runtime), so deployment is just "copy the exe and its
+REM small resources folder to where the Start Menu shortcut already points."
+if exist "C:\DSSAT48\Tools\GB2" (
+    del /f /q "C:\DSSAT48\Tools\GB2\*.*" 2>nul
+    for /d %%d in ("C:\DSSAT48\Tools\GB2\*") do rmdir /s /q "%%d" 2>nul
 ) else (
-    "%QT_DIR%\bin\windeployqt.exe" --release --no-translations --no-system-d3d-compiler --no-opengl-sw manual_deployment\GB2.exe
+    mkdir "C:\DSSAT48\Tools\GB2"
 )
-
+xcopy /E /I /Y manual_deployment\* "C:\DSSAT48\Tools\GB2\" >nul
 if %ERRORLEVEL% neq 0 (
-    echo ERROR: windeployqt failed!
+    echo ERROR: Deployment to C:\DSSAT48\Tools\GB2 failed!
     pause
     exit /b 1
 )
+if not defined QUIET_MODE echo SUCCESS: Deployed to C:\DSSAT48\Tools\GB2\GB2.exe
 
-REM windeployqt only ships the GUI platform plugin (qwindows). GB2 --mcp renders
-REM its headless plot children with QT_QPA_PLATFORM=offscreen, so also bundle the
-REM offscreen plugin — the MCP server auto-selects it when present next to the exe.
-if exist "%QT_DIR%\plugins\platforms\qoffscreen.dll" (
-    copy /Y "%QT_DIR%\plugins\platforms\qoffscreen.dll" manual_deployment\platforms\ >nul
-    if not defined QUIET_MODE echo Bundled offscreen platform plugin for --mcp headless rendering
-)
-
-if not defined QUIET_MODE echo.
-if not defined QUIET_MODE echo Step 6: Removing unnecessary files and folders...
-REM Remove unwanted plugin folders (KEEP platforms folder - it's essential!)
-if exist manual_deployment\generic rmdir /s /q manual_deployment\generic
-if exist manual_deployment\iconengines rmdir /s /q manual_deployment\iconengines
-if exist manual_deployment\imageformats rmdir /s /q manual_deployment\imageformats
-if exist manual_deployment\networkinformation rmdir /s /q manual_deployment\networkinformation
-if exist manual_deployment\styles rmdir /s /q manual_deployment\styles
-if exist manual_deployment\tls rmdir /s /q manual_deployment\tls
-
-REM Remove unwanted DLL files (KEEP libgcc_s_seh-1.dll and libwinpthread-1.dll - they're needed!)
-if exist manual_deployment\Qt6Network.dll del manual_deployment\Qt6Network.dll
-if exist manual_deployment\Qt6Svg.dll del manual_deployment\Qt6Svg.dll
-if exist manual_deployment\D3Dcompiler_47.dll del manual_deployment\D3Dcompiler_47.dll
-if exist manual_deployment\opengl32sw.dll del manual_deployment\opengl32sw.dll
-
-if not defined QUIET_MODE echo Removed unnecessary files to minimize deployment size
-if not defined QUIET_MODE echo KEPT: platforms folder, libgcc/libwinpthread
-
-if not defined QUIET_MODE echo.
-if not defined QUIET_MODE echo Step 7: Building single portable GB2.exe with NSIS...
-cd /d "%PROJECT_DIR%"
-
-REM Auto-detect NSIS
-set NSIS_PATH=
-if exist "C:\Program Files\NSIS\makensis.exe" set NSIS_PATH=C:\Program Files\NSIS\makensis.exe
-if exist "C:\Program Files (x86)\NSIS\makensis.exe" set NSIS_PATH=C:\Program Files (x86)\NSIS\makensis.exe
-
-if not defined NSIS_PATH (
-    echo WARNING: NSIS not found - skipping portable exe build
-    echo Install NSIS from https://nsis.sourceforge.io to enable single-exe packaging
-    goto :skip_nsis
-)
-
-REM Extract full version (includes git hash) from version_generated.h — display only.
-set GB2_VERSION_FULL=unknown
-for /f "tokens=3" %%v in ('findstr /c:"#define GB2_VERSION_FULL " "%PROJECT_DIR%include\version_generated.h"') do set GB2_VERSION_FULL=%%v
-set GB2_VERSION_FULL=%GB2_VERSION_FULL:"=%
-if not defined QUIET_MODE echo Packaging version: %GB2_VERSION_FULL%
-
-REM Content hash of the ACTUAL packaged binary. This — not the git version — keys
-REM the launcher's extracted runtime, so a different binary always re-extracts even
-REM if the version string happens to match, and an identical binary is never
-REM confused with a stale cache. Fixes "gave 2.0.60, opened stale 2.0.40" on another PC.
-set GB2_PAYLOAD_HASH=
-for /f "skip=1 tokens=* delims=" %%h in ('certutil -hashfile "%PROJECT_DIR%manual_deployment\GB2.exe" MD5') do (
-    if not defined GB2_PAYLOAD_HASH set GB2_PAYLOAD_HASH=%%h
-)
-REM Strip any spaces certutil may insert
-set GB2_PAYLOAD_HASH=%GB2_PAYLOAD_HASH: =%
-if not defined GB2_PAYLOAD_HASH set GB2_PAYLOAD_HASH=nohash
-if not defined QUIET_MODE echo Payload hash: %GB2_PAYLOAD_HASH%
-
-"%NSIS_PATH%" /DVERSION=%GB2_VERSION_FULL% /DPAYLOADHASH=%GB2_PAYLOAD_HASH% gb2_launcher.nsi
-if %ERRORLEVEL% neq 0 (
-    echo ERROR: NSIS packaging failed!
-    goto :skip_nsis
-)
-
-call :sign_exe "C:\DSSAT48\Tools\gb2\GB2.exe"
-
-if not defined QUIET_MODE echo SUCCESS: Single portable exe saved to C:\DSSAT48\Tools\gb2\GB2.exe
-
-:skip_nsis
 if not defined QUIET_MODE (
     echo.
     echo ========================================
@@ -294,7 +223,7 @@ if not defined QUIET_MODE (
     echo ========================================
     echo.
     echo Deployment folder: %PROJECT_DIR%manual_deployment
-    echo Portable single exe: C:\DSSAT48\Tools\gb2\GB2.exe
+    echo Installed at: C:\DSSAT48\Tools\GB2\GB2.exe
     echo ========================================
     pause
 ) else (

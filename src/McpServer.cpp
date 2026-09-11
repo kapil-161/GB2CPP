@@ -157,7 +157,13 @@ QJsonObject runHeadless(const QStringList &args, const QString &savePath,
     // default platform.
     QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
     QString exeDir = QFileInfo(QCoreApplication::applicationFilePath()).absolutePath();
-#ifdef Q_OS_WIN
+#ifdef GB2_STATIC_BUILD
+    // Statically linked build: the offscreen plugin is compiled directly into
+    // the exe (see qt_import_plugins in CMakeLists.txt) — there's no separate
+    // platforms/*.dll to probe for, and none will ever exist. It's always
+    // available.
+    env.insert("QT_QPA_PLATFORM", "offscreen");
+#elif defined(Q_OS_WIN)
     if (QFileInfo::exists(exeDir + "/platforms/qoffscreen.dll"))
         env.insert("QT_QPA_PLATFORM", "offscreen");
 #else
