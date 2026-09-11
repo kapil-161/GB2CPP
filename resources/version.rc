@@ -22,7 +22,7 @@ BEGIN
             VALUE "FileDescription", "DSSAT GB2 Tool - Scientific Data Analysis"
             VALUE "FileVersion", "2.0.0.0"
             VALUE "InternalName", "GB2"
-            VALUE "LegalCopyright", "Copyright © 2025 DSSAT Foundation"
+            VALUE "LegalCopyright", "Copyright © 2026 DSSAT Foundation"
             VALUE "OriginalFilename", "GB2.exe"
             VALUE "ProductName", "DSSAT GB2 Tool"
             VALUE "ProductVersion", "2.0.0.0"

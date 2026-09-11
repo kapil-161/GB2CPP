@@ -1328,7 +1328,8 @@ void MainWindow::onAbout()
         QString("<h3>%1 v%2</h3>"
                 "<p>DSSAT  GB2 Tool</p>"
                 "<p>Built with Qt6 and C++</p>"
-                "<p>Copyright © 2025 DSSAT Foundation</p>")
+                "<p>Copyright © 2026 DSSAT Foundation</p>"
+                "<p>See the LICENSE file for terms of use.</p>")
         .arg(Config::APP_NAME, Config::APP_VERSION));
 }
 

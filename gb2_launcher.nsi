@@ -53,6 +53,7 @@ Section
 
     SetOutPath "$8"
     File "manual_deployment\GB2.exe"
+    File "manual_deployment\LICENSE.txt"
     File "manual_deployment\libgcc_s_seh-1.dll"
     File "manual_deployment\libstdc++-6.dll"
     File "manual_deployment\libwinpthread-1.dll"

@@ -1,0 +1,66 @@
+GB2 (DSSAT Lettuce Visualization Tool)
+LICENSE & WARRANTY AGREEMENT
+
+Copyright (c) 2026 Kapil Bhattarai. All rights reserved.
+
+IMPORTANT - READ CAREFULLY: This license and warranty agreement is a legal
+document between you (either an individual or a single entity) and Kapil
+Bhattarai ("the Author") governing use of the GB2 software and related
+materials ("GB2"). All rights not specifically granted in this Agreement are
+reserved to the Author. By installing or using GB2, you agree to be bound by
+the terms of this Agreement.
+
+Note: GB2 is a companion tool for viewing and analyzing output from DSSAT
+(Decision Support System for Agrotechnology Transfer). DSSAT itself is
+separately owned and licensed by the DSSAT Foundation under its own License
+& Warranty Agreement (see DSSAT48/Help/DSSAT v4.8 License & Warranty
+Agreement.pdf); nothing in this document grants any rights to DSSAT, and use
+of DSSAT alongside GB2 remains subject to the DSSAT Foundation's terms.
+
+_______________________________________________________________________
+
+SOFTWARE LICENSE
+
+Copyright: GB2 and related Materials are owned by the Author and are
+protected by United States and international copyright and treaty
+provisions.
+
+Definitions: As used herein, the following words, phrases, or terms in this
+Agreement shall have the following meanings:
+
+  "Software" means the actual copy of GB2 and all or any portion of the
+  computer programs delivered, inclusive of backups, updates, or
+  subsequently supplied versions.
+
+  "Related Materials" means all printed materials, user documentation,
+  training documentation, and source code provided with GB2.
+
+Grant of License:
+  1. GB2 may be installed and used on computers you or your organization
+     control, for the purpose of working with DSSAT simulation output.
+
+Description of Other Rights and Limitations:
+  1. Rental: You may not sell, rent, lease, sublicense, lend, time-share, or
+     transfer, in whole or in part, or provide unlicensed parties access to
+     prior or present versions of GB2 and related Materials, any updates, or
+     your rights under this Agreement, without the Author's prior written
+     consent.
+  2. Termination: Without prejudice to any other rights, the Author may
+     terminate this Agreement if you fail to comply with its terms and
+     conditions. In such an event, you must destroy all copies of the
+     Software and its component parts.
+
+WARRANTY
+
+The Author disclaims all warranties, whether expressed or implied, as to
+GB2's fitness, performance, or accuracy for any purpose, and assumes no
+liability or responsibility for loss or damage caused by the use of GB2.
+This disclaimer of liability includes, but is not limited to, the loss of
+data, time, and/or money. The Author is not liable for direct, indirect,
+and/or incidental damages resulting from defects, errors, or failure of GB2
+to perform.
+
+GB2 IS PROVIDED "AS IS." THE AUTHOR DISCLAIMS ALL OTHER WARRANTIES, EITHER
+EXPRESS OR IMPLIED, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
+MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE, WITH RESPECT TO THE
+SOFTWARE AND RELATED MATERIALS.

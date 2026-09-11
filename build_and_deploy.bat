@@ -13,6 +13,17 @@ if "%1"=="quiet" (
 REM Set Qt license bypass
 set QTFRAMEWORK_BYPASS_LICENSE_CHECK=1
 
+REM Code signing (optional): set one of these BEFORE running this script to
+REM sign the built exe(s). Unset = builds stay unsigned, exactly as before.
+REM   GB2_SIGN_CERT           path to a .pfx certificate file
+REM   GB2_SIGN_PASS           password for that .pfx (paired with GB2_SIGN_CERT)
+REM   GB2_SIGN_THUMBPRINT     SHA1 thumbprint of a cert in the Windows cert
+REM                           store (use this for an EV cert on a hardware
+REM                           token, which can't be exported as a .pfx)
+REM   GB2_SIGN_TIMESTAMP_URL  optional, defaults to DigiCert's RFC3161 server
+REM Requires signtool.exe (from the Windows SDK) on PATH or in its usual
+REM Windows Kits install location.
+
 REM Set paths - These will be auto-detected or you can override them
 set PROJECT_DIR=%~dp0
 
@@ -182,8 +193,13 @@ if exist build_win\bin\GB2.exe (
     exit /b 1
 )
 
+call :sign_exe "%PROJECT_DIR%manual_deployment\GB2.exe"
+
 REM Copy resources
 if exist resources xcopy /E /I resources manual_deployment\resources
+
+REM Copy license text so it ships alongside the exe
+if exist LICENSE copy /Y LICENSE manual_deployment\LICENSE.txt >nul
 
 if not defined QUIET_MODE echo.
 if not defined QUIET_MODE echo Step 5: Deploying Qt6 dependencies...
@@ -265,6 +281,9 @@ if %ERRORLEVEL% neq 0 (
     echo ERROR: NSIS packaging failed!
     goto :skip_nsis
 )
+
+call :sign_exe "C:\DSSAT48\Tools\gb2\GB2.exe"
+
 if not defined QUIET_MODE echo SUCCESS: Single portable exe saved to C:\DSSAT48\Tools\gb2\GB2.exe
 
 :skip_nsis
@@ -281,3 +300,43 @@ if not defined QUIET_MODE (
 ) else (
     echo Build complete. Deployment folder: %PROJECT_DIR%manual_deployment
 )
+
+exit /b 0
+
+REM ============================================================
+REM :sign_exe "path\to\file.exe"
+REM No-op unless GB2_SIGN_CERT or GB2_SIGN_THUMBPRINT is set (see top of file).
+REM ============================================================
+:sign_exe
+if not defined GB2_SIGN_CERT if not defined GB2_SIGN_THUMBPRINT (
+    if not defined QUIET_MODE echo Skipping code signing for %~1 ^(set GB2_SIGN_CERT or GB2_SIGN_THUMBPRINT to enable^)
+    exit /b 0
+)
+
+if not defined SIGNTOOL_PATH (
+    where signtool.exe >nul 2>&1
+    if not errorlevel 1 (
+        set SIGNTOOL_PATH=signtool.exe
+    ) else (
+        for /f "delims=" %%s in ('dir /b /s "C:\Program Files (x86)\Windows Kits\10\bin\*\x64\signtool.exe" 2^>nul') do if not defined SIGNTOOL_PATH set SIGNTOOL_PATH=%%s
+    )
+)
+if not defined SIGNTOOL_PATH (
+    echo WARNING: signtool.exe not found ^(install the Windows SDK^) - cannot sign %~1
+    exit /b 0
+)
+
+if not defined GB2_SIGN_TIMESTAMP_URL set GB2_SIGN_TIMESTAMP_URL=http://timestamp.digicert.com
+
+if not defined QUIET_MODE echo Signing %~1 ...
+if defined GB2_SIGN_THUMBPRINT (
+    "%SIGNTOOL_PATH%" sign /sha1 %GB2_SIGN_THUMBPRINT% /fd SHA256 /tr "%GB2_SIGN_TIMESTAMP_URL%" /td SHA256 "%~1"
+) else (
+    "%SIGNTOOL_PATH%" sign /f "%GB2_SIGN_CERT%" /p "%GB2_SIGN_PASS%" /fd SHA256 /tr "%GB2_SIGN_TIMESTAMP_URL%" /td SHA256 "%~1"
+)
+if errorlevel 1 (
+    echo WARNING: Signing failed for %~1
+) else (
+    if not defined QUIET_MODE echo Signed: %~1
+)
+exit /b 0
