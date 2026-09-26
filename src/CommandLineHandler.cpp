@@ -92,11 +92,7 @@ CommandLineArgs CommandLineHandler::parseCommandLineArgs(const QStringList &args
             // non-default install.
             result.dssatBase = DataProcessor::getDSSATBase();
             if (result.dssatBase.isEmpty()) {
-#ifdef Q_OS_WIN
-                result.dssatBase = "C:/DSSAT48";
-#else
-                result.dssatBase = "/Applications/DSSAT48";
-#endif
+                result.dssatBase = Config::DSSAT_BASE;
             }
             result.cropDir = result.dssatBase + "/" + result.cropName;
             result.isValid = true;

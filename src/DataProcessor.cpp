@@ -1263,28 +1263,37 @@ void DataProcessor::convertDates(DataTable &table)
 
 QString DataProcessor::getDSSATBase()
 {
-    // Check environment variable override first
-    QString envPath = qgetenv("DSSAT_PATH");
-    if (!envPath.isEmpty() && QDir(envPath).exists()) {
-        DataProcessor::m_dssatBasePath = envPath;
-        return envPath;
-    }
-    
-    // Use Config.h base path
-    QString basePath = Config::DSSAT_BASE;
-    if (QDir(basePath).exists()) {
-        DataProcessor::m_dssatBasePath = basePath;
-        return basePath;
-    }
-    
-    // Try other search paths from Config.h
-    for (const QString& searchPath : Config::DSSAT_SEARCH_PATHS) {
-        if (QDir(searchPath).exists()) {
-            DataProcessor::m_dssatBasePath = searchPath;
-            return searchPath;
+    // Candidate install roots in priority order. Every DSSAT lookup (base dir,
+    // DETAIL.CDE, DATA.CDE, DSSATPRO) resolves through this one list so they can
+    // never disagree about which installation is in use.
+    QStringList candidates;
+
+    // Environment variable override first
+    const QString envPath = qgetenv("DSSAT_PATH");
+    if (!envPath.isEmpty()) {
+        if (QDir(envPath).exists()) {
+            candidates << envPath;
+        } else {
+            static bool warned = false;
+            if (!warned) {
+                warned = true;
+                qWarning() << "DSSAT_PATH is set to" << envPath
+                           << "but that folder does not exist; falling back to default locations.";
+            }
         }
     }
-    
+
+    candidates << Config::DSSAT_BASE << Config::DSSAT_SEARCH_PATHS;
+    candidates << QStandardPaths::writableLocation(QStandardPaths::HomeLocation)
+                      + QDir::separator() + "DSSAT48";
+
+    for (const QString &path : candidates) {
+        if (QDir(path).exists()) {
+            DataProcessor::m_dssatBasePath = path;
+            return path;
+        }
+    }
+
     return QString();
 }
 
@@ -1536,40 +1545,40 @@ bool DataProcessor::isFilePlottable(const QString &filePath)
 
 QString DataProcessor::findDetailCde()
 {
-    QStringList searchPaths;
-    
-    // Check environment variable override first
-    QString envPath = qgetenv("DSSAT_PATH");
-    if (!envPath.isEmpty()) {
-        searchPaths << envPath + QDir::separator() + "DETAIL.CDE";
-    }
-    
-    // Add Config.h-defined search paths
-    for (const QString& basePath : Config::DSSAT_SEARCH_PATHS) {
-        searchPaths << basePath + QDir::separator() + "DETAIL.CDE";
-    }
-    
-    // Add user home directory paths
-    QString homeDir = QStandardPaths::writableLocation(QStandardPaths::HomeLocation);
-    searchPaths << homeDir + QDir::separator() + "DSSAT48" + QDir::separator() + "DETAIL.CDE";
-    
-    // Check each path
-    for (const QString &path : searchPaths) {
-        if (QFile::exists(path)) {
-            return path;
-        }
-    }
-    
-    // Try using current DSSAT base
     QString dssatBase = getDSSATBase();
-    if (!dssatBase.isEmpty()) {
-        QString detailPath = dssatBase + QDir::separator() + "DETAIL.CDE";
-        if (QFile::exists(detailPath)) {
-            return detailPath;
+    if (dssatBase.isEmpty()) {
+        return QString();
+    }
+    QString detailPath = dssatBase + QDir::separator() + "DETAIL.CDE";
+    return QFile::exists(detailPath) ? detailPath : QString();
+}
+
+// Locate the DSSATPRO profile file in a DSSAT base folder without assuming a
+// DSSAT version. Windows installs use DSSATPRO.Vnn and Unix installs DSSATPRO.Lnn;
+// if several versions are present the highest one wins. Any DSSATPRO.* file is
+// accepted as a last resort.
+static QString findProfileIn(const QString &base)
+{
+    QDir dir(base);
+    QStringList names = dir.entryList(QStringList() << "DSSATPRO.*", QDir::Files, QDir::Name);
+    if (names.isEmpty()) {
+        return QString();
+    }
+#ifdef Q_OS_WIN
+    const QString platformPrefix = "DSSATPRO.V";
+#else
+    const QString platformPrefix = "DSSATPRO.L";
+#endif
+    QString chosen;
+    for (const QString &name : names) {
+        if (name.startsWith(platformPrefix, Qt::CaseInsensitive)) {
+            chosen = name;  // names are sorted ascending, so the last match is the highest version
         }
     }
-    
-    return QString(); // Not found
+    if (chosen.isEmpty()) {
+        chosen = names.last();
+    }
+    return dir.absoluteFilePath(chosen);
 }
 
 QString DataProcessor::findDssatProFile()
@@ -1578,17 +1587,7 @@ QString DataProcessor::findDssatProFile()
     if (dssatBase.isEmpty()) {
         return QString();
     }
-    
-#ifdef Q_OS_WIN
-    QString proFile = dssatBase + QDir::separator() + "DSSATPRO.V48";
-#else
-    QString proFile = dssatBase + QDir::separator() + "DSSATPRO.L48";
-#endif
-    
-    if (QFile::exists(proFile)) {
-        return proFile;
-    }
-    return QString();
+    return findProfileIn(dssatBase);
 }
 
 bool DataProcessor::verifyDssatInstallation(const QString &basePath)
@@ -1596,20 +1595,19 @@ bool DataProcessor::verifyDssatInstallation(const QString &basePath)
     if (basePath.isEmpty()) {
         return false;
     }
-    
-    QStringList requiredFiles;
-#ifdef Q_OS_WIN
-    requiredFiles << "DSSATPRO.V48" << "DETAIL.CDE" << "DSCSM048.EXE";
-#else
-    requiredFiles << "DSSATPRO.L48" << "DETAIL.CDE" << "DSCSM048";
-#endif
-    
-    for (const QString &file : requiredFiles) {
-        if (!QFile::exists(basePath + QDir::separator() + file)) {
-            return false;
-        }
+
+    QDir dir(basePath);
+    if (!QFile::exists(dir.filePath("DETAIL.CDE")) || findProfileIn(basePath).isEmpty()) {
+        return false;
     }
-    return true;
+
+    // Model executable: DSCSMnnn (.EXE on Windows), whatever the version.
+#ifdef Q_OS_WIN
+    const QString exePattern = "DSCSM*.EXE";
+#else
+    const QString exePattern = "DSCSM*";
+#endif
+    return !dir.entryList(QStringList() << exePattern, QDir::Files).isEmpty();
 }
 
 QString DataProcessor::findDataCde()

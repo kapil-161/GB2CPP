@@ -1114,7 +1114,7 @@ void MainWindow::onUserManual()
 <table border="1" cellpadding="4" cellspacing="0" style="border-collapse:collapse;">
   <tr style="background:#E3F2FD;"><th>Statistic</th><th>Definition</th></tr>
   <tr><td><b>n</b></td><td>Number of simulated–observed pairs the statistics are computed from.</td></tr>
-  <tr><td><b>R&sup2;</b></td><td>Coefficient of determination — fraction of the variation in the observations explained by the simulations.</td></tr>
+  <tr><td><b>R&sup2;</b></td><td>Squared Pearson correlation between simulated and observed values.</td></tr>
   <tr><td><b>RMSE</b></td><td>Root mean squared error, in the variable's own units.</td></tr>
   <tr><td><b>NRMSE</b></td><td>RMSE normalized by the observed mean, expressed as a percent.</td></tr>
   <tr><td><b>d-stat</b></td><td>Willmott's index of agreement (0–1).</td></tr>

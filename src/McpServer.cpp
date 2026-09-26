@@ -15,6 +15,7 @@
 #include <QSet>
 
 #include "Config.h"
+#include "DataProcessor.h"
 
 #ifdef Q_OS_WIN
 #include <windows.h>
@@ -248,12 +249,12 @@ QJsonObject toolPlotTimeseries(const QJsonObject &args)
         return errorToolResult("plot_timeseries requires at least one yvars entry.");
 
     QString dssatBase = args.value("dssat_base").toString();
-    if (dssatBase.isEmpty())
-#ifdef Q_OS_WIN
-        dssatBase = "C:/DSSAT48";
-#else
-        dssatBase = "/Applications/DSSAT48";
-#endif
+    if (dssatBase.isEmpty()) {
+        // Same resolution as the GUI/CLI: DSSAT_PATH, then the platform defaults.
+        dssatBase = DataProcessor::getDSSATBase();
+        if (dssatBase.isEmpty())
+            dssatBase = Config::DSSAT_BASE;
+    }
     QString metricsPath = args.value("metrics_path").toString();
     bool boxplot = args.value("boxplot").toBool(false);
     bool grid = args.value("grid").toBool(false);
