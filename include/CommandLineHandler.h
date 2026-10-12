@@ -5,6 +5,7 @@
 #include <QString>
 #include <QStringList>
 #include <QTimer>
+#include "DataProcessor.h"
 
 class MainWindow;
 
@@ -36,6 +37,18 @@ class CommandLineHandler : public QObject
     Q_OBJECT
 
 public:
+    // Process exit codes reported to the calling program in headless mode
+    enum ExitCode {
+        ExitOk = 0,
+        ExitInternalError = 1,
+        ExitCropNotFound = 2,
+        ExitNoOutputFiles = 3,
+        ExitEmptyData = 4,
+        ExitExportFailed = 5,
+        ExitTimeout = 6
+    };
+    static constexpr int kRenderTimeoutMs = 60000;  // safety net only, not a normal wait
+
     explicit CommandLineHandler(QObject *parent = nullptr);
     
     static CommandLineArgs parseCommandLineArgs(const QStringList &args);
@@ -47,6 +60,7 @@ private slots:
     void loadInitialContent();
     void headlessAutoPlot();
     void headlessScatterPlot();
+    void runScatterPlot(const DataTable &evalData);
 
 private:
     MainWindow *m_mainWindow;

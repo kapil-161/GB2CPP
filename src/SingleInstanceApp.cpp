@@ -25,7 +25,18 @@ SingleInstanceApp::SingleInstanceApp(int &argc, char **argv, const QString &appI
 #endif
 {
     // Check if we're the first instance
-    m_isFirstInstance = !lockInstance();
+    // Headless command-line renders are short-lived batch jobs: never take the lock,
+    // so several can run in parallel and none blocks a GUI launch.
+    bool headless = false;
+    for (int i = 1; i < argc; ++i) {
+        const QByteArray a(argv[i]);
+        if (a.compare("--save", Qt::CaseInsensitive) == 0 ||
+            a.compare("--scatter", Qt::CaseInsensitive) == 0) {
+            headless = true;
+            break;
+        }
+    }
+    m_isFirstInstance = headless ? true : !lockInstance();
     
     if (!m_isFirstInstance) {
     } else {

@@ -9,6 +9,10 @@
 #include <QMessageBox>
 #include <QListWidget>
 #include <QRegularExpression>
+#include <QElapsedTimer>
+#include <QFile>
+#include <QFileInfo>
+#include <memory>
 
 CommandLineHandler::CommandLineHandler(QObject *parent)
     : QObject(parent), m_mainWindow(nullptr)
@@ -164,7 +168,7 @@ void CommandLineHandler::applyCommandLineArgsToUI()
             QString message = QString("Crop folder '%1' not found").arg(m_args.cropName);
             if (m_args.headlessMode) {
                 qCritical() << message;
-                QApplication::quit();
+                QApplication::exit(ExitCropNotFound);
             } else {
                 QMessageBox::warning(m_mainWindow, "Command Line Warning", message);
             }
@@ -196,7 +200,7 @@ void CommandLineHandler::selectOutputFiles()
     if (!m_mainWindow || m_args.outputFiles.isEmpty()) {
         // For scatter headless mode, no output files needed — go straight to scatter plot
         if (m_args.scatterMode)
-            QTimer::singleShot(100, this, &CommandLineHandler::loadInitialContent);
+            QTimer::singleShot(0, this, &CommandLineHandler::loadInitialContent);
         return;
     }
     
@@ -207,13 +211,13 @@ void CommandLineHandler::selectOutputFiles()
                                 .arg(m_args.cropName).arg(selectedCount);
 
             // Load the first tab content
-            QTimer::singleShot(100, this, &CommandLineHandler::loadInitialContent);
+            QTimer::singleShot(0, this, &CommandLineHandler::loadInitialContent);
         } else {
             QString message = QString("No valid output files found from: %1")
                                 .arg(m_args.outputFiles.join(", "));
             if (m_args.headlessMode) {
                 qCritical() << "CommandLineHandler (headless):" << message;
-                QApplication::quit();
+                QApplication::exit(ExitNoOutputFiles);
             } else {
                 QMessageBox::warning(m_mainWindow, "Warning", message);
             }
@@ -242,13 +246,13 @@ void CommandLineHandler::loadInitialContent()
 
             if (m_args.scatterMode) {
                 // Scatter headless — trigger scatter plot directly
-                QTimer::singleShot(300, this, &CommandLineHandler::headlessScatterPlot);
+                QTimer::singleShot(0, this, &CommandLineHandler::headlessScatterPlot);
             } else if (currentTab == 0) {  // Time series tab
                 // Load variables but don't auto-plot
                 m_mainWindow->loadVariables();
 
                 if (m_args.headlessMode) {
-                    QTimer::singleShot(300, this, &CommandLineHandler::headlessAutoPlot);
+                    QTimer::singleShot(0, this, &CommandLineHandler::headlessAutoPlot);
                 }
             }
             
@@ -310,14 +314,14 @@ QString CommandLineHandler::extractCropNameFromPath(const QString &cropDirPath)
 void CommandLineHandler::headlessAutoPlot()
 {
     if (!m_mainWindow) {
-        QApplication::quit();
+        QApplication::exit(ExitInternalError);
         return;
     }
 
     PlotWidget *plot = m_mainWindow->getPlotWidget();
     if (!plot) {
         qCritical() << "CommandLineHandler (headless): no PlotWidget";
-        QApplication::quit();
+        QApplication::exit(ExitInternalError);
         return;
     }
 
@@ -351,90 +355,140 @@ void CommandLineHandler::headlessAutoPlot()
         plot->setPlotSettings(s);
     }
 
-    // Trigger plot update
-    m_mainWindow->updateTimeSeriesPlot();
-
-    // After 2000 ms: export plot and/or save metrics, then quit.
-    // Axes are now fitted synchronously so 2s is sufficient for Qt to finish rendering.
-    QTimer::singleShot(2000, this, [this]() {
-        PlotWidget *plot = m_mainWindow->getPlotWidget();
-        if (plot && !m_args.savePlotPath.isEmpty()) {
+    // Export as soon as the plot reports it has finished drawing (no fixed delay).
+    // The timer is only a safety net so a failed render cannot hang the process.
+    auto finished = std::make_shared<bool>(false);
+    auto doExport = [this, plot, finished]() {
+        if (*finished) return;
+        *finished = true;
+        int code = ExitOk;
+        if (!m_args.savePlotPath.isEmpty()) {
             // Render at a fixed canvas size, then export at 300 DPI (or vector PDF
             // if the save path ends in .pdf) via the publication-quality path
             plot->resize(1200, 800);
             QApplication::processEvents(QEventLoop::AllEvents, 500);
+            QFile::remove(m_args.savePlotPath);
             plot->exportPlot(m_args.savePlotPath, "PNG", 300);
+            if (!QFileInfo::exists(m_args.savePlotPath)) {
+                qCritical() << "CommandLineHandler (headless): plot export failed:" << m_args.savePlotPath;
+                code = ExitExportFailed;
+            }
         }
         if (!m_args.saveMetricsPath.isEmpty()) {
             if (!m_mainWindow->saveMetricsToFile(m_args.saveMetricsPath)) {
                 qWarning() << "CommandLineHandler (headless): failed to save metrics to"
                            << m_args.saveMetricsPath;
+                if (code == ExitOk) code = ExitExportFailed;
             }
         }
-        QApplication::quit();
+        QApplication::exit(code);
+    };
+    connect(plot, &PlotWidget::plotUpdated, this, [doExport]() {
+        QTimer::singleShot(0, doExport);  // let the layout pass finish first
+    }, Qt::SingleShotConnection);
+    QTimer::singleShot(kRenderTimeoutMs, this, [finished]() {
+        if (!*finished) {
+            qCritical() << "CommandLineHandler (headless): timed out waiting for plot";
+            QApplication::exit(ExitTimeout);
+        }
     });
+
+    // Trigger plot update
+    m_mainWindow->updateTimeSeriesPlot();
 }
 
 void CommandLineHandler::headlessScatterPlot()
 {
-    if (!m_mainWindow) { QApplication::quit(); return; }
+    if (!m_mainWindow) { QApplication::exit(ExitInternalError); return; }
 
     PlotWidget *plot = m_mainWindow->getScatterPlotWidget();
     if (!plot) {
         fprintf(stderr, "[SCATTER-HEADLESS] no scatter PlotWidget\n"); fflush(stderr);
-        QApplication::quit();
+        QApplication::exit(ExitInternalError);
         return;
     }
 
     // Select Evaluate.OUT via the same UI path as the user would
     m_mainWindow->selectOutputFiles({"Evaluate.OUT"});
 
-    // Wait for file to load then get evaluate data and plot
-    QTimer::singleShot(1500, this, [this]() {
-        PlotWidget *plot = m_mainWindow->getScatterPlotWidget();
+    // Poll until the evaluation data has loaded (or the timeout expires)
+    auto elapsed = std::make_shared<QElapsedTimer>();
+    elapsed->start();
+    auto *poll = new QTimer(this);
+    poll->setInterval(25);
+    connect(poll, &QTimer::timeout, this, [this, poll, elapsed]() {
         DataTable evalData = m_mainWindow->getEvaluateData();
-
         if (evalData.rowCount == 0) {
-            QApplication::quit();
+            if (elapsed->elapsed() < kRenderTimeoutMs) return;
+            qCritical() << "CommandLineHandler (headless): Evaluate data empty or not loaded";
+            poll->stop();
+            poll->deleteLater();
+            QApplication::exit(ExitEmptyData);
             return;
         }
-
-        // Determine variables
-        QStringList vars = m_args.scatterVars;
-        if (vars.isEmpty()) {
-            QSet<QString> seen;
-            for (const QString &col : evalData.columnNames) {
-                if ((col.endsWith('S') || col.endsWith('M')) && col.length() > 1) {
-                    QString base = col.left(col.length() - 1);
-                    if (!seen.contains(base)) { seen.insert(base); vars.append(base); }
-                }
-                if (vars.size() >= 4) break;
-            }
-        }
-
-        // Apply metrics
-        if (!m_args.scatterMetrics.isEmpty()) {
-            PlotSettings s = plot->getPlotSettings();
-            s.scatterMetrics.clear();
-            for (const QString &m : m_args.scatterMetrics) {
-                if (m == "R2") s.scatterMetrics.insert("R\xc2\xb2");  // R²
-                else if (m.compare("BIAS", Qt::CaseInsensitive) == 0) s.scatterMetrics.insert("Bias");
-                else s.scatterMetrics.insert(m);
-            }
-            plot->setPlotSettings(s);
-        }
-
-        plot->plotScatter(evalData, vars);
-
-        // Export after render
-        QTimer::singleShot(3000, this, [this]() {
-            PlotWidget *p = m_mainWindow->getScatterPlotWidget();
-            if (p && !m_args.savePlotPath.isEmpty()) {
-                p->show();
-                QApplication::processEvents(QEventLoop::AllEvents, 500);
-                p->exportPlot(m_args.savePlotPath, "PNG");
-            }
-            QApplication::quit();
-        });
+        poll->stop();
+        poll->deleteLater();
+        runScatterPlot(evalData);
     });
+    poll->start();
+}
+
+void CommandLineHandler::runScatterPlot(const DataTable &evalData)
+{
+    PlotWidget *plot = m_mainWindow->getScatterPlotWidget();
+
+    // Determine variables
+    QStringList vars = m_args.scatterVars;
+    if (vars.isEmpty()) {
+        QSet<QString> seen;
+        for (const QString &col : evalData.columnNames) {
+            if ((col.endsWith('S') || col.endsWith('M')) && col.length() > 1) {
+                QString base = col.left(col.length() - 1);
+                if (!seen.contains(base)) { seen.insert(base); vars.append(base); }
+            }
+            if (vars.size() >= 4) break;
+        }
+    }
+
+    // Apply metrics
+    if (!m_args.scatterMetrics.isEmpty()) {
+        PlotSettings s = plot->getPlotSettings();
+        s.scatterMetrics.clear();
+        for (const QString &m : m_args.scatterMetrics) {
+            if (m == "R2") s.scatterMetrics.insert("R\xc2\xb2");  // R²
+            else if (m.compare("BIAS", Qt::CaseInsensitive) == 0) s.scatterMetrics.insert("Bias");
+            else s.scatterMetrics.insert(m);
+        }
+        plot->setPlotSettings(s);
+    }
+
+    auto finished = std::make_shared<bool>(false);
+    auto doExport = [this, finished]() {
+        if (*finished) return;
+        *finished = true;
+        int code = ExitOk;
+        PlotWidget *p = m_mainWindow->getScatterPlotWidget();
+        if (p && !m_args.savePlotPath.isEmpty()) {
+            p->show();
+            QApplication::processEvents(QEventLoop::AllEvents, 500);
+            QFile::remove(m_args.savePlotPath);
+            p->exportPlot(m_args.savePlotPath, "PNG");
+            if (!QFileInfo::exists(m_args.savePlotPath)) {
+                qCritical() << "CommandLineHandler (headless): plot export failed:" << m_args.savePlotPath;
+                code = ExitExportFailed;
+            }
+        }
+        QApplication::exit(code);
+    };
+    connect(plot, &PlotWidget::plotUpdated, this, [doExport]() {
+        QTimer::singleShot(0, doExport);  // let deferred panel resize run first
+    }, Qt::SingleShotConnection);
+    QTimer::singleShot(kRenderTimeoutMs, this, [finished]() {
+        if (!*finished) {
+            qCritical() << "CommandLineHandler (headless): timed out waiting for plot";
+            QApplication::exit(ExitTimeout);
+        }
+    });
+
+    plot->plotScatter(evalData, vars);
 }
