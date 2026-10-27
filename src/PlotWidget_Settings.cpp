@@ -97,71 +97,83 @@ void PlotWidget::onSettingsButtonClicked()
     }
 
     PlotSettingsDialog dialog(m_plotSettings, this, this);
-    if (dialog.exec() == QDialog::Accepted) {
-        PlotSettings newSettings = dialog.getSettings();
+    // Apply keeps the dialog open; OK applies (again, if anything changed) and closes
+    connect(&dialog, &PlotSettingsDialog::applyRequested, this, [this, &dialog]() {
+        applySettingsFromDialog(dialog.getSettings(), false);
+    });
+    if (dialog.exec() == QDialog::Accepted)
+        applySettingsFromDialog(dialog.getSettings(), dialog.shouldPersist());
+}
 
-        // Capture all diffs BEFORE applyPlotSettings/m_plotSettings=newSettings overwrites old values
-        bool filterChanged    = (m_plotSettings.excludedSeriesKeys != newSettings.excludedSeriesKeys);
-        bool errorBarChanged  = (m_plotSettings.showErrorBars != newSettings.showErrorBars) ||
-                                (m_plotSettings.errorBarType  != newSettings.errorBarType);
-        bool axisRangeChanged = (m_plotSettings.useCustomXMin != newSettings.useCustomXMin) ||
-                                (m_plotSettings.useCustomXMax != newSettings.useCustomXMax) ||
-                                (m_plotSettings.useCustomYMin != newSettings.useCustomYMin) ||
-                                (m_plotSettings.useCustomYMax != newSettings.useCustomYMax) ||
-                                (m_plotSettings.xAxisMin      != newSettings.xAxisMin) ||
-                                (m_plotSettings.xAxisMax      != newSettings.xAxisMax) ||
-                                (m_plotSettings.yAxisMin      != newSettings.yAxisMin) ||
-                                (m_plotSettings.yAxisMax      != newSettings.yAxisMax) ||
-                                (m_plotSettings.yAxisTickSpacing != newSettings.yAxisTickSpacing) ||
-                                (m_plotSettings.xAxisTickSpacing != newSettings.xAxisTickSpacing);
-        bool boxReplot        = (m_plotSettings.yAxisTickSpacing    != newSettings.yAxisTickSpacing) ||
-                                (m_plotSettings.yAxisDecimals      != newSettings.yAxisDecimals);
-        bool layoutChanged    = (m_plotSettings.multiPanelTimeSeries != newSettings.multiPanelTimeSeries) ||
-                                (m_plotSettings.gridByExperiment     != newSettings.gridByExperiment) ||
-                                (m_plotSettings.plotMeanReps        != newSettings.plotMeanReps);
+void PlotWidget::applySettingsFromDialog(const PlotSettings &newSettings, bool persist)
+{
+    // Tell listeners (the export preview) once the plot reflects the new settings,
+    // on every return path below
+    struct EmitOnExit {
+        PlotWidget *w;
+        ~EmitOnExit() { emit w->plotSettingsApplied(); }
+    } emitOnExit{ this };
+    // Capture all diffs BEFORE applyPlotSettings/m_plotSettings=newSettings overwrites old values
+    bool filterChanged    = (m_plotSettings.excludedSeriesKeys != newSettings.excludedSeriesKeys);
+    bool errorBarChanged  = (m_plotSettings.showErrorBars != newSettings.showErrorBars) ||
+                            (m_plotSettings.errorBarType  != newSettings.errorBarType);
+    bool axisRangeChanged = (m_plotSettings.useCustomXMin != newSettings.useCustomXMin) ||
+                            (m_plotSettings.useCustomXMax != newSettings.useCustomXMax) ||
+                            (m_plotSettings.useCustomYMin != newSettings.useCustomYMin) ||
+                            (m_plotSettings.useCustomYMax != newSettings.useCustomYMax) ||
+                            (m_plotSettings.xAxisMin      != newSettings.xAxisMin) ||
+                            (m_plotSettings.xAxisMax      != newSettings.xAxisMax) ||
+                            (m_plotSettings.yAxisMin      != newSettings.yAxisMin) ||
+                            (m_plotSettings.yAxisMax      != newSettings.yAxisMax) ||
+                            (m_plotSettings.yAxisTickSpacing != newSettings.yAxisTickSpacing) ||
+                            (m_plotSettings.xAxisTickSpacing != newSettings.xAxisTickSpacing);
+    bool boxReplot        = (m_plotSettings.yAxisTickSpacing    != newSettings.yAxisTickSpacing) ||
+                            (m_plotSettings.yAxisDecimals      != newSettings.yAxisDecimals);
+    bool layoutChanged    = (m_plotSettings.multiPanelTimeSeries != newSettings.multiPanelTimeSeries) ||
+                            (m_plotSettings.gridByExperiment     != newSettings.gridByExperiment) ||
+                            (m_plotSettings.plotMeanReps        != newSettings.plotMeanReps);
 
-        applyPlotSettings(newSettings);
-        m_plotSettings = newSettings;
-        // OK applies to the current session/plot only; "Save Settings" also persists
-        // the settings to disk so they survive a restart.
-        if (dialog.shouldPersist())
-            saveSettings();
+    applyPlotSettings(newSettings);
+    m_plotSettings = newSettings;
+    // OK applies to the current session/plot only; "Save Settings" also persists
+    // the settings to disk so they survive a restart.
+    if (persist)
+        saveSettings();
 
-        // Toggling error bars switches the chart between aggregated mean-points and
-        // raw points (and, with DATE-gap axis breaks, swaps the x-axis type). Mutating
-        // the existing chart in place leaves stale axis/series state that has caused
-        // garbage axis labels and hangs. For an error-bar change, tear the chart down
-        // completely and rebuild from scratch so nothing stale survives.
-        if (errorBarChanged && !m_isScatterMode && !m_isBoxPlotMode && m_simData.rowCount > 0) {
-            clearChart();
+    // Toggling error bars switches the chart between aggregated mean-points and
+    // raw points (and, with DATE-gap axis breaks, swaps the x-axis type). Mutating
+    // the existing chart in place leaves stale axis/series state that has caused
+    // garbage axis labels and hangs. For an error-bar change, tear the chart down
+    // completely and rebuild from scratch so nothing stale survives.
+    if (errorBarChanged && !m_isScatterMode && !m_isBoxPlotMode && m_simData.rowCount > 0) {
+        clearChart();
+        updatePlotWithScaling();
+        if (m_obsData.rowCount > 0)
+            calculateMetrics();
+        return;
+    }
+
+    if (m_isScatterMode && m_simData.rowCount > 0 && !m_currentYVars.isEmpty()) {
+        // Always replot scatter — metrics selection, appearance, etc. all require rebuild
+        DataTable dataCopy = m_simData;
+        plotScatter(dataCopy, m_currentYVars);
+    } else if (m_isBoxPlotMode && m_simData.rowCount > 0) {
+        if (boxReplot || filterChanged || axisRangeChanged) {
+            updatePlotWithScaling();
+        }
+    } else if (!m_isScatterMode && m_simData.rowCount > 0) {
+        bool hasCustomRange = newSettings.useCustomXMin || newSettings.useCustomXMax
+                              || newSettings.useCustomYMin || newSettings.useCustomYMax;
+        if (filterChanged || layoutChanged) {
             updatePlotWithScaling();
             if (m_obsData.rowCount > 0)
                 calculateMetrics();
-            return;
-        }
-
-        if (m_isScatterMode && m_simData.rowCount > 0 && !m_currentYVars.isEmpty()) {
-            // Always replot scatter — metrics selection, appearance, etc. all require rebuild
-            DataTable dataCopy = m_simData;
-            plotScatter(dataCopy, m_currentYVars);
-        } else if (m_isBoxPlotMode && m_simData.rowCount > 0) {
-            if (boxReplot || filterChanged || axisRangeChanged) {
-                updatePlotWithScaling();
-            }
-        } else if (!m_isScatterMode && m_simData.rowCount > 0) {
-            bool hasCustomRange = newSettings.useCustomXMin || newSettings.useCustomXMax
-                                  || newSettings.useCustomYMin || newSettings.useCustomYMax;
-            if (filterChanged || layoutChanged) {
-                updatePlotWithScaling();
-                if (m_obsData.rowCount > 0)
-                    calculateMetrics();
-            } else if (axisRangeChanged) {
-                updatePlotWithScaling();
-            } else if (hasCustomRange) {
-                // Custom range active but nothing changed — just re-apply axis range to live chart
-                // without a full replot (avoids resetting legend, treatment panel, etc.)
-                applyPlotSettings(m_plotSettings);
-            }
+        } else if (axisRangeChanged) {
+            updatePlotWithScaling();
+        } else if (hasCustomRange) {
+            // Custom range active but nothing changed — just re-apply axis range to live chart
+            // without a full replot (avoids resetting legend, treatment panel, etc.)
+            applyPlotSettings(m_plotSettings);
         }
     }
 }

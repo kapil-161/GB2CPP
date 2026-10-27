@@ -286,6 +286,7 @@ protected:
 
 signals:
     void plotUpdated();
+    void plotSettingsApplied();  // Plot Settings OK/Apply changed the plot
     void errorOccurred(const QString &error);
     void metricsCalculated(const QVector<QMap<QString, QVariant>> &metrics);
     void xVariableChanged(const QString &xVariable);
@@ -397,6 +398,8 @@ private:
     void floatLegend();
     void dockLegend();
     void fitFloatingLegendHeight();
+    // Apply settings chosen in Plot Settings (OK or Apply) and replot as needed
+    void applySettingsFromDialog(const PlotSettings &newSettings, bool persist);
 
     // Legacy functions (kept for compatibility)
     void createLegendHeader();

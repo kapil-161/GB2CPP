@@ -1004,7 +1004,15 @@ void MainWindow::onExportPlot()
     form->addRow("Width:", widthBox);
     form->addRow("Height:", heightBox);
     form->addRow("Resolution (DPI):", dpiCombo);
-    form->addRow(legendCheck);
+    // Fonts, markers, line widths, axes etc. are in Plot Settings; open it from here so
+    // the preview shows the effect (Apply there updates the preview without closing)
+    auto *settingsButton = new QPushButton("Plot Settings...", &dlg);
+    settingsButton->setEnabled(activeWidget != nullptr);
+    auto *legendRow = new QHBoxLayout();
+    legendRow->addWidget(legendCheck);
+    legendRow->addStretch(1);
+    legendRow->addWidget(settingsButton);
+    form->addRow(legendRow);
     form->addRow(hint);
     form->addRow(buttons);
     connect(buttons, &QDialogButtonBox::accepted, &dlg, &QDialog::accept);
@@ -1070,6 +1078,12 @@ void MainWindow::onExportPlot()
     connect(widthBox,  QOverload<double>::of(&QDoubleSpinBox::valueChanged), &dlg, schedulePreview);
     connect(heightBox, QOverload<double>::of(&QDoubleSpinBox::valueChanged), &dlg, schedulePreview);
     connect(legendCheck, &QCheckBox::toggled, &dlg, schedulePreview);
+    if (activeWidget) {
+        connect(activeWidget, &PlotWidget::plotSettingsApplied, &dlg, schedulePreview);
+        connect(settingsButton, &QPushButton::clicked, &dlg, [activeWidget]() {
+            activeWidget->onSettingsButtonClicked();
+        });
+    }
     QTimer::singleShot(0, &dlg, schedulePreview);  // first preview once the dialog is shown
 
     if (dlg.exec() != QDialog::Accepted) return;

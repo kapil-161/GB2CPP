@@ -578,9 +578,14 @@ void PlotSettingsDialog::setupUI()
 
     buttonLayout->addStretch();
 
-    QDialogButtonBox *buttonBox = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel);
+    QDialogButtonBox *buttonBox = new QDialogButtonBox(
+        QDialogButtonBox::Ok | QDialogButtonBox::Apply | QDialogButtonBox::Cancel);
     if (QPushButton *okBtn = buttonBox->button(QDialogButtonBox::Ok))
         okBtn->setToolTip("Apply these settings to the current plot for this session only (not saved)");
+    if (QPushButton *applyBtn = buttonBox->button(QDialogButtonBox::Apply)) {
+        applyBtn->setToolTip("Apply to the plot and keep this dialog open (e.g. to watch the export preview)");
+        connect(applyBtn, &QPushButton::clicked, this, &PlotSettingsDialog::applyRequested);
+    }
     connect(buttonBox, &QDialogButtonBox::accepted, this, &QDialog::accept);
     connect(buttonBox, &QDialogButtonBox::rejected, this, &QDialog::reject);
     buttonLayout->addWidget(buttonBox);

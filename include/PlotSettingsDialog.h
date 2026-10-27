@@ -131,6 +131,10 @@ public:
     // plain OK, which applies to the current session/plot but is not written out.
     bool shouldPersist() const { return m_persist; }
 
+signals:
+    // Apply button: apply the current choices to the plot without closing the dialog
+    void applyRequested();
+
 private slots:
     void onBackgroundColorClicked();
     void onPlotAreaColorClicked();

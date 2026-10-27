@@ -3692,10 +3692,42 @@ static void thinCrowdedValueAxes(QChart *chart, QList<SavedValueAxisTicks> &save
         const int fits = qMax(2, int(length / labelSize) + 1);
         if (shown <= fits) continue;
         saved.append({ va, va->tickType(), va->tickCount(), va->tickInterval(), va->tickAnchor() });
+        if (fits <= 2) {
+            // Room for two labels only: a round step would usually overshoot the range
+            // and leave a single label, so label the two ends of the axis instead
+            va->setTickType(QValueAxis::TicksFixed);
+            va->setTickCount(2);
+            continue;
+        }
         const double step = niceStepAtLeast((va->max() - va->min()) / (fits - 1));
         va->setTickAnchor(std::ceil(va->min() / step) * step);
         va->setTickInterval(step);
         va->setTickType(QValueAxis::TicksDynamic);
+    }
+}
+
+// When a small panel has no room for an axis title, Qt Charts shrinks it to "..." and
+// draws that over the tick labels; hide such titles for the export instead
+static void hideSqueezedAxisTitles(QChart *chart, QList<QAbstractAxis*> &hidden)
+{
+    const QRectF pa = chart->plotArea();
+    const QRectF all = chart->rect();
+    for (QAbstractAxis *ax : chart->axes()) {
+        if (!ax->isTitleVisible() || ax->titleText().isEmpty()) continue;
+        const QFontMetrics labelFm(ax->labelsFont()), titleFm(ax->titleFont());
+        const bool horizontal = ax->orientation() == Qt::Horizontal;
+        // A title is cut short when it is longer than its axis, or (below the X axis)
+        // when the strip under the plot is too short for the labels plus the title
+        const double length = horizontal ? pa.width() : pa.height();
+        bool squeezed = titleFm.horizontalAdvance(ax->titleText()) > length;
+        // (the chart's own bottom margin is part of that strip but holds no text)
+        if (horizontal)
+            squeezed |= (all.bottom() - pa.bottom() - chart->margins().bottom())
+                         < labelFm.height() + titleFm.height() + 6;
+        if (squeezed) {
+            ax->setTitleVisible(false);
+            hidden.append(ax);
+        }
     }
 }
 
@@ -3957,10 +3989,14 @@ void PlotWidget::exportPlot(const QString &filePath, const QString &format, int 
         QApplication::processEvents();
     }
     QList<SavedValueAxisTicks> savedValueTicks;
+    QList<QAbstractAxis*> hiddenAxisTitles;
     if (resizeForExport) {
         for (QChartView *cv : findChildren<QChartView*>())
             if (cv->chart() && cv->isVisible()) thinCrowdedValueAxes(cv->chart(), savedValueTicks);
         if (!savedValueTicks.isEmpty()) QApplication::processEvents();
+        for (QChartView *cv : findChildren<QChartView*>())
+            if (cv->chart() && cv->isVisible()) hideSqueezedAxisTitles(cv->chart(), hiddenAxisTitles);
+        if (!hiddenAxisTitles.isEmpty()) QApplication::processEvents();
     }
     // adjustSize() measures the polished label; its preset size can under-measure and
     // cut off the last value. If the metrics could not be moved above the plot, pin the
@@ -4003,6 +4039,7 @@ void PlotWidget::exportPlot(const QString &filePath, const QString &format, int 
         window()->restoreGeometry(savedWindowGeometry);
         QApplication::processEvents();
         if (exportDateAxis) exportDateAxis->setTickCount(calculateOptimalDateTickCount());
+        for (QAbstractAxis *ax : hiddenAxisTitles) ax->setTitleVisible(true);
         for (const auto &t : savedValueTicks) {
             t.axis->setTickType(t.type);
             t.axis->setTickInterval(t.interval);
