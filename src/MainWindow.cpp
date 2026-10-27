@@ -24,6 +24,11 @@
 #include <QDialog>
 #include <QDialogButtonBox>
 #include <QInputDialog>
+#include <QFormLayout>
+#include <QComboBox>
+#include <QDoubleSpinBox>
+#include <QCheckBox>
+#include <QLabel>
 #include <QDragEnterEvent>
 #include <QDragMoveEvent>
 #include <QDropEvent>
@@ -928,24 +933,104 @@ void MainWindow::onExportPlot()
     else if (suffix == "jpg" || suffix == "jpeg") format = "JPG";
     else if (suffix == "png")                     format = "PNG";
 
-    // PDF is vector — resolution-independent. For raster formats ask the target DPI.
-    int dpi = 300;
-    if (format != "PDF") {
-        QStringList dpiOptions = { "300 DPI", "600 DPI", "150 DPI", "96 DPI" };
-        bool dpiOk = false;
-        QString choice = QInputDialog::getItem(this, "Export Resolution",
-            "Image resolution:", dpiOptions, 0, false, &dpiOk);
-        if (!dpiOk) return;
-        dpi = choice.section(' ', 0, 0).toInt();
-    }
+    // Figure size: the plot is laid out at the physical size it will be placed at, so
+    // fonts stay legible when several figures share one slide. PDF is vector, so it
+    // only needs the size; raster formats also need the DPI.
+    struct SizePreset { const char *label; double w, h; };
+    static const SizePreset presets[] = {
+        { "As shown on screen",                0.0, 0.0 },
+        { "Slide, 1 per slide (9 x 5.5 in)",   9.0, 5.5 },
+        { "Slide, 2 per slide (6 x 4.5 in)",   6.0, 4.5 },
+        { "Slide, 4 per slide (6 x 2.9 in)",   6.0, 2.9 },
+        { "Slide, 6 per slide (4.1 x 2.9 in)", 4.1, 2.9 },
+        { "Journal, 1 column (3.5 x 2.6 in)",  3.5, 2.6 },
+        { "Journal, 2 columns (7 x 4.5 in)",   7.0, 4.5 },
+        { "Custom",                            0.0, 0.0 },
+    };
+    const int nPresets = int(sizeof(presets) / sizeof(presets[0]));
+    const int customIndex = nPresets - 1;
+
+    QSettings settings("DSSAT", "GB2");
+    QDialog dlg(this);
+    dlg.setWindowTitle("Export Plot");
+    auto *form = new QFormLayout(&dlg);
+    auto *sizeCombo = new QComboBox(&dlg);
+    for (const SizePreset &p : presets) sizeCombo->addItem(p.label);
+    auto makeInchBox = [&dlg](double value) {
+        auto *box = new QDoubleSpinBox(&dlg);
+        box->setRange(1.0, 30.0);
+        box->setDecimals(2);
+        box->setSingleStep(0.1);
+        box->setSuffix(" in");
+        box->setValue(value);
+        return box;
+    };
+    auto *widthBox  = makeInchBox(settings.value("export/widthIn", 4.1).toDouble());
+    auto *heightBox = makeInchBox(settings.value("export/heightIn", 2.9).toDouble());
+    auto *dpiCombo = new QComboBox(&dlg);
+    dpiCombo->addItems({ "300", "600", "150", "96" });
+    dpiCombo->setCurrentText(settings.value("export/dpi", "300").toString());
+    dpiCombo->setEnabled(format != "PDF");
+    auto *legendCheck = new QCheckBox("Include legend", &dlg);
+    legendCheck->setChecked(settings.value("export/includeLegend", true).toBool());
+    auto *hint = new QLabel("Fonts, lines and markers keep their point size at the chosen size.\n"
+                            "Insert the image at this size (don't shrink it) for readable text.\n"
+                            "On small figures the legend is placed below the plot. For several\n"
+                            "plots per slide you can also export the plots without the legend.", &dlg);
+    hint->setStyleSheet("color: gray;");
+    auto *buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dlg);
+    form->addRow("Figure size:", sizeCombo);
+    form->addRow("Width:", widthBox);
+    form->addRow("Height:", heightBox);
+    form->addRow("Resolution (DPI):", dpiCombo);
+    form->addRow(legendCheck);
+    form->addRow(hint);
+    form->addRow(buttons);
+    connect(buttons, &QDialogButtonBox::accepted, &dlg, &QDialog::accept);
+    connect(buttons, &QDialogButtonBox::rejected, &dlg, &QDialog::reject);
+
+    bool applyingPreset = false;
+    auto updateSizeEnabled = [&]() {
+        bool onScreen = sizeCombo->currentIndex() == 0;
+        widthBox->setEnabled(!onScreen);
+        heightBox->setEnabled(!onScreen);
+    };
+    connect(sizeCombo, QOverload<int>::of(&QComboBox::currentIndexChanged), &dlg, [&](int i) {
+        if (presets[i].w > 0) {
+            applyingPreset = true;
+            widthBox->setValue(presets[i].w);
+            heightBox->setValue(presets[i].h);
+            applyingPreset = false;
+        }
+        updateSizeEnabled();
+    });
+    auto markCustom = [&]() { if (!applyingPreset) sizeCombo->setCurrentIndex(customIndex); };
+    connect(widthBox,  QOverload<double>::of(&QDoubleSpinBox::valueChanged), &dlg, markCustom);
+    connect(heightBox, QOverload<double>::of(&QDoubleSpinBox::valueChanged), &dlg, markCustom);
+    // Restore the last choice; a preset re-applies its size, "Custom" keeps the saved one
+    sizeCombo->setCurrentIndex(qBound(0, settings.value("export/sizePreset", 4).toInt(), customIndex));
+    updateSizeEnabled();
+
+    if (dlg.exec() != QDialog::Accepted) return;
+
+    const int dpi = dpiCombo->currentText().toInt();
+    const bool onScreen = sizeCombo->currentIndex() == 0;
+    const QSizeF sizeInches = onScreen ? QSizeF() : QSizeF(widthBox->value(), heightBox->value());
+    settings.setValue("export/sizePreset", sizeCombo->currentIndex());
+    settings.setValue("export/widthIn", widthBox->value());
+    settings.setValue("export/heightIn", heightBox->value());
+    settings.setValue("export/dpi", dpiCombo->currentText());
+    settings.setValue("export/includeLegend", legendCheck->isChecked());
 
     bool isScatterTab = (m_tabWidget && m_tabWidget->currentIndex() == 2);
     PlotWidget *activeWidget = (isScatterTab && m_scatterPlotWidget) ? m_scatterPlotWidget : m_plotWidget;
     if (activeWidget) {
-        activeWidget->exportPlot(fileName, format, dpi);
+        activeWidget->exportPlot(fileName, format, dpi, sizeInches, legendCheck->isChecked());
+        QString sizeText = onScreen ? QString()
+            : QString(" at %1 x %2 in").arg(sizeInches.width()).arg(sizeInches.height());
         m_statusWidget->showSuccess(format == "PDF"
-            ? "Plot exported as vector PDF"
-            : QString("Plot exported at %1 DPI").arg(dpi));
+            ? "Plot exported as vector PDF" + sizeText
+            : QString("Plot exported%1, %2 DPI").arg(sizeText).arg(dpi));
     }
 }
 
@@ -1220,6 +1305,9 @@ QT_QPA_PLATFORM_PLUGIN_PATH=/opt/homebrew/Cellar/qt/&lt;version&gt;/share/qt/plu
   <tr><td><code>--yvar</code></td><td><code>VAR1,VAR2</code></td><td>Pre-select one or more Y variables (comma-separated)</td></tr>
   <tr><td><code>--save</code></td><td><code>plot.png</code></td><td>Render and save the plot image, then exit (headless)</td></tr>
   <tr><td><code>--metrics</code></td><td><code>metrics.csv</code></td><td>Save time-series metrics to CSV (use with <code>--save</code>)</td></tr>
+  <tr><td><code>--size</code></td><td><code>4.1x2.9</code></td><td>Figure size in inches for <code>--save</code>; fonts keep their point size (e.g. <code>4.1x2.9</code> = 6 per slide)</td></tr>
+  <tr><td><code>--no-legend</code></td><td>—</td><td>Save the plot without its legend (the Y axis is titled with the variable instead)</td></tr>
+  <tr><td><code>--legend-inside</code></td><td>—</td><td>Float the legend over the plot's lower-right corner (docked beside it if it does not fit)</td></tr>
   <tr><td><code>--boxplot</code></td><td>—</td><td>Render as a box plot (OSU seasonal files)</td></tr>
   <tr><td><code>--grid</code></td><td>—</td><td>Tile an experiment&nbsp;&times;&nbsp;variable grid (rows = experiments, columns = variables)</td></tr>
   <tr><td><code>--scatter</code></td><td>—</td><td>Headless scatter plot mode (requires EVALUATE.OUT)</td></tr>

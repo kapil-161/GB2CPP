@@ -4,6 +4,7 @@
 #include <QObject>
 #include <QString>
 #include <QStringList>
+#include <QSizeF>
 #include <QTimer>
 #include "DataProcessor.h"
 
@@ -21,6 +22,9 @@ struct CommandLineArgs {
     QStringList yVars;          // --yvar LAID,TOPMD
     QString savePlotPath;       // --save plot.png
     QString saveMetricsPath;    // --metrics metrics.csv
+    QSizeF saveSizeInches;      // --size 4.1x2.9 : figure size in inches (empty = default canvas)
+    bool saveLegend = true;     // --no-legend : export without the legend
+    bool legendInside = false;  // --legend-inside : float the legend over the plot
     bool headlessMode = false;  // true when --save is present
 
     // Scatter headless mode

@@ -162,7 +162,8 @@ public:
     explicit LegendSampleWidget(bool hasSymbol = false, const QPen& pen = QPen(), 
                                const QString& symbol = QString(), const QBrush& brush = QBrush(),
                                const QString& tooltip = QString(), QWidget* parent = nullptr);
-    
+    bool hasSymbol() const { return m_hasSymbol; }  // true = observed marker, false = simulated line
+
 protected:
     void paintEvent(QPaintEvent* event) override;
     
@@ -237,8 +238,15 @@ public:
     QString getPlotCSV() const;
     QString getPlotRCode() const;  // ggplot2 R script reproducing the current plot
     QString getScatterCSV() const; // CSV export for multi-panel scatter (VARIABLE,EXPERIMENT,SIMULATED,MEASURED)
-    void exportPlot(const QString &filePath, const QString &format = "PNG", int dpi = 300);
+    // sizeInches: physical figure size; the plot is laid out at that size so fonts keep
+    // their point size when the figure is placed small (e.g. 6 panels on a slide).
+    // Empty = export at the current on-screen size. includeLegend=false drops the legend
+    // (e.g. for a multi-panel slide that carries one shared legend).
+    void exportPlot(const QString &filePath, const QString &format = "PNG", int dpi = 300,
+                    QSizeF sizeInches = QSizeF(), bool includeLegend = true);
     void exportPlotComposite(const QString &filePath, const QString &format, int width, int height, int dpi);
+    // Float the legend over the plot area's bottom-right corner, as if the user dragged it there
+    void floatLegendInPlot();
     void copyPlotToClipboard();  // Copy plot to clipboard
     QPixmap cropToContent(const QPixmap &source);
     void renderLegendContent(QPainter *painter, const QRect &rect);
@@ -384,6 +392,7 @@ private:
     // Draggable legend
     void floatLegend();
     void dockLegend();
+    void fitFloatingLegendHeight();
 
     // Legacy functions (kept for compatibility)
     void createLegendHeader();

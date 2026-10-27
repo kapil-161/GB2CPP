@@ -42,6 +42,19 @@ CommandLineArgs CommandLineHandler::parseCommandLineArgs(const QStringList &args
                 result.headlessMode = true;
             } else if (tok == "--metrics" && i + 1 < tokens.size()) {
                 result.saveMetricsPath = tokens[++i];
+            } else if (tok == "--size" && i + 1 < tokens.size()) {
+                const QStringList wh = tokens[++i].split(QRegularExpression("[xX]"));
+                bool okW = false, okH = false;
+                const double w = wh.value(0).toDouble(&okW);
+                const double h = wh.value(1).toDouble(&okH);
+                if (wh.size() == 2 && okW && okH && w > 0 && h > 0)
+                    result.saveSizeInches = QSizeF(w, h);
+                else
+                    qWarning() << "Ignoring --size, expected WIDTHxHEIGHT in inches:" << tokens[i];
+            } else if (tok == "--no-legend") {
+                result.saveLegend = false;
+            } else if (tok == "--legend-inside") {
+                result.legendInside = true;
             } else if (tok == "--boxplot") {
                 result.boxPlotMode = true;
             } else if (tok == "--grid") {
@@ -367,8 +380,12 @@ void CommandLineHandler::headlessAutoPlot()
             // if the save path ends in .pdf) via the publication-quality path
             plot->resize(1200, 800);
             QApplication::processEvents(QEventLoop::AllEvents, 500);
+            if (m_args.legendInside) {
+                plot->floatLegendInPlot();
+                QApplication::processEvents(QEventLoop::AllEvents, 500);
+            }
             QFile::remove(m_args.savePlotPath);
-            plot->exportPlot(m_args.savePlotPath, "PNG", 300);
+            plot->exportPlot(m_args.savePlotPath, "PNG", 300, m_args.saveSizeInches, m_args.saveLegend);
             if (!QFileInfo::exists(m_args.savePlotPath)) {
                 qCritical() << "CommandLineHandler (headless): plot export failed:" << m_args.savePlotPath;
                 code = ExitExportFailed;
@@ -472,7 +489,7 @@ void CommandLineHandler::runScatterPlot(const DataTable &evalData)
             p->show();
             QApplication::processEvents(QEventLoop::AllEvents, 500);
             QFile::remove(m_args.savePlotPath);
-            p->exportPlot(m_args.savePlotPath, "PNG");
+            p->exportPlot(m_args.savePlotPath, "PNG", 300, m_args.saveSizeInches, m_args.saveLegend);
             if (!QFileInfo::exists(m_args.savePlotPath)) {
                 qCritical() << "CommandLineHandler (headless): plot export failed:" << m_args.savePlotPath;
                 code = ExitExportFailed;
