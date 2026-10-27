@@ -99,3 +99,6 @@ manual_deployment/*
 # Test files with API keys
 test_api.py
 test_gemini.py
+# Office documents (outlines, demo decks) - kept locally, not in the repo
+*.pptx
+*.docx
