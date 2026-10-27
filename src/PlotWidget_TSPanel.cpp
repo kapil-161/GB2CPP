@@ -357,8 +357,12 @@ void PlotWidget::resizeTimeSeriesPanels()
                                 : m_leftContainer->height();
     if (availW < 50) availW = width() - 150;
     if (availH < 50) availH = height() - 20;
-    if (availW < 300) availW = 800;
-    if (availH < 200) availH = 600;
+    // On screen, a viewport too small for panels means it is not laid out yet. A sized
+    // export can legitimately be that small (e.g. 6 figures per slide), so keep it.
+    if (!m_fitPanelsForExport) {
+        if (availW < 300) availW = 800;
+        if (availH < 200) availH = 600;
+    }
 
     // Vertical experiment-header column (grid mode only) reserves a fixed strip at col 0.
     int headerW = m_tsGridHasHeaders ? 26 : 0;
@@ -366,17 +370,23 @@ void PlotWidget::resizeTimeSeriesPanels()
 
     // Landscape panels: divide available space by visible rows only (max 3 rows shown at once).
     // Extra rows scroll — this prevents panels from shrinking when many variables are selected.
-    int visibleRows = qMin(nRows, 3);
+    // A sized export cannot scroll, so there every row shares the figure height.
+    int visibleRows = m_fitPanelsForExport ? nRows : qMin(nRows, 3);
     int panelW = (availW - margins - headerW - spacing * (totalCols - 1)) / nCols;
     int panelH = (availH - margins - spacing * (visibleRows - 1)) / visibleRows;
 
-    // Enforce a minimum and a 3:2 ratio (width:height)
-    panelW = qMax(panelW, 260);
-    panelH = qMax(panelH, 160);
+    if (m_fitPanelsForExport) {
+        panelW = qMax(panelW, 60);
+        panelH = qMax(panelH, 60);
+    } else {
+        // Enforce a minimum and a 3:2 ratio (width:height)
+        panelW = qMax(panelW, 260);
+        panelH = qMax(panelH, 160);
 
-    // When only one column, don't make panels unnecessarily tall
-    if (nCols == 1)
-        panelH = qMin(panelH, panelW * 2 / 3);
+        // When only one column, don't make panels unnecessarily tall
+        if (nCols == 1)
+            panelH = qMin(panelH, panelW * 2 / 3);
+    }
 
     for (int i = 0; i < m_tsPanelGrid->count(); ++i) {
         QLayoutItem *item = m_tsPanelGrid->itemAt(i);

@@ -25,6 +25,8 @@
 #include <QDialogButtonBox>
 #include <QInputDialog>
 #include <QFormLayout>
+#include <QHBoxLayout>
+#include <QVBoxLayout>
 #include <QComboBox>
 #include <QDoubleSpinBox>
 #include <QCheckBox>
@@ -950,10 +952,29 @@ void MainWindow::onExportPlot()
     const int nPresets = int(sizeof(presets) / sizeof(presets[0]));
     const int customIndex = nPresets - 1;
 
+    bool isScatterTab = (m_tabWidget && m_tabWidget->currentIndex() == 2);
+    PlotWidget *activeWidget = (isScatterTab && m_scatterPlotWidget) ? m_scatterPlotWidget : m_plotWidget;
+
     QSettings settings("DSSAT", "GB2");
     QDialog dlg(this);
     dlg.setWindowTitle("Export Plot");
-    auto *form = new QFormLayout(&dlg);
+    // Settings on the left, live preview of the exported figure on the right
+    auto *outer = new QHBoxLayout(&dlg);
+    auto *formHost = new QWidget(&dlg);
+    auto *form = new QFormLayout(formHost);
+    form->setContentsMargins(0, 0, 0, 0);
+    outer->addWidget(formHost, 0, Qt::AlignTop);
+    const QSize previewArea(560, 420);
+    auto *previewLabel = new QLabel(&dlg);
+    previewLabel->setFixedSize(previewArea);
+    previewLabel->setAlignment(Qt::AlignCenter);
+    previewLabel->setStyleSheet("QLabel { background-color: #E4E8ED; border: 1px solid #C9D6DF; }");
+    auto *previewCaption = new QLabel(&dlg);
+    previewCaption->setStyleSheet("color: gray;");
+    auto *previewColumn = new QVBoxLayout();
+    previewColumn->addWidget(previewLabel);
+    previewColumn->addWidget(previewCaption);
+    outer->addLayout(previewColumn);
     auto *sizeCombo = new QComboBox(&dlg);
     for (const SizePreset &p : presets) sizeCombo->addItem(p.label);
     auto makeInchBox = [&dlg](double value) {
@@ -1011,7 +1032,48 @@ void MainWindow::onExportPlot()
     sizeCombo->setCurrentIndex(qBound(0, settings.value("export/sizePreset", 4).toInt(), customIndex));
     updateSizeEnabled();
 
+    // Live preview: render the figure exactly as it will be exported, shortly after the
+    // last change (rendering re-lays out the plot, so typing is not re-rendered per key)
+    QTimer previewTimer;
+    previewTimer.setSingleShot(true);
+    previewTimer.setInterval(250);
+    bool previewRendering = false;
+    auto refreshPreview = [&]() {
+        if (!activeWidget) { previewCaption->setText("No plot to preview"); return; }
+        // Rendering processes events; a change arriving meanwhile re-renders afterwards
+        if (previewRendering) { previewTimer.start(); return; }
+        previewRendering = true;
+        previewCaption->setText("Updating preview...");
+        const bool onScreenSize = sizeCombo->currentIndex() == 0;
+        const QSizeF size = onScreenSize ? QSizeF() : QSizeF(widthBox->value(), heightBox->value());
+        const qreal dpr = dlg.devicePixelRatioF();
+        QImage img = activeWidget->renderExportPreview(size, legendCheck->isChecked(), qRound(96 * dpr));
+        previewRendering = false;
+        if (img.isNull()) { previewCaption->setText("Preview unavailable"); return; }
+        // At 96 logical px per inch the figure shows at its real size when it fits
+        const QSizeF figurePx = QSizeF(img.size()) / dpr;
+        const double fit = qMin(1.0, qMin(previewArea.width()  / figurePx.width(),
+                                          previewArea.height() / figurePx.height()));
+        QPixmap pm = QPixmap::fromImage(img.scaled((figurePx * fit * dpr).toSize(),
+                                                   Qt::KeepAspectRatio, Qt::SmoothTransformation));
+        pm.setDevicePixelRatio(dpr);
+        previewLabel->setPixmap(pm);
+        const QString inches = QString("%1 x %2 in").arg(figurePx.width() / 96.0, 0, 'f', 1)
+                                                    .arg(figurePx.height() / 96.0, 0, 'f', 1);
+        previewCaption->setText(fit >= 0.999
+            ? QString("Preview at actual size (%1)").arg(inches)
+            : QString("Preview scaled to %1% (%2)").arg(qRound(fit * 100)).arg(inches));
+    };
+    connect(&previewTimer, &QTimer::timeout, &dlg, refreshPreview);
+    auto schedulePreview = [&]() { previewTimer.start(); };
+    connect(sizeCombo, QOverload<int>::of(&QComboBox::currentIndexChanged), &dlg, schedulePreview);
+    connect(widthBox,  QOverload<double>::of(&QDoubleSpinBox::valueChanged), &dlg, schedulePreview);
+    connect(heightBox, QOverload<double>::of(&QDoubleSpinBox::valueChanged), &dlg, schedulePreview);
+    connect(legendCheck, &QCheckBox::toggled, &dlg, schedulePreview);
+    QTimer::singleShot(0, &dlg, schedulePreview);  // first preview once the dialog is shown
+
     if (dlg.exec() != QDialog::Accepted) return;
+    previewTimer.stop();
 
     const int dpi = dpiCombo->currentText().toInt();
     const bool onScreen = sizeCombo->currentIndex() == 0;
@@ -1022,8 +1084,6 @@ void MainWindow::onExportPlot()
     settings.setValue("export/dpi", dpiCombo->currentText());
     settings.setValue("export/includeLegend", legendCheck->isChecked());
 
-    bool isScatterTab = (m_tabWidget && m_tabWidget->currentIndex() == 2);
-    PlotWidget *activeWidget = (isScatterTab && m_scatterPlotWidget) ? m_scatterPlotWidget : m_plotWidget;
     if (activeWidget) {
         activeWidget->exportPlot(fileName, format, dpi, sizeInches, legendCheck->isChecked());
         QString sizeText = onScreen ? QString()

@@ -36,14 +36,18 @@ void PlotWidget::resizeScatterPanels()
                                      : m_leftContainer->height();
     if (availW < 50) availW = width() - 150;
     if (availH < 50) availH = height() - 20;
-    if (availW < 200) availW = 700;
-    if (availH < 200) availH = 600;
+    // On screen a tiny viewport means it is not laid out yet; a sized export can
+    // legitimately be that small, and its panels must fit it (no scrolling)
+    if (!m_fitPanelsForExport) {
+        if (availW < 200) availW = 700;
+        if (availH < 200) availH = 600;
+    }
 
     int sideW = (availW - margins - spacing * (nCols - 1)) / nCols;
     int sideH = (availH - margins - spacing * (nRows - 1)) / nRows;
     // Use the smaller of the two so panels fit both axes without scrolling
     int side  = qMin(sideW, sideH);
-    if (side < 180) side = 180;
+    side = qMax(side, m_fitPanelsForExport ? 80 : 180);
 
     int statsFontPt = qBound(8, side / 28, 13);
     if (m_plotSettings.axisTickFontSize != 9)
@@ -234,21 +238,9 @@ void PlotWidget::plotScatter(
     if (m_scatterScrollArea) m_scatterScrollArea->setVisible(true);
     m_scatterPanelContainer->setVisible(true);
 
-    // --- Determine grid layout ---
-    int n     = vars.size();
-    int nCols, nRows;
-    if      (n == 1) { nCols = 1; nRows = 1; }
-    else if (n == 2) { nCols = 2; nRows = 1; }
-    else if (n == 3) { nCols = 2; nRows = 2; } // 2×2 with one empty cell
-    else if (n == 4) { nCols = 2; nRows = 2; }
-    else if (n <= 6) { nCols = 3; nRows = 2; }
-    else             { nCols = 3; nRows = 3; }
-
-    m_scatterNCols = nCols;
-    m_scatterNRows = nRows;
-
-    // Equal column stretch only — height controlled explicitly
-    for (int c = 0; c < nCols; ++c) m_scatterPanelGrid->setColumnStretch(c, 1);
+    // Panels are placed once all are built: a variable without data is skipped, and the
+    // grid must be sized by the panels that exist, or skipped ones leave empty cells
+    QVector<QWidget*> builtPanels;
 
     // Initial size: use a reasonable default; resizeScatterPanels() will correct it
     // once the widget is actually laid out (deferred via QTimer below)
@@ -527,9 +519,7 @@ void PlotWidget::plotScatter(
         auto *repo = new Repositioner(cvRef, labelRef, cvRef);
         cvRef->installEventFilter(repo);
 
-        int row = vi / nCols;
-        int col = vi % nCols;
-        m_scatterPanelGrid->addWidget(panelWidget, row, col);
+        builtPanels.append(panelWidget);
         m_scatterPanelViews.append(cv);
 
         // Collect full metrics for dialog
@@ -558,6 +548,24 @@ void PlotWidget::plotScatter(
         mmap["Experiment"] = expOrder.size() == 1 ? QVariant(expOrder.first()) : QVariant("All");
         allMetrics.append(mmap);
     }
+
+    // --- Determine grid layout from the panels actually built ---
+    const int n = int(builtPanels.size());
+    int nCols, nRows;
+    if      (n <= 1) { nCols = 1; nRows = 1; }
+    else if (n == 2) { nCols = 2; nRows = 1; }
+    else if (n == 3) { nCols = 2; nRows = 2; } // 2×2 with one empty cell
+    else if (n == 4) { nCols = 2; nRows = 2; }
+    else if (n <= 6) { nCols = 3; nRows = 2; }
+    else             { nCols = 3; nRows = (n + 2) / 3; }
+
+    m_scatterNCols = nCols;
+    m_scatterNRows = nRows;
+
+    // Equal column stretch only — height controlled explicitly
+    for (int c = 0; c < nCols; ++c) m_scatterPanelGrid->setColumnStretch(c, 1);
+    for (int i = 0; i < n; ++i)
+        m_scatterPanelGrid->addWidget(builtPanels[i], i / nCols, i % nCols);
 
     // Defer panel resize until after the layout is complete and widget has real dimensions
     QTimer::singleShot(0, this, [this]() { resizeScatterPanels(); });

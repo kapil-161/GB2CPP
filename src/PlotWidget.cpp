@@ -3620,16 +3620,20 @@ static BottomLegendLayout layoutBottomLegend(const QVector<BottomLegendEntry> &e
 }
 
 static void paintBottomLegend(QPainter *p, const QVector<BottomLegendEntry> &entries,
-                              const BottomLegendLayout &L, const QRectF &area)
+                              const BottomLegendLayout &L, const QRectF &area,
+                              const QColor &background)
 {
     if (entries.isEmpty()) return;
     p->save();
-    p->setFont(L.font);
-    p->setPen(Qt::black);
     QFontMetrics fm(L.font);
     const int blockW = L.cols * L.cellW - kLegendColumnGap;
     const double x0 = area.left() + qMax(0.0, (area.width() - blockW) / 2.0);
     const double y0 = area.top() + 5;
+    // Legend background colour from Plot Settings (transparent by default)
+    if (background.alpha() > 0)
+        p->fillRect(QRectF(x0 - 6, y0 - 3, blockW + 12, L.rows * L.lineH + 6), background);
+    p->setFont(L.font);
+    p->setPen(Qt::black);
     for (int i = 0; i < entries.size(); ++i) {
         // Fill down the columns so the legend keeps the on-screen treatment order
         const int col = i / L.rows, row = i % L.rows;
@@ -3646,6 +3650,53 @@ static void paintBottomLegend(QPainter *p, const QVector<BottomLegendEntry> &ent
                     fm.elidedText(entries[i].label, Qt::ElideRight, L.textW + 2));
     }
     p->restore();
+}
+
+// Smallest "nice" step (1, 2, 2.5 or 5 x 10^n) that is at least x
+static double niceStepAtLeast(double x)
+{
+    if (x <= 0) return 1.0;
+    const double mag = std::pow(10.0, std::floor(std::log10(x)));
+    const double f = x / mag;
+    return (f <= 1.0 ? 1.0 : f <= 2.0 ? 2.0 : f <= 2.5 ? 2.5 : f <= 5.0 ? 5.0 : 10.0) * mag;
+}
+
+struct SavedValueAxisTicks {
+    QValueAxis *axis;
+    QValueAxis::TickType type;
+    int count;
+    double interval, anchor;
+};
+
+// On a small figure a value axis can have more labels than fit, so the numbers run
+// together. Space such axes at a round interval with only as many labels as fit.
+static void thinCrowdedValueAxes(QChart *chart, QList<SavedValueAxisTicks> &saved)
+{
+    const QRectF pa = chart->plotArea();
+    for (QAbstractAxis *ax : chart->axes()) {
+        auto *va = qobject_cast<QValueAxis*>(ax);
+        if (!va || !va->labelsVisible() || va->max() <= va->min()) continue;
+        const bool horizontal = va->orientation() == Qt::Horizontal;
+        const double length = horizontal ? pa.width() : pa.height();
+        if (length <= 0) continue;
+        QFontMetrics fm(va->labelsFont());
+        auto labelText = [&](double v) {
+            const QString fmt = va->labelFormat();
+            return fmt.isEmpty() ? QString::number(v) : QString::asprintf(fmt.toLatin1().constData(), v);
+        };
+        const int labelSize = horizontal
+            ? qMax(fm.horizontalAdvance(labelText(va->min())), fm.horizontalAdvance(labelText(va->max()))) + 12
+            : fm.height() + 4;
+        const int shown = va->tickType() == QValueAxis::TicksDynamic && va->tickInterval() > 0
+            ? int((va->max() - va->min()) / va->tickInterval()) + 1 : va->tickCount();
+        const int fits = qMax(2, int(length / labelSize) + 1);
+        if (shown <= fits) continue;
+        saved.append({ va, va->tickType(), va->tickCount(), va->tickInterval(), va->tickAnchor() });
+        const double step = niceStepAtLeast((va->max() - va->min()) / (fits - 1));
+        va->setTickAnchor(std::ceil(va->min() / step) * step);
+        va->setTickInterval(step);
+        va->setTickType(QValueAxis::TicksDynamic);
+    }
 }
 
 // Plain-text lines of the metrics overlay, one per variable ("RMSE = 820.7   d = 0.979").
@@ -3724,8 +3775,15 @@ static void paintMetricsBlock(QPainter *p, const QStringList &lines, const QFont
     p->restore();
 }
 
+QImage PlotWidget::renderExportPreview(QSizeF sizeInches, bool includeLegend, int dpi)
+{
+    QImage image;
+    exportPlot(QString(), "PNG", dpi, sizeInches, includeLegend, &image);
+    return image;
+}
+
 void PlotWidget::exportPlot(const QString &filePath, const QString &format, int dpi,
-                            QSizeF sizeInches, bool includeLegend)
+                            QSizeF sizeInches, bool includeLegend, QImage *previewOut)
 {
     if (!this) return;
 
@@ -3838,7 +3896,21 @@ void PlotWidget::exportPlot(const QString &filePath, const QString &format, int 
     const QSize savedMaxSize = maximumSize();
     const QByteArray savedWindowGeometry = resizeForExport ? window()->saveGeometry() : QByteArray();
     const QSize preExportSize = size();
+    // Multi-panel time series: fit every panel into the figure instead of scrolling
+    const Qt::ScrollBarPolicy savedTsVPolicy = m_tsScrollArea ? m_tsScrollArea->verticalScrollBarPolicy()
+                                                              : Qt::ScrollBarAsNeeded;
+    const Qt::ScrollBarPolicy savedTsHPolicy = m_tsScrollArea ? m_tsScrollArea->horizontalScrollBarPolicy()
+                                                              : Qt::ScrollBarAsNeeded;
+    const Qt::ScrollBarPolicy savedScatterVPolicy = m_scatterScrollArea
+        ? m_scatterScrollArea->verticalScrollBarPolicy() : Qt::ScrollBarAsNeeded;
     if (resizeForExport) {
+        m_fitPanelsForExport = true;
+        if (m_tsScrollArea) {
+            m_tsScrollArea->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+            m_tsScrollArea->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+        }
+        if (m_scatterScrollArea)
+            m_scatterScrollArea->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
         setFixedSize(canvasSize.width(), canvasSize.height() - (bottomLegend ? bottomLayout.height : 0));
         // Twice: resizeEvent defers the multi-panel grid refit to the next event cycle
         QApplication::processEvents();
@@ -3872,16 +3944,23 @@ void PlotWidget::exportPlot(const QString &filePath, const QString &format, int 
         savedDateTitle  = exportDateAxis->titleText();
         const QDateTime dMin = exportDateAxis->min(), dMax = exportDateAxis->max();
         const bool oneYear = dMin.date().year() == dMax.date().year();
-        // Within one calendar year the year moves to the axis title, e.g. "DATE (2002)"
+        // Within one calendar year the year moves to the axis title, e.g. "DATE (2002)";
+        // a title the user typed in Plot Settings is left as written
         const QString fmt = oneYear ? "d MMM" : "MMM yyyy";
         exportDateAxis->setFormat(fmt);
-        if (oneYear && !savedDateTitle.isEmpty())
+        if (oneYear && !savedDateTitle.isEmpty() && m_plotSettings.xAxisTitle.isEmpty())
             exportDateAxis->setTitleText(QString("%1 (%2)").arg(savedDateTitle).arg(dMin.date().year()));
         QFontMetrics fm(exportDateAxis->labelsFont());
         const int labelW = fm.horizontalAdvance(QDateTime(QDate(2000, 12, 28), QTime()).toString(fmt));
         const double plotW = m_chart->plotArea().width();
         exportDateAxis->setTickCount(qBound(2, int(plotW / (labelW + 24)) + 1, 10));
         QApplication::processEvents();
+    }
+    QList<SavedValueAxisTicks> savedValueTicks;
+    if (resizeForExport) {
+        for (QChartView *cv : findChildren<QChartView*>())
+            if (cv->chart() && cv->isVisible()) thinCrowdedValueAxes(cv->chart(), savedValueTicks);
+        if (!savedValueTicks.isEmpty()) QApplication::processEvents();
     }
     // adjustSize() measures the polished label; its preset size can under-measure and
     // cut off the last value. If the metrics could not be moved above the plot, pin the
@@ -3904,6 +3983,13 @@ void PlotWidget::exportPlot(const QString &filePath, const QString &format, int 
             m_tsMetricsOverlay->setVisible(overlayWasVisible);
         }
         if (!resizeForExport) return;
+        m_fitPanelsForExport = false;
+        if (m_tsScrollArea) {
+            m_tsScrollArea->setVerticalScrollBarPolicy(savedTsVPolicy);
+            m_tsScrollArea->setHorizontalScrollBarPolicy(savedTsHPolicy);
+        }
+        if (m_scatterScrollArea)
+            m_scatterScrollArea->setVerticalScrollBarPolicy(savedScatterVPolicy);
         if (legendWasFloating) {
             if (m_legendResizeBottom) m_legendResizeBottom->show();
             m_legendPanel->setGeometry(savedLegendGeometry);
@@ -3917,6 +4003,15 @@ void PlotWidget::exportPlot(const QString &filePath, const QString &format, int 
         window()->restoreGeometry(savedWindowGeometry);
         QApplication::processEvents();
         if (exportDateAxis) exportDateAxis->setTickCount(calculateOptimalDateTickCount());
+        for (const auto &t : savedValueTicks) {
+            t.axis->setTickType(t.type);
+            t.axis->setTickInterval(t.interval);
+            t.axis->setTickAnchor(t.anchor);
+            t.axis->setTickCount(t.count);
+        }
+        if (m_tsPanelContainer && m_tsPanelContainer->isVisible()) resizeTimeSeriesPanels();
+        if (m_isScatterMode && m_scatterPanelContainer && m_scatterPanelContainer->isVisible())
+            resizeScatterPanels();
     };
 
     // Plot area in widget-logical coordinates, for positioning the inside legend
@@ -3933,13 +4028,37 @@ void PlotWidget::exportPlot(const QString &filePath, const QString &format, int 
         metricsRect = leastCrowdedCorner(m_chart, m_chartView->mapTo(this, QPoint(0, 0)),
                                          metricsBlockSize(metricsLines, metricsFont));
 
+    // Multi-panel metrics chips get the same treatment, per panel
+    struct PanelMetrics { QStringList lines; QRectF rect; };
+    QVector<PanelMetrics> panelMetrics;
+    QList<QLabel*> hiddenPanelChips;
+    if (resizeForExport) {
+        for (QLabel *chip : m_tsPanelOverlays) {
+            if (!chip || !chip->isVisible() || chip->text().trimmed().isEmpty()) continue;
+            QChartView *cv = qobject_cast<QChartView*>(chip->parentWidget());
+            if (!cv && chip->parentWidget()) cv = chip->parentWidget()->findChild<QChartView*>();
+            if (!cv || !cv->chart() || !cv->isVisible()) continue;
+            const QPoint offset = cv->mapTo(this, QPoint(0, 0));
+            QStringList lines = chip->text().split('\n', Qt::SkipEmptyParts);
+            for (QString &l : lines) l = l.trimmed();
+            // One line if it fits the plot width, else one metric per line
+            const QStringList oneLine{ lines.join("   ") };
+            if (metricsBlockSize(oneLine, metricsFont).width() <= cv->chart()->plotArea().width() - 8)
+                lines = oneLine;
+            panelMetrics.append({ lines, leastCrowdedCorner(cv->chart(), offset,
+                                                            metricsBlockSize(lines, metricsFont)) });
+            chip->hide();
+            hiddenPanelChips.append(chip);
+        }
+    }
+
     auto restoreLegendForOverlay = [&]() {
         if (m_legendStack) m_legendStack->setVisible(legendStackWasVisible);
         QApplication::processEvents();
     };
 
     bool ok = false;
-    if (filePath.endsWith(".pdf", Qt::CaseInsensitive)) {
+    if (!previewOut && filePath.endsWith(".pdf", Qt::CaseInsensitive)) {
         // Verify the path is writable before handing to QPdfWriter
         QFile testFile(filePath);
         if (!testFile.open(QIODevice::WriteOnly)) {
@@ -3948,6 +4067,7 @@ void PlotWidget::exportPlot(const QString &filePath, const QString &format, int 
             if (m_bottomStatusWidget) m_bottomStatusWidget->setVisible(statusWasVisible);
             if (m_legendPanel) m_legendPanel->setVisible(legendPanelWasVisible);
             if (m_legendHandle) m_legendHandle->setVisible(legendHandleWasVisible);
+            for (QLabel *chip : hiddenPanelChips) chip->show();
             restoreExportSize();
             QMessageBox::critical(nullptr, "Export Failed",
                 QString("Cannot write to:\n%1\n\n%2").arg(filePath, testFile.errorString()));
@@ -3980,9 +4100,12 @@ void PlotWidget::exportPlot(const QString &filePath, const QString &format, int 
                          QWidget::DrawWindowBackground | QWidget::DrawChildren);
             if (metricsRect.isValid())
                 paintMetricsBlock(&pdfPainter, metricsLines, metricsFont, metricsRect);
+            for (const auto &pm : panelMetrics)
+                paintMetricsBlock(&pdfPainter, pm.lines, metricsFont, pm.rect);
             if (bottomLegend)
                 paintBottomLegend(&pdfPainter, bottomEntries, bottomLayout,
-                                  QRectF(0, height(), canvasSize.width(), bottomLayout.height));
+                                  QRectF(0, height(), canvasSize.width(), bottomLayout.height),
+                                  m_plotSettings.legendBackgroundColor);
             if (insideLegend) {
                 restoreLegendForOverlay();
                 overlayLegend(&pdfPainter, m_legendWidget, m_plotSettings.legendPosition,
@@ -4006,9 +4129,12 @@ void PlotWidget::exportPlot(const QString &filePath, const QString &format, int 
             this->render(&painter);
             if (metricsRect.isValid())
                 paintMetricsBlock(&painter, metricsLines, metricsFont, metricsRect);
+            for (const auto &pm : panelMetrics)
+                paintMetricsBlock(&painter, pm.lines, metricsFont, pm.rect);
             if (bottomLegend)
                 paintBottomLegend(&painter, bottomEntries, bottomLayout,
-                                  QRectF(0, height(), canvasSize.width(), bottomLayout.height));
+                                  QRectF(0, height(), canvasSize.width(), bottomLayout.height),
+                                  m_plotSettings.legendBackgroundColor);
             if (insideLegend) {
                 restoreLegendForOverlay();
                 overlayLegend(&painter, m_legendWidget, m_plotSettings.legendPosition,
@@ -4024,7 +4150,12 @@ void PlotWidget::exportPlot(const QString &filePath, const QString &format, int 
         image.setDotsPerMeterY(dotsPerMeter);
         const int quality = (format.compare("JPG", Qt::CaseInsensitive) == 0 ||
                              format.compare("JPEG", Qt::CaseInsensitive) == 0) ? 95 : -1;
-        ok = image.save(filePath, format.toUtf8().constData(), quality);
+        if (previewOut) {
+            *previewOut = image;
+            ok = true;
+        } else {
+            ok = image.save(filePath, format.toUtf8().constData(), quality);
+        }
     }
 
     if (m_legendStack) m_legendStack->setVisible(legendStackWasVisible);
@@ -4032,6 +4163,7 @@ void PlotWidget::exportPlot(const QString &filePath, const QString &format, int 
     if (m_bottomStatusWidget) m_bottomStatusWidget->setVisible(statusWasVisible);
     if (m_legendPanel) m_legendPanel->setVisible(legendPanelWasVisible);
     if (m_legendHandle) m_legendHandle->setVisible(legendHandleWasVisible);
+    for (QLabel *chip : hiddenPanelChips) chip->show();
     restoreExportSize();
 
     if (!ok)

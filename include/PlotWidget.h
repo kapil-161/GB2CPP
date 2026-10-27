@@ -242,8 +242,12 @@ public:
     // their point size when the figure is placed small (e.g. 6 panels on a slide).
     // Empty = export at the current on-screen size. includeLegend=false drops the legend
     // (e.g. for a multi-panel slide that carries one shared legend).
+    // previewOut: render into this image instead of writing filePath (export dialog preview)
     void exportPlot(const QString &filePath, const QString &format = "PNG", int dpi = 300,
-                    QSizeF sizeInches = QSizeF(), bool includeLegend = true);
+                    QSizeF sizeInches = QSizeF(), bool includeLegend = true,
+                    QImage *previewOut = nullptr);
+    // The figure exactly as exportPlot would produce it, for a live preview
+    QImage renderExportPreview(QSizeF sizeInches, bool includeLegend, int dpi = 150);
     void exportPlotComposite(const QString &filePath, const QString &format, int width, int height, int dpi);
     // Float the legend over the plot area's bottom-right corner, as if the user dragged it there
     void floatLegendInPlot();
@@ -591,6 +595,7 @@ private:
     // (experiment, variable) so the async metrics refresh can place per-cell chips.
     QVector<QPair<QString,QString>> m_tsGridCells;
     bool m_tsGridHasHeaders = false;  // grid mode adds a vertical experiment-header column at col 0
+    bool m_fitPanelsForExport = false;  // sized export: every panel (time series or scatter) must fit the figure, no scrolling
     int m_tsNCols = 1;
     int m_tsNRows = 1;
 
