@@ -1380,7 +1380,7 @@ QT_QPA_PLATFORM_PLUGIN_PATH=/opt/homebrew/Cellar/qt/&lt;version&gt;/share/qt/plu
   <tr><td><code>--save</code></td><td><code>plot.png</code></td><td>Render and save the plot image, then exit (headless)</td></tr>
   <tr><td><code>--metrics</code></td><td><code>metrics.csv</code></td><td>Save time-series metrics to CSV (use with <code>--save</code>)</td></tr>
   <tr><td><code>--size</code></td><td><code>4.1x2.9</code></td><td>Figure size in inches for <code>--save</code>; fonts keep their point size (e.g. <code>4.1x2.9</code> = 6 per slide)</td></tr>
-  <tr><td><code>--no-legend</code></td><td>—</td><td>Save the plot without its legend (the Y axis is titled with the variable instead)</td></tr>
+  <tr><td><code>--no-legend</code></td><td>—</td><td>Save the plot without its legend</td></tr>
   <tr><td><code>--legend-inside</code></td><td>—</td><td>Float the legend over the plot's lower-right corner (docked beside it if it does not fit)</td></tr>
   <tr><td><code>--boxplot</code></td><td>—</td><td>Render as a box plot (OSU seasonal files)</td></tr>
   <tr><td><code>--grid</code></td><td>—</td><td>Tile an experiment&nbsp;&times;&nbsp;variable grid (rows = experiments, columns = variables)</td></tr>

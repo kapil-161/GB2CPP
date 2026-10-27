@@ -3732,7 +3732,7 @@ static void hideSqueezedAxisTitles(QChart *chart, QList<QAbstractAxis*> &hidden)
 }
 
 // Plain-text lines of the metrics overlay, one per variable ("RMSE = 820.7   d = 0.979").
-// With a single variable its name is dropped: the axis title or legend already gives it.
+// dropVariableName: leave the name out when the figure already shows it elsewhere.
 static QStringList metricsLinesFromOverlay(const QString &html, bool dropVariableName)
 {
     static const QRegularExpression rowRe("<tr[^>]*>(.*?)</tr>",
@@ -3884,22 +3884,14 @@ void PlotWidget::exportPlot(const QString &filePath, const QString &format, int 
     QStringList metricsLines;
     const QFont metricsFont(m_plotSettings.fontFamily, m_plotSettings.axisTickFontSize);
     if (resizeForExport && overlayWasVisible && !m_isScatterMode) {
-        metricsLines = metricsLinesFromOverlay(m_tsMetricsOverlay->text(), m_currentYVars.size() == 1);
+        // A single variable's name can be left out of the metrics text only when something
+        // else names it: a Y title from Plot Settings or the side legend's heading
+        const bool sideLegendShown = includeLegend && !bottomLegend && legendPanelWasVisible;
+        const bool variableNamedElsewhere = m_currentYVars.size() == 1
+            && ((m_plotSettings.showAxisTitles && !m_plotSettings.yAxisTitle.isEmpty()) || sideLegendShown);
+        metricsLines = metricsLinesFromOverlay(m_tsMetricsOverlay->text(), variableNamedElsewhere);
         if (!metricsLines.isEmpty())
             m_tsMetricsOverlay->hide();
-    }
-
-    // Without the side legend nothing names the plotted variable; when a single variable
-    // is shown and no Y title is set, title the Y axis with it for this export only
-    QAbstractAxis *autoTitledYAxis = nullptr;
-    if ((!includeLegend || bottomLegend) && !m_isScatterMode && m_chart && m_currentYVars.size() == 1
-        && m_plotSettings.showAxisTitles && m_plotSettings.yAxisTitle.isEmpty()) {
-        const auto yAxes = m_chart->axes(Qt::Vertical);
-        if (yAxes.size() == 1 && yAxes.first()->titleText().isEmpty()) {
-            QPair<QString,QString> vi = DataProcessor::getVariableInfo(m_currentYVars.first());
-            autoTitledYAxis = yAxes.first();
-            autoTitledYAxis->setTitleText(vi.first.isEmpty() ? m_currentYVars.first() : vi.first);
-        }
     }
     // A figure has a plain white background: override the app-wide light-blue widget
     // background (MainWindow stylesheet) and square off the chart's rounded card
@@ -4010,7 +4002,6 @@ void PlotWidget::exportPlot(const QString &filePath, const QString &format, int 
             m_tsMetricsOverlay->hide();
     }
     auto restoreExportSize = [&]() {
-        if (autoTitledYAxis) autoTitledYAxis->setTitleText(QString());
         setStyleSheet(savedStyleSheet);
         for (const auto &cr : savedRoundness) cr.first->setBackgroundRoundness(cr.second);
         for (const auto &at : savedTruncate) at.first->setTruncateLabels(at.second);
